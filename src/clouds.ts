@@ -6,14 +6,13 @@ import {
   Particle,
 } from './types';
 import { sin, cos, max, min, floor, random, randRange } from './math';
-import {
-  playCloudEcho,
-  CloudAudioVoice,
-} from './audio';
+import { playCloudEcho } from './audio';
+
+const THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
 
 export class CloudManager {
   public group: any;
-  public clouds: (CloudData & { voice?: CloudAudioVoice | null; echoed?: boolean })[] = [];
+  public clouds: (CloudData & { echoed?: boolean })[] = [];
   private scene: any;
   private cloudGeom: any;
 
@@ -183,7 +182,7 @@ export class CloudManager {
     }
   }
 
-  public popCloud(c: CloudData & { voice?: CloudAudioVoice | null; echoed?: boolean }): void {
+  public popCloud(c: CloudData & { echoed?: boolean }): void {
     if (c.stabbed) return;
     c.stabbed = true;
     c.popping = true;

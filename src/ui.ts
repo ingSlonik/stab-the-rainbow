@@ -11,11 +11,8 @@ import { getRandomDeathQuip } from './quips';
 
 const DEATH_QUOTES = [
   'Gravity: 1, Unicorn: 0',
-  'You stepped on a missing lane. Newton is weeping.',
   'Rainbow out of order. Please insert 1 cloud.',
-  'Flight capabilities not installed on this horn.',
   'Lost forever in the cyan-deprived astral abyss.',
-  'The laws of optics have left the chat.',
 ];
 
 export interface UIButton {
@@ -27,6 +24,8 @@ export interface UIButton {
   text: string;
   action: () => void;
 }
+
+const THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
 
 export class UIManager {
   public group: any;

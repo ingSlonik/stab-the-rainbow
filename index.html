@@ -5,26 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Stab the Rainbow</title>
-  <script>
-    // Enforce standard WebXR XRWebGLLayer on Meta Quest (matches https://immersive-web.github.io/webxr-samples/immersive-vr-session.html)
-    try {
-      if (typeof XRWebGLBinding !== 'undefined') {
-        delete XRWebGLBinding.prototype.createProjectionLayer;
-        try {
-          Object.defineProperty(XRWebGLBinding.prototype, 'createProjectionLayer', {
-            value: undefined,
-            configurable: true,
-          });
-        } catch (_) {}
-      }
-    } catch (_) {}
-    try {
-      Object.defineProperty(window, 'XRWebGLBinding', {
-        value: undefined,
-        configurable: true,
-      });
-    } catch (_) {}
-  </script>
+  <script src="https://play.js13kgames.com/2026/webxr/aframe.js"></script>
   <link rel="stylesheet" href="./src/style.css">
 </head>
 
@@ -50,7 +31,7 @@
           <span class="btn-icon">⚡</span>
           <span class="btn-text">
             <strong>VR: TY JSI JEDNOROŽEC! (HARD)</strong>
-            <small>POUZE pohybem těla a hlavy • Trhnutí = Bodnutí • Výskok • Hlášky</small>
+            <small>Pohyb těla a hlavy • Trhnutí = Bodnutí • Výskok • Hlášky</small>
           </span>
         </button>
 
@@ -58,13 +39,14 @@
           <span class="btn-icon">💻</span>
           <span class="btn-text">
             <strong>HRÁT NA DESKTOPU</strong>
-            <small>Ovládání myší: Pohyb = řízení • L-klik = STAB • P-klik = SKOK</small>
+            <small>Myš: Pohyb = řízení • L-klik = Bodnutí • P-klik = Skok</small>
           </span>
         </button>
       </div>
 
       <div class="controls-guide">
-        <p>🎯 <strong>VR Módy:</strong> <strong>Easy (Jezdec):</strong> Roh ovládáš rukou (spoušť = bodnutí, grip = skok). <strong>Hard (Jednorožec):</strong> Čistě tělem (úkroky = zatáčení, trhnutí čelem = bodnutí, výskok = skok + hlášky). <strong>Desktop:</strong> Myš / klávesnice.</p>
+        <p>🎯 <strong>Ovládání:</strong> VR Easy: ovladače • VR Hard: pohyby těla • Desktop: myš / klávesnice
+          (šipky/mezerník/S)</p>
       </div>
 
       <div class="bottom-bar">
@@ -94,11 +76,19 @@
     </div>
   </div>
 
-  <script type="module">
-    import * as THREE from 'three';
-    window.THREE = THREE;
-    if (window.bootGame) window.bootGame();
-  </script>
+  <!-- A-Frame Scene -->
+  <a-scene id="game-scene" rainbow-game embedded="false" vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false" renderer="antialias: true; powerPreference: high-performance"
+    fog="type: exponential; color: #180932; density: 0.008">
+    <a-sky color="#040011"></a-sky>
+    <a-light type="ambient" color="#d2dcff" intensity="0.75"></a-light>
+    <a-light type="directional" color="#fff4e0" intensity="1.1" position="5 12 6"></a-light>
+    <a-entity id="rig" position="0 1.45 0">
+      <a-camera id="camera" position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera>
+      <a-entity id="left-controller" oculus-touch-controls="hand: left"></a-entity>
+      <a-entity id="right-controller" oculus-touch-controls="hand: right"></a-entity>
+    </a-entity>
+  </a-scene>
   <script type="module" src="./src/game.ts"></script>
 </body>
 

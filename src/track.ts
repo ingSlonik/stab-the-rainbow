@@ -7,6 +7,8 @@ import {
 } from './types';
 import { sin, cos, max, min, floor, random } from './math';
 
+const THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
+
 export class TrackManager {
   public group: any;
   public laneHealth: number[];

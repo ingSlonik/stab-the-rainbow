@@ -1,23 +1,4 @@
-// Enforce standard WebXR XRWebGLLayer on Meta Quest (matches https://immersive-web.github.io/webxr-samples/immersive-vr-session.html)
-if (typeof window !== 'undefined') {
-  try {
-    if (typeof (window as any).XRWebGLBinding !== 'undefined') {
-      delete (window as any).XRWebGLBinding.prototype.createProjectionLayer;
-      try {
-        Object.defineProperty((window as any).XRWebGLBinding.prototype, 'createProjectionLayer', {
-          value: undefined,
-          configurable: true,
-        });
-      } catch (_) {}
-    }
-  } catch (_) {}
-  try {
-    Object.defineProperty(window, 'XRWebGLBinding', {
-      value: undefined,
-      configurable: true,
-    });
-  } catch (_) {}
-}
+const THREE = (window as any).THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
 
 import {
   GameState,
@@ -49,14 +30,19 @@ import { Player } from './player';
 import { UIManager } from './ui';
 
 export class Game {
+  public sceneEl: any;
   public scene: any;
   public camera: any;
   public renderer: any;
+  public cameraEl: any;
+  public rigEl: any;
+  public leftControllerEl: any;
+  public rightControllerEl: any;
 
-  public track: TrackManager;
-  public clouds: CloudManager;
-  public player: Player;
-  public ui: UIManager;
+  public track!: TrackManager;
+  public clouds!: CloudManager;
+  public player!: Player;
+  public ui!: UIManager;
 
   public state: GameState = GameState.MENU;
   public currentVRMode: VRMode = VRMode.NONE;
@@ -69,323 +55,192 @@ export class Game {
 
   private clock: any;
   private hasWebXR = false;
-  private vrSession: any = null;
-  private skyMesh: any;
-  private hillsGroup: any;
   private prevHeadZ = 0;
-  private prevHeadY = 0;
   private thumbstickDebounce = false;
+  private isReady = false;
 
   // Desktop Pointer state
   private pointerNdcX = 0;
   private pointerNdcY = 0;
   private keysDown: { [k: string]: boolean } = {};
 
-  constructor() {
+  constructor(sceneEl: any) {
+    this.sceneEl = sceneEl;
     this.clock = new THREE.Clock();
 
-    this.initScene();
-    this.initRenderer();
-
-    this.track = new TrackManager(this.scene);
-    this.clouds = new CloudManager(this.scene);
-    this.player = new Player(this.scene, this.camera);
-    this.ui = new UIManager(this.scene, this.camera);
-
-    this.initLighting();
-    this.initWebXR();
     this.initDOM();
     this.initInput();
 
-    window.addEventListener('resize', () => this.onResize());
-
-    // Start main animation loop
-    this.renderer.setAnimationLoop((time: number, frame: any) =>
-      this.loop(time, frame)
-    );
-  }
-
-  private initScene(): void {
-    this.scene = new THREE.Scene();
-
-    this.camera = new THREE.PerspectiveCamera(
-      70,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      200
-    );
-    // Camera default head height & natural downward bird's-eye glance from the clouds
-    this.camera.position.set(0, 1.6, 0);
-    this.camera.rotation.x = -0.10;
-
-    this.initSky();
-  }
-
-  private createMountainRidge(
-    radius: number,
-    baseY: number,
-    peakHeight: number,
-    colorHex: number,
-    freq1: number,
-    freq2: number,
-    phase: number
-  ): any {
-    const segments = 96;
-    const geom = new THREE.BufferGeometry();
-    const pos = new Float32Array((segments + 1) * 2 * 3);
-    const indices: number[] = [];
-
-    for (let i = 0; i <= segments; i++) {
-      const u = i / segments;
-      const angle = u * Math.PI * 2;
-      const x = Math.sin(angle) * radius;
-      const z = Math.cos(angle) * radius;
-
-      const wave =
-        Math.sin(angle * freq1 + phase) * 0.52 +
-        Math.sin(angle * freq2 + phase * 1.6) * 0.36 +
-        Math.cos(angle * 12 + phase) * 0.12;
-      const topY = baseY + wave * peakHeight;
-      const botY = baseY - 65;
-
-      const idx = i * 2;
-      pos[idx * 3] = x;
-      pos[idx * 3 + 1] = topY;
-      pos[idx * 3 + 2] = z;
-
-      pos[(idx + 1) * 3] = x;
-      pos[(idx + 1) * 3 + 1] = botY;
-      pos[(idx + 1) * 3 + 2] = z;
-
-      if (i < segments) {
-        indices.push(idx, idx + 1, idx + 2);
-        indices.push(idx + 2, idx + 1, idx + 3);
-      }
+    if (sceneEl.hasLoaded) {
+      this.setup();
+    } else {
+      sceneEl.addEventListener('loaded', () => this.setup());
     }
-
-    geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geom.setIndex(indices);
-    geom.computeVertexNormals();
-
-    const mat = new THREE.MeshBasicMaterial({
-      color: colorHex,
-      side: THREE.DoubleSide,
-      fog: false,
-    });
-    return new THREE.Mesh(geom, mat);
   }
 
-  private initSky(): void {
-    const cvs = document.createElement('canvas');
-    cvs.width = 16;
-    cvs.height = 256;
-    const ctx = cvs.getContext('2d')!;
+  private setup(): void {
+    if (this.isReady) return;
 
-    const grad = ctx.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0.0, '#040011');
-    grad.addColorStop(0.35, '#150630');
-    grad.addColorStop(0.62, '#2f155c');
-    grad.addColorStop(0.82, '#6c2b7e');
-    grad.addColorStop(0.94, '#b04a75');
-    grad.addColorStop(1.0, '#f28e6b');
+    this.scene = this.sceneEl.object3D;
+    this.renderer = this.sceneEl.renderer;
 
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 16, 256);
+    this.cameraEl = this.sceneEl.querySelector('#camera') || this.sceneEl.camera?.el;
+    this.camera = this.sceneEl.camera || this.cameraEl?.getObject3D('camera');
 
-    const skyTex = new THREE.CanvasTexture(cvs);
-    const skyGeom = new THREE.SphereGeometry(180, 24, 16);
-    const skyMat = new THREE.MeshBasicMaterial({
-      map: skyTex,
-      side: THREE.BackSide,
-      fog: false,
-      depthWrite: false,
-    });
-    this.skyMesh = new THREE.Mesh(skyGeom, skyMat);
-    this.scene.add(this.skyMesh);
+    this.rigEl = this.sceneEl.querySelector('#rig');
+    this.leftControllerEl = this.sceneEl.querySelector('#left-controller');
+    this.rightControllerEl = this.sceneEl.querySelector('#right-controller');
 
-    // Dynamic Parallax Horizon Mountains
-    this.hillsGroup = new THREE.Group();
+    this.track = new TrackManager(this.scene);
+    this.clouds = new CloudManager(this.scene);
+    this.player = new Player(this.scene, this.camera, this.rigEl, this.rightControllerEl);
+    this.ui = new UIManager(this.scene, this.camera);
 
-    // Layer 1: Distant dark jagged silhouette peaks
-    this.hillsGroup.add(
-      this.createMountainRidge(155, -8, 22, 0x180932, 5, 11, 0.4)
-    );
+    this.initAFrameWebXR();
 
-    // Layer 2: Mid-distance violet twilight ridges
-    this.hillsGroup.add(
-      this.createMountainRidge(130, -14, 18, 0x2e114d, 7, 13, 1.8)
-    );
-
-    // Layer 3: Closer alpine ridge
-    this.hillsGroup.add(
-      this.createMountainRidge(105, -20, 15, 0x481b66, 9, 17, 3.2)
-    );
-
-    // Layer 4: Soft dreamy magenta foothills
-    this.hillsGroup.add(
-      this.createMountainRidge(80, -25, 12, 0x6e2874, 11, 19, 4.5)
-    );
-
-    // Layer 5: Cloud Sea floating below the rainbow highway
-    const seaGeom = new THREE.RingGeometry(15, 130, 32);
-    seaGeom.rotateX(-Math.PI / 2);
-    seaGeom.translate(0, -15, 0);
-    const seaMat = new THREE.MeshBasicMaterial({
-      color: 0xd6eeff,
-      transparent: true,
-      opacity: 0.42,
-      side: THREE.DoubleSide,
-      fog: false,
-      depthWrite: false,
-    });
-    this.hillsGroup.add(new THREE.Mesh(seaGeom, seaMat));
-
-    this.scene.add(this.hillsGroup);
-
-    this.scene.background = null;
-    this.scene.fog = new THREE.FogExp2(0x3e719c, 0.007);
+    this.isReady = true;
   }
 
-  private initRenderer(): void {
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      powerPreference: 'high-performance',
-      xrCompatible: true,
-    });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(min(window.devicePixelRatio, 2));
-    this.renderer.xr.enabled = true;
-    try {
-      this.renderer.xr.setReferenceSpaceType('local');
-    } catch (_) {}
-
-    document.body.appendChild(this.renderer.domElement);
-  }
-
-  private initLighting(): void {
-    const ambLight = new THREE.AmbientLight(0xd2dcff, 0.75);
-    this.scene.add(ambLight);
-
-    const dirLight = new THREE.DirectionalLight(0xfff4e0, 1.1);
-    dirLight.position.set(5, 12, 6);
-    this.scene.add(dirLight);
-
-    // Magical point light that illuminates the road from the horn
-    const hornLight = new THREE.PointLight(0xfff2b0, 1.4, 15);
-    hornLight.position.set(0, 0, -0.6);
-    this.player.horn.add(hornLight);
-  }
-
-  private async initWebXR(): Promise<void> {
+  private async initAFrameWebXR(): Promise<void> {
     if ('xr' in navigator && (navigator as any).xr) {
       try {
-        this.hasWebXR = await (navigator as any).xr.isSessionSupported(
-          'immersive-vr'
-        );
+        this.hasWebXR = await (navigator as any).xr.isSessionSupported('immersive-vr');
       } catch (_) {
         this.hasWebXR = false;
       }
     }
 
-    // Bind VR Controllers: Trigger = stab (playing) or restart (gameover), Grip = jump (playing) or menu (gameover)
-    const setupController = (c: any) => {
-      c.addEventListener('selectstart', () => {
-        if (this.state === GameState.PLAYING) {
-          this.player.stab();
-        } else if (this.state === GameState.GAMEOVER) {
-          this.restartGame();
-        }
-      });
-      c.addEventListener('squeezestart', () => {
-        if (this.state === GameState.PLAYING) {
-          this.player.jump();
-        } else if (this.state === GameState.GAMEOVER) {
-          this.goToMenu();
-        }
-      });
-      this.player.cameraRig.add(c);
+    this.sceneEl.addEventListener('enter-vr', () => this.onEnterVR());
+    this.sceneEl.addEventListener('exit-vr', () => this.onExitVR());
+
+    const bindController = (el: any) => {
+      if (!el) return;
+      el.addEventListener('triggerdown', () => this.onTriggerDown());
+      el.addEventListener('selectstart', () => this.onTriggerDown());
+      el.addEventListener('gripdown', () => this.onGripDown());
+      el.addEventListener('squeezestart', () => this.onGripDown());
+      el.addEventListener('thumbstickmoved', (e: any) => this.onThumbstick(e.detail));
+      el.addEventListener('axismove', (e: any) => this.onAxisMove(e.detail));
     };
 
-    setupController(this.renderer.xr.getController(0));
-    setupController(this.renderer.xr.getController(1));
+    bindController(this.leftControllerEl);
+    bindController(this.rightControllerEl);
+  }
+
+  private onTriggerDown(): void {
+    if (this.state === GameState.PLAYING) {
+      this.player.stab();
+    } else if (this.state === GameState.GAMEOVER) {
+      this.restartGame();
+    }
+  }
+
+  private onGripDown(): void {
+    if (this.state === GameState.PLAYING) {
+      this.player.jump();
+    } else if (this.state === GameState.GAMEOVER) {
+      this.goToMenu();
+    }
+  }
+
+  private onThumbstick(detail: any): void {
+    if (!detail) return;
+    const { x, y } = detail;
+    if (Math.abs(x) > 0.55 && !this.thumbstickDebounce && this.state === GameState.PLAYING) {
+      this.player.shiftLane(x > 0 ? 1 : -1);
+      this.thumbstickDebounce = true;
+      setTimeout(() => (this.thumbstickDebounce = false), 220);
+    }
+    if (y < -0.65 && this.state === GameState.PLAYING) {
+      this.player.jump();
+    }
+  }
+
+  private onAxisMove(detail: any): void {
+    if (!detail || !detail.axis) return;
+    const [x, y] = detail.axis;
+    if (Math.abs(x) > 0.55 && !this.thumbstickDebounce && this.state === GameState.PLAYING) {
+      this.player.shiftLane(x > 0 ? 1 : -1);
+      this.thumbstickDebounce = true;
+      setTimeout(() => (this.thumbstickDebounce = false), 220);
+    }
+    if (y < -0.65 && this.state === GameState.PLAYING) {
+      this.player.jump();
+    }
+  }
+
+  private onEnterVR(): void {
+    const modal = document.getElementById('modal');
+    if (modal) modal.style.display = 'none';
+    const goModal = document.getElementById('go-modal');
+    if (goModal) goModal.style.display = 'none';
+
+    const rightObj = this.rightControllerEl?.object3D;
+    this.player.setVRMode(this.currentVRMode, rightObj);
+
+    if (this.currentVRMode === VRMode.UNICORN_HARD) {
+      const startQuip = getRandomStartQuip();
+      this.ui.setQuip(startQuip);
+      speakQuip(startQuip, true);
+    }
+
+    this.startGame();
+  }
+
+  private onExitVR(): void {
+    this.currentVRMode = VRMode.NONE;
+    this.player.setVRMode(VRMode.NONE);
+    if (this.state === GameState.MENU) {
+      const m = document.getElementById('modal');
+      if (m) m.style.display = 'flex';
+    }
   }
 
   private initDOM(): void {
-    const vrEasyBtn = document.getElementById('btn-vr-easy');
-    if (vrEasyBtn) {
-      vrEasyBtn.addEventListener('click', () => {
-        if (this.hasWebXR) {
-          this.requestVRSession(VRMode.RIDER_EASY);
-        } else {
-          alert(
-            'WebXR brýle nebyly detekovány. Pro plný VR zážitek otevřete tuto stránku v prohlížeči v Meta Quest.\n\nHra se nyní spustí na desktopu.'
-          );
-          this.startGame();
-        }
-      });
-    }
+    const on = (id: string, fn: () => void) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', fn);
+    };
 
-    const vrHardBtn = document.getElementById('btn-vr-hard');
-    if (vrHardBtn) {
-      vrHardBtn.addEventListener('click', () => {
-        if (this.hasWebXR) {
-          this.requestVRSession(VRMode.UNICORN_HARD);
-        } else {
-          alert(
-            'WebXR brýle nebyly detekovány. Pro plný VR zážitek otevřete tuto stránku v prohlížeči v Meta Quest.\n\nHra se nyní spustí na desktopu.'
-          );
-          this.startGame();
-        }
-      });
-    }
+    const noVR = () => {
+      alert('VR nenalezeno, spouštím desktop.');
+      this.startGame();
+    };
 
-    const pcBtn = document.getElementById('btn-desktop');
-    if (pcBtn) {
-      pcBtn.addEventListener('click', () => {
-        this.startGame();
-      });
-    }
+    on('btn-vr-easy', () => {
+      if (this.hasWebXR) {
+        this.requestVRSession(VRMode.RIDER_EASY);
+      } else {
+        noVR();
+      }
+    });
 
-    const retryBtn = document.getElementById('btn-retry');
-    if (retryBtn) {
-      retryBtn.addEventListener('click', () => {
-        this.restartGame();
-      });
-    }
+    on('btn-vr-hard', () => {
+      if (this.hasWebXR) {
+        this.requestVRSession(VRMode.UNICORN_HARD);
+      } else {
+        noVR();
+      }
+    });
 
-    const homeBtn = document.getElementById('btn-home');
-    if (homeBtn) {
-      homeBtn.addEventListener('click', () => {
-        this.goToMenu();
-      });
-    }
-
-    const musicBtn = document.getElementById('btn-music');
-    if (musicBtn) {
-      musicBtn.addEventListener('click', () => {
-        toggleAudio();
-        musicBtn.textContent = `🎵 HUDBA: ${getAudioMuted() ? 'VYP' : 'ZAP'}`;
-      });
-    }
-
-    const sfxBtn = document.getElementById('btn-sfx');
-    if (sfxBtn) {
-      sfxBtn.addEventListener('click', () => {
-        toggleSfx();
-        sfxBtn.textContent = `🔊 ZVUKY: ${getSfxMuted() ? 'VYP' : 'ZAP'}`;
-      });
-    }
-
-    const fsBtn = document.getElementById('btn-fs');
-    if (fsBtn) {
-      fsBtn.addEventListener('click', () => {
-        this.toggleFullscreen();
-      });
-    }
+    on('btn-desktop', () => this.startGame());
+    on('btn-retry', () => this.restartGame());
+    on('btn-home', () => this.goToMenu());
+    on('btn-music', () => {
+      toggleAudio();
+      const b = document.getElementById('btn-music');
+      if (b) b.textContent = `🎵 HUDBA: ${getAudioMuted() ? 'VYP' : 'ZAP'}`;
+    });
+    on('btn-sfx', () => {
+      toggleSfx();
+      const b = document.getElementById('btn-sfx');
+      if (b) b.textContent = `🔊 ZVUKY: ${getSfxMuted() ? 'VYP' : 'ZAP'}`;
+    });
+    on('btn-fs', () => this.toggleFullscreen());
 
     const highBadge = document.getElementById('high-score');
     if (highBadge) {
-      highBadge.textContent = `🏆 NEJLEPŠÍ SKÓRE: ${this.ui.getHighScore()}`;
+      highBadge.textContent = `🏆 NEJLEPŠÍ SKÓRE: ${this.ui?.getHighScore() || 0}`;
     }
   }
 
@@ -398,70 +253,17 @@ export class Game {
   }
 
   public async requestVRSession(mode: VRMode = VRMode.RIDER_EASY): Promise<void> {
-    if (!this.hasWebXR) return;
+    initAudio();
+    this.currentVRMode = mode;
     try {
-      initAudio();
-      this.currentVRMode = mode;
-
-      // Standard WebXR immersive-vr session matching https://immersive-web.github.io/webxr-samples/immersive-vr-session.html
-      const session = await (navigator as any).xr.requestSession('immersive-vr', {
-        optionalFeatures: ['local', 'hand-tracking'],
-      });
-      this.vrSession = session;
-
-      // Wrap requestReferenceSpace with fallback to 'local' for maximum device compatibility
-      const origRequestReferenceSpace = session.requestReferenceSpace.bind(session);
-      session.requestReferenceSpace = async (type: string) => {
-        try {
-          return await origRequestReferenceSpace(type);
-        } catch (err) {
-          console.warn(`Reference space '${type}' unavailable, falling back to 'local':`, err);
-          return await origRequestReferenceSpace('local');
-        }
-      };
-
-      try {
-        this.renderer.xr.setReferenceSpaceType('local');
-      } catch (_) {}
-
-      await this.renderer.xr.setSession(session);
-
-      // Reset camera transforms for pristine WebXR headset tracking
-      this.camera.position.set(0, 0, 0);
-      this.camera.rotation.set(0, 0, 0);
-      this.camera.quaternion.set(0, 0, 0, 1);
-
-      // Configure player with chosen VR mode and primary controller
-      const primaryController = this.renderer.xr.getController(0);
-      this.player.setVRMode(mode, primaryController);
-
-      const modal = document.getElementById('modal');
-      if (modal) modal.style.display = 'none';
-      const goModal = document.getElementById('go-modal');
-      if (goModal) goModal.style.display = 'none';
-
-      // If Hard mode, speak funny start quip
-      if (mode === VRMode.UNICORN_HARD) {
-        const startQuip = getRandomStartQuip();
-        this.ui.setQuip(startQuip);
-        speakQuip(startQuip, true);
+      if (this.sceneEl.is('vr-mode')) {
+        this.onEnterVR();
+      } else {
+        await this.sceneEl.enterVR();
       }
-
-      session.addEventListener('end', () => {
-        this.vrSession = null;
-        this.currentVRMode = VRMode.NONE;
-        this.player.setVRMode(VRMode.NONE);
-        this.camera.position.set(0, 0.15, 0);
-        this.camera.rotation.set(-0.10, 0, 0);
-        if (this.state === GameState.MENU) {
-          const m = document.getElementById('modal');
-          if (m) m.style.display = 'flex';
-        }
-      });
-
-      this.startGame();
     } catch (err) {
-      console.warn('VR session request error:', err);
+      console.warn('Enter VR error:', err);
+      this.startGame();
     }
   }
 
@@ -472,10 +274,10 @@ export class Game {
 
       if (this.state === GameState.PLAYING) {
         // Direct mouse steering across lanes
-        this.player.setTargetX(this.pointerNdcX * 1.05);
+        this.player?.setTargetX(this.pointerNdcX * 1.05);
 
         // Tilt camera slightly with mouse on desktop
-        if (!this.renderer.xr.isPresenting) {
+        if (!this.sceneEl?.is('vr-mode') && this.camera) {
           this.camera.rotation.y = -this.pointerNdcX * 0.25;
           this.camera.rotation.x = -0.10 + this.pointerNdcY * 0.20;
         }
@@ -484,9 +286,9 @@ export class Game {
 
     window.addEventListener(
       'wheel',
-      (e) => {
+      () => {
         if (this.state === GameState.PLAYING) {
-          this.player.jump();
+          this.player?.jump();
         }
       },
       { passive: true }
@@ -497,16 +299,11 @@ export class Game {
 
     window.addEventListener('mousedown', (e) => {
       initAudio();
-      if (this.state === GameState.PLAYING) {
-        if (e.button === 2) {
-          // Right mouse button: JUMP
+      if (this.state === GameState.PLAYING && this.player) {
+        if (e.button === 2 || e.button === 1) {
           this.player.jump();
         } else if (e.button === 0) {
-          // Left mouse button: STAB
           this.player.stab();
-        } else if (e.button === 1) {
-          // Middle click: JUMP
-          this.player.jump();
         }
       }
     });
@@ -514,60 +311,37 @@ export class Game {
     window.addEventListener('keydown', (e) => {
       this.keysDown[e.code] = true;
       initAudio();
+      const c = e.code;
+      const isPlay = this.state === GameState.PLAYING;
 
-      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+      if (c === 'ArrowLeft' || c === 'KeyA') {
         e.preventDefault();
-        if (this.state === GameState.PLAYING) {
-          this.player.shiftLane(-1);
-        }
-      } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        if (isPlay) this.player?.shiftLane(-1);
+      } else if (c === 'ArrowRight' || c === 'KeyD') {
         e.preventDefault();
-        if (this.state === GameState.PLAYING) {
-          this.player.shiftLane(1);
-        }
-      } else if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+        if (isPlay) this.player?.shiftLane(1);
+      } else if (c === 'ArrowUp' || c === 'KeyW' || c === 'Space') {
         e.preventDefault();
-        if (this.state === GameState.PLAYING) {
-          this.player.jump();
-        }
-      } else if (
-        e.code === 'ArrowDown' ||
-        e.code === 'KeyS' ||
-        e.code === 'KeyE' ||
-        e.code === 'Enter' ||
-        e.code === 'ShiftLeft' ||
-        e.code === 'ShiftRight'
-      ) {
+        if (isPlay) this.player?.jump();
+        else if (this.state === GameState.GAMEOVER && c === 'Space') this.restartGame();
+      } else if (['ArrowDown', 'KeyS', 'KeyE', 'Enter', 'ShiftLeft', 'ShiftRight'].includes(c)) {
         e.preventDefault();
-        if (this.state === GameState.PLAYING) {
-          this.player.stab();
-        }
-      } else if (e.code === 'Space') {
-        e.preventDefault();
-        if (this.state === GameState.PLAYING) {
-          this.player.jump();
-        } else if (this.state === GameState.GAMEOVER) {
-          this.restartGame();
-        }
-      } else if (e.code === 'KeyF') {
+        if (isPlay) this.player?.stab();
+      } else if (c === 'KeyF') {
         e.preventDefault();
         this.toggleFullscreen();
-      } else if (e.code === 'KeyM') {
+      } else if (c === 'KeyM') {
         e.preventDefault();
         toggleAudio();
-        const musicBtn = document.getElementById('btn-music');
-        if (musicBtn)
-          musicBtn.textContent = `🎵 HUDBA: ${getAudioMuted() ? 'VYP' : 'ZAP'}`;
-      } else if (e.code === 'KeyN') {
+        const b = document.getElementById('btn-music');
+        if (b) b.textContent = `🎵 HUDBA: ${getAudioMuted() ? 'VYP' : 'ZAP'}`;
+      } else if (c === 'KeyN') {
         e.preventDefault();
         toggleSfx();
-        const sfxBtn = document.getElementById('btn-sfx');
-        if (sfxBtn)
-          sfxBtn.textContent = `🔊 ZVUKY: ${getSfxMuted() ? 'VYP' : 'ZAP'}`;
-      } else if (e.code === 'KeyH' || e.code === 'Escape') {
-        if (this.state === GameState.GAMEOVER) {
-          this.goToMenu();
-        }
+        const b = document.getElementById('btn-sfx');
+        if (b) b.textContent = `🔊 ZVUKY: ${getSfxMuted() ? 'VYP' : 'ZAP'}`;
+      } else if (c === 'KeyH' || c === 'Escape') {
+        if (this.state === GameState.GAMEOVER) this.goToMenu();
       }
     });
 
@@ -576,10 +350,10 @@ export class Game {
     });
 
     // Touch support for mobile
-    window.addEventListener('touchstart', (e) => {
+    window.addEventListener('touchstart', () => {
       initAudio();
       if (this.state === GameState.PLAYING) {
-        this.player.stab();
+        this.player?.stab();
       }
     });
   }
@@ -591,7 +365,7 @@ export class Game {
     if (modal) modal.style.display = 'flex';
 
     const highBadge = document.getElementById('high-score');
-    if (highBadge) {
+    if (highBadge && this.ui) {
       highBadge.textContent = `🏆 NEJLEPŠÍ SKÓRE: ${this.ui.getHighScore()}`;
     }
 
@@ -601,9 +375,9 @@ export class Game {
     this.speed = 18;
     this.runTime = 0;
     this.cloudsStabbed = 0;
-    this.track.reset();
-    this.clouds.reset();
-    this.player.reset();
+    this.track?.reset();
+    this.clouds?.reset();
+    this.player?.reset();
   }
 
   public startGame(): void {
@@ -618,13 +392,13 @@ export class Game {
     this.speed = 18;
     this.runTime = 0;
     this.cloudsStabbed = 0;
-    this.track.reset();
-    this.clouds.reset();
-    this.player.reset();
+    this.track?.reset();
+    this.clouds?.reset();
+    this.player?.reset();
 
     if (this.currentVRMode === VRMode.UNICORN_HARD) {
       const startQuip = getRandomStartQuip();
-      this.ui.setQuip(startQuip);
+      this.ui?.setQuip(startQuip);
       speakQuip(startQuip, true);
     }
   }
@@ -633,14 +407,8 @@ export class Game {
     this.startGame();
   }
 
-  private onResize(): void {
-    if (this.renderer?.xr?.isPresenting) return;
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-  }
-
   private checkHornCloudCollisions(): void {
+    if (!this.player || !this.clouds || !this.track) return;
     const hornTipPos = this.player.getHornTipPosition();
     const isAirborne = !this.player.isGrounded;
 
@@ -686,6 +454,7 @@ export class Game {
   }
 
   private checkTrackFall(): void {
+    if (!this.player || !this.track) return;
     if (this.player.isGrounded && !this.player.isFalling) {
       const effectiveX = this.player.x;
       const laneIdx = this.track.getLaneIndexFromX(effectiveX);
@@ -707,11 +476,12 @@ export class Game {
     }
   }
 
-  private loop(timestamp: number, frame: any): void {
-    const dt = min(0.08, this.clock.getDelta());
-    const totalTime = this.clock.getElapsedTime();
+  public loop(time: number, timeDelta: number): void {
+    if (!this.isReady) return;
+    const dt = min(0.08, timeDelta / 1000);
+    const totalTime = time / 1000;
 
-    const isVR = this.renderer?.xr?.isPresenting || false;
+    const isVR = this.sceneEl?.is('vr-mode') || false;
 
     // VR Controls
     if (isVR) {
@@ -724,12 +494,12 @@ export class Game {
       }
 
       // 2. Thumbstick support for lane shifting
-      const session = this.renderer.xr.getSession();
-      if (session) {
+      const session = this.sceneEl.xrSession;
+      if (session && session.inputSources) {
         for (const source of session.inputSources) {
           if (source.gamepad && source.gamepad.axes) {
             const axes = source.gamepad.axes;
-            const stickX = axes.length >= 3 ? axes[2] : 0;
+            const stickX = axes.length >= 3 ? axes[2] : (axes.length >= 1 ? axes[0] : 0);
             if (Math.abs(stickX) > 0.55) {
               if (!this.thumbstickDebounce && this.state === GameState.PLAYING) {
                 this.player.shiftLane(stickX > 0 ? 1 : -1);
@@ -738,7 +508,7 @@ export class Game {
               }
             }
 
-            const stickY = axes.length >= 4 ? axes[3] : 0;
+            const stickY = axes.length >= 4 ? axes[3] : (axes.length >= 2 ? axes[1] : 0);
             if (stickY < -0.65 && this.state === GameState.PLAYING) {
               this.player.jump();
             }
@@ -757,14 +527,6 @@ export class Game {
       }
     }
 
-    // Sky and hills follow player world lateral coordinate
-    if (this.skyMesh) {
-      this.skyMesh.position.set(this.player.x, this.player.y, 0);
-    }
-    if (this.hillsGroup) {
-      this.hillsGroup.position.x = this.player.x;
-      this.hillsGroup.position.z = 0;
-    }
 
     // Sync audio engine with state, airborne jumping status, and run speed
     setAudioState(
@@ -781,23 +543,6 @@ export class Game {
       this.player.update(dt, demoSpeed, true, isVR);
       this.track.update(dt, demoSpeed, totalTime, 60, true);
       this.clouds.update(dt, demoSpeed, totalTime);
-
-      this.ui.renderUI(
-        GameState.MENU,
-        0,
-        this.track.laneHealth,
-        -1,
-        totalTime,
-        dt,
-        this.hasWebXR,
-        () => this.startGame(),
-        (m) => this.requestVRSession(m),
-        () => this.restartGame(),
-        () => this.goToMenu(),
-        () => this.toggleFullscreen(),
-        isVR,
-        this.currentVRMode
-      );
     } else if (this.state === GameState.PLAYING) {
       this.runTime += dt;
       this.speed = min(36, 18 + this.runTime * 0.28);
@@ -814,23 +559,6 @@ export class Game {
 
       this.checkHornCloudCollisions();
       this.checkTrackFall();
-
-      this.ui.renderUI(
-        GameState.PLAYING,
-        this.score,
-        this.track.laneHealth,
-        this.track.getUrgentLane(),
-        totalTime,
-        dt,
-        this.hasWebXR,
-        () => this.startGame(),
-        (m) => this.requestVRSession(m),
-        () => this.restartGame(),
-        () => this.goToMenu(),
-        () => this.toggleFullscreen(),
-        isVR,
-        this.currentVRMode
-      );
     } else if (this.state === GameState.FALLING) {
       this.fallTimer += dt;
       this.player.update(dt, this.speed * 0.4, false, isVR);
@@ -854,51 +582,48 @@ export class Game {
           if (goQuote) goQuote.textContent = `"${this.ui.getLastQuote()}"`;
         }
       }
-
-      this.ui.renderUI(
-        GameState.FALLING,
-        this.score,
-        this.track.laneHealth,
-        -1,
-        totalTime,
-        dt,
-        this.hasWebXR,
-        () => this.startGame(),
-        (m) => this.requestVRSession(m),
-        () => this.restartGame(),
-        () => this.goToMenu(),
-        () => this.toggleFullscreen(),
-        isVR,
-        this.currentVRMode
-      );
-    } else if (this.state === GameState.GAMEOVER) {
-      this.ui.renderUI(
-        GameState.GAMEOVER,
-        this.score,
-        this.track.laneHealth,
-        -1,
-        totalTime,
-        dt,
-        this.hasWebXR,
-        () => this.startGame(),
-        (m) => this.requestVRSession(m),
-        () => this.restartGame(),
-        () => this.goToMenu(),
-        () => this.toggleFullscreen(),
-        isVR,
-        this.currentVRMode
-      );
     }
 
-    // 3. Render 3D scene
-    this.renderer.render(this.scene, this.camera);
+    this.ui.renderUI(
+      this.state,
+      this.score,
+      this.track.laneHealth,
+      this.state === GameState.PLAYING ? this.track.getUrgentLane() : -1,
+      totalTime,
+      dt,
+      this.hasWebXR,
+      () => this.startGame(),
+      (m) => this.requestVRSession(m),
+      () => this.restartGame(),
+      () => this.goToMenu(),
+      () => this.toggleFullscreen(),
+      isVR,
+      this.currentVRMode
+    );
   }
 }
 
-// Auto-boot
+// Register A-Frame component
+if (typeof AFRAME !== 'undefined') {
+  AFRAME.registerComponent('rainbow-game', {
+    init: function () {
+      (window as any)._g = new Game(this.el);
+    },
+    tick: function (time: number, timeDelta: number) {
+      if ((window as any)._g) {
+        (window as any)._g.loop(time, timeDelta);
+      }
+    }
+  });
+}
+
+// Auto-boot helper
 export const bootGame = () => {
-  if (!(window as any)._g && window.THREE) {
-    (window as any)._g = new Game();
+  const sceneEl = document.querySelector('a-scene');
+  if (sceneEl && !(window as any)._g) {
+    if (!sceneEl.hasAttribute('rainbow-game')) {
+      sceneEl.setAttribute('rainbow-game', '');
+    }
   }
 };
 (window as any).bootGame = bootGame;
