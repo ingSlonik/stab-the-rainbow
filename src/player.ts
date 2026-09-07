@@ -23,7 +23,7 @@ export class Player {
   public isStabbing = false;
   public stabTimer = 0;
   private readonly STAB_DURATION = 0.24;
-  private readonly hornBaseZ = -0.16;
+  private readonly hornBaseZ = -0.32;
   private hornMat: any;
 
   private hornTipWorldPos: any;
@@ -45,7 +45,7 @@ export class Player {
       this.root = new THREE.Group();
       scene.add(this.root);
       this.cameraRig = new THREE.Group();
-      this.cameraRig.position.set(0, 1.45, 0);
+      this.cameraRig.position.set(0, 2.25, 0);
       this.root.add(this.cameraRig);
       this.cameraRig.add(camera);
     }
@@ -93,8 +93,8 @@ export class Player {
     this.horn.add(this.hornTip);
 
     // Default desktop placement
-    this.horn.position.set(0, 0.24, this.hornBaseZ);
-    this.horn.rotation.x = -0.09;
+    this.horn.position.set(0, -0.22, this.hornBaseZ);
+    this.horn.rotation.x = 0.12;
   }
 
   public setVRMode(mode: VRMode, controller?: any): void {
@@ -135,11 +135,11 @@ export class Player {
     } else {
       // Desktop
       this.camera.add(this.horn);
-      this.horn.position.set(0, 0.24, this.hornBaseZ);
-      this.horn.rotation.set(-0.09, 0, 0);
+      this.horn.position.set(0, -0.22, this.hornBaseZ);
+      this.horn.rotation.set(0.12, 0, 0);
       this.horn.scale.set(1.0, 1.0, 1.0);
 
-      this.cameraRig.position.set(0, 1.45, 0);
+      this.cameraRig.position.set(0, 2.25, 0);
     }
   }
 
@@ -205,7 +205,7 @@ export class Player {
     this.isCalibrated = false;
     this.prevHeadZ = 0;
     this.prevHeadY = 0;
-    this.root.position.set(0, 1.45, 0);
+    this.root.position.set(0, this.vrMode === VRMode.NONE ? 2.25 : 1.45, 0);
     this.root.rotation.set(0, 0, 0);
     if (this.hornMat) this.hornMat.emissiveIntensity = 0.36;
   }
@@ -298,8 +298,9 @@ export class Player {
 
 
     // 5. Update root position & orientation
+    const baseH = this.vrMode === VRMode.NONE ? 2.25 : 1.45;
     this.root.position.x = this.x;
-    this.root.position.y = 1.45 + this.y + gallopY;
+    this.root.position.y = baseH + this.y + gallopY;
 
     if (isVR) {
       // In VR, the physical headset dictates orientation. Horizon remains level!
