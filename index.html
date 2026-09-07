@@ -9,6 +9,14 @@
 </head>
 
 <body>
+  <script>
+    try {
+      if (window.XRWebGLBinding && window.XRWebGLBinding.prototype) {
+        delete window.XRWebGLBinding.prototype.createProjectionLayer;
+      }
+      window.XRWebGLBinding = undefined;
+    } catch (_) {}
+  </script>
   <script type="module">
     import * as THREE from 'three';
     window.THREE = THREE;

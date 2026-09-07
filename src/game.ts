@@ -1,3 +1,13 @@
+// Fix for Meta Quest WebXR stereoscopy: force standard XRWebGLLayer over experimental createProjectionLayer
+try {
+  if (typeof window !== 'undefined') {
+    if ((window as any).XRWebGLBinding?.prototype) {
+      delete (window as any).XRWebGLBinding.prototype.createProjectionLayer;
+    }
+    (window as any).XRWebGLBinding = undefined;
+  }
+} catch (_) {}
+
 import {
   GameState,
   LANE_COUNT,
@@ -496,14 +506,15 @@ export class Game {
 
   private handleActionTrigger(): void {
     if (this.state === GameState.MENU) {
-      this.ui.triggerClick();
+      if (!this.ui.triggerClick()) {
+        this.startGame();
+      }
     } else if (this.state === GameState.PLAYING) {
       this.player.jump();
     } else if (this.state === GameState.GAMEOVER) {
-      if (this.ui.triggerClick()) {
-        return;
+      if (!this.ui.triggerClick()) {
+        this.restartGame();
       }
-      this.restartGame();
     }
   }
 
@@ -536,6 +547,7 @@ export class Game {
   }
 
   private onResize(): void {
+    if (this.renderer?.xr?.isPresenting) return;
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -674,7 +686,8 @@ export class Game {
         () => this.requestVRSession(),
         () => this.restartGame(),
         () => this.goToMenu(),
-        () => this.toggleFullscreen()
+        () => this.toggleFullscreen(),
+        this.renderer?.xr?.isPresenting || false
       );
     } else if (this.state === GameState.PLAYING) {
       this.runTime += dt;
@@ -705,7 +718,8 @@ export class Game {
         () => this.requestVRSession(),
         () => this.restartGame(),
         () => this.goToMenu(),
-        () => this.toggleFullscreen()
+        () => this.toggleFullscreen(),
+        this.renderer?.xr?.isPresenting || false
       );
     } else if (this.state === GameState.FALLING) {
       this.fallTimer += dt;
@@ -728,7 +742,8 @@ export class Game {
         () => this.requestVRSession(),
         () => this.restartGame(),
         () => this.goToMenu(),
-        () => this.toggleFullscreen()
+        () => this.toggleFullscreen(),
+        this.renderer?.xr?.isPresenting || false
       );
     } else if (this.state === GameState.GAMEOVER) {
       this.ui.renderUI(
@@ -742,7 +757,8 @@ export class Game {
         () => this.requestVRSession(),
         () => this.restartGame(),
         () => this.goToMenu(),
-        () => this.toggleFullscreen()
+        () => this.toggleFullscreen(),
+        this.renderer?.xr?.isPresenting || false
       );
     }
 

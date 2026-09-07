@@ -167,18 +167,19 @@ export class UIManager {
     onEnterVR: () => void,
     onRestart: () => void,
     onHome?: () => void,
-    onToggleFullscreen?: () => void
+    onToggleFullscreen?: () => void,
+    isVR: boolean = false
   ): void {
     const ctx = this.uiCtx;
     ctx.clearRect(0, 0, 1024, 1024);
     this.buttons = [];
 
     if (state === GameState.MENU) {
-      this.drawMenu(ctx, time, hasWebXR, onStartGame, onEnterVR, onToggleFullscreen);
+      this.drawMenu(ctx, time, hasWebXR, onStartGame, onEnterVR, onToggleFullscreen, isVR);
     } else if (state === GameState.PLAYING) {
-      this.drawHUD(ctx, score, laneHealth, urgentLane, time);
+      this.drawHUD(ctx, score, laneHealth, urgentLane, time, isVR);
     } else if (state === GameState.FALLING || state === GameState.GAMEOVER) {
-      this.drawGameOver(ctx, score, onRestart, onHome || onRestart, time);
+      this.drawGameOver(ctx, score, onRestart, onHome || onRestart, time, isVR);
     }
 
     this.uiTexture.needsUpdate = true;
@@ -190,7 +191,8 @@ export class UIManager {
     hasWebXR: boolean,
     onStartGame: () => void,
     onEnterVR: () => void,
-    onToggleFullscreen?: () => void
+    onToggleFullscreen?: () => void,
+    isVR: boolean = false
   ): void {
     // Backdrop panel
     ctx.fillStyle = 'rgba(15, 10, 35, 0.88)';
@@ -230,7 +232,13 @@ export class UIManager {
 
     ctx.font = '700 17px system-ui, sans-serif';
     ctx.fillStyle = '#00d4ff';
-    ctx.fillText('🥽 PRIMÁRNĚ PRO VR • DESKTOP SLOUŽÍ PRO DIVÁKY VENKU 📺', 512, 197);
+    ctx.fillText(
+      isVR
+        ? '🥽 VR REŽIM AKTIVNÍ • STISKNI SPOUŠŤ NEBO MEZERNÍK PRO START 🦄'
+        : '🥽 PRIMÁRNĚ PRO VR • DESKTOP SLOUŽÍ PRO DIVÁKY VENKU 📺',
+      512,
+      197
+    );
 
     // High Score badge
     ctx.fillStyle = 'rgba(255, 221, 0, 0.18)';
@@ -357,7 +365,8 @@ export class UIManager {
     score: number,
     laneHealth: number[],
     urgentLane: number,
-    time: number
+    time: number,
+    isVR: boolean = false
   ): void {
     // Upper HUD ribbon
     ctx.fillStyle = 'rgba(10, 8, 25, 0.72)';
@@ -371,7 +380,13 @@ export class UIManager {
     ctx.textAlign = 'center';
     ctx.font = '700 16px system-ui, sans-serif';
     ctx.fillStyle = '#00d4ff';
-    ctx.fillText('📺 SPECTATOR VIEW • BEST IN VR 🥽', 512, 60);
+    ctx.fillText(
+      isVR
+        ? '🥽 VR IMMERSIVE MODE • THRUST TO STAB 🦄'
+        : '📺 SPECTATOR VIEW • BEST IN VR 🥽',
+      512,
+      60
+    );
 
     // Score
     ctx.textAlign = 'left';
@@ -434,7 +449,8 @@ export class UIManager {
     score: number,
     onRestart: () => void,
     onHome: () => void,
-    time: number
+    time: number,
+    isVR: boolean = false
   ): void {
     // Dark dramatic panel
     ctx.fillStyle = 'rgba(20, 5, 15, 0.92)';
@@ -503,7 +519,13 @@ export class UIManager {
 
     ctx.font = '500 20px system-ui, sans-serif';
     ctx.fillStyle = '#8f9db5';
-    ctx.fillText('Press SPACEBAR to restart • Press H or ESC for home', 512, 715);
+    ctx.fillText(
+      isVR
+        ? 'Stiskni SPOUŠŤ pro nový běh • Úchop (Grip) pro Menu'
+        : 'Press SPACEBAR to restart • Press H or ESC for home',
+      512,
+      715
+    );
   }
 
   private drawButton(
