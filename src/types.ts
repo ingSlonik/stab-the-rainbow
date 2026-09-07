@@ -36,14 +36,15 @@ export const RAINBOW_HEX_STRINGS = [
   '#b82bfb',
 ];
 
-export const COLOR_NAMES = [
-  'Ruby Red',
-  'Solar Orange',
-  'Cosmic Yellow',
-  'Emerald Green',
-  'Neon Cyan',
-  'Deep Blue',
-  'Astral Violet',
+
+export const COLOR_NAMES_CZ = [
+  'Červená',
+  'Oranžová',
+  'Žlutá',
+  'Zelená',
+  'Azurová',
+  'Modrá',
+  'Fialová',
 ];
 
 export interface CloudData {
