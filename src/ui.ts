@@ -4,8 +4,10 @@ import {
   RAINBOW_HEX_STRINGS,
   COLOR_NAMES,
   GameState,
+  VRMode,
 } from './types';
 import { sin, max, min, floor, randChoice } from './math';
+import { getRandomDeathQuip } from './quips';
 
 const DEATH_QUOTES = [
   'Gravity: 1, Unicorn: 0',
@@ -30,7 +32,7 @@ export class UIManager {
   public group: any;
   private camera: any;
 
-  // 3D UI Meshes: Slim HUD ribbon and VR Game Over panel
+  // 3D UI Meshes: Upper HUD ribbon and VR Game Over panel
   private hudMesh: any;
   private hudCanvas: HTMLCanvasElement;
   private hudCtx: CanvasRenderingContext2D;
@@ -49,6 +51,10 @@ export class UIManager {
 
   private highScore = 0;
   private lastQuote = '';
+
+  // Dynamic funny quips for Hard mode
+  private currentQuip = '';
+  private quipTimer = 0;
 
   constructor(scene: any, camera: any) {
     this.camera = camera;
@@ -89,27 +95,32 @@ export class UIManager {
     return this.lastQuote || 'Gravity always wins.';
   }
 
+  public setQuip(text: string): void {
+    this.currentQuip = text;
+    this.quipTimer = 4.0;
+  }
+
   private initCanvasMesh(): void {
-    // 1. Sleek upper HUD ribbon (never occludes track or horn)
+    // 1. Upper HUD ribbon: positioned at comfortable stereoscopic distance (2.3m) with depthTest enabled
     this.hudCanvas = document.createElement('canvas');
     this.hudCanvas.width = 1024;
-    this.hudCanvas.height = 256;
+    this.hudCanvas.height = 320;
     this.hudCtx = this.hudCanvas.getContext('2d')!;
 
     this.hudTexture = new THREE.CanvasTexture(this.hudCanvas);
     this.hudTexture.minFilter = THREE.LinearFilter;
 
-    const hudGeom = new THREE.PlaneGeometry(1.6, 0.40);
+    const hudGeom = new THREE.PlaneGeometry(1.9, 0.58);
     const hudMat = new THREE.MeshBasicMaterial({
       map: this.hudTexture,
       transparent: true,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
     });
 
     this.hudMesh = new THREE.Mesh(hudGeom, hudMat);
-    this.hudMesh.position.set(0, 0.55, -1.8);
-    this.hudMesh.rotation.x = 0.12;
+    this.hudMesh.position.set(0, 0.65, -2.3);
+    this.hudMesh.rotation.x = 0.14;
     this.hudMesh.visible = false;
     this.camera.add(this.hudMesh);
 
@@ -122,16 +133,16 @@ export class UIManager {
     this.goTexture = new THREE.CanvasTexture(this.goCanvas);
     this.goTexture.minFilter = THREE.LinearFilter;
 
-    const goGeom = new THREE.PlaneGeometry(1.6, 1.4);
+    const goGeom = new THREE.PlaneGeometry(1.65, 1.45);
     const goMat = new THREE.MeshBasicMaterial({
       map: this.goTexture,
       transparent: true,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
     });
 
     this.goMesh = new THREE.Mesh(goGeom, goMat);
-    this.goMesh.position.set(0, 0.05, -1.8);
+    this.goMesh.position.set(0, 0.12, -2.1);
     this.goMesh.visible = false;
     this.camera.add(this.goMesh);
   }
@@ -176,8 +187,12 @@ export class UIManager {
     return false;
   }
 
-  public setGameOverDeathQuote(): void {
-    this.lastQuote = randChoice(DEATH_QUOTES);
+  public setGameOverDeathQuote(isHardVR = false): void {
+    if (isHardVR) {
+      this.lastQuote = getRandomDeathQuip();
+    } else {
+      this.lastQuote = randChoice(DEATH_QUOTES);
+    }
   }
 
   public renderUI(
@@ -186,18 +201,26 @@ export class UIManager {
     laneHealth: number[],
     urgentLane: number,
     time: number,
+    dt: number,
     hasWebXR: boolean,
     onStartGame: () => void,
-    onEnterVR: () => void,
+    onEnterVR: (mode: VRMode) => void,
     onRestart: () => void,
     onHome?: () => void,
     onToggleFullscreen?: () => void,
-    isVR: boolean = false
+    isVR: boolean = false,
+    vrMode: VRMode = VRMode.NONE
   ): void {
     this.buttons = [];
 
+    if (this.quipTimer > 0) {
+      this.quipTimer -= dt;
+      if (this.quipTimer <= 0) {
+        this.currentQuip = '';
+      }
+    }
+
     if (state === GameState.MENU) {
-      // In MENU, 3D UI mesh is completely hidden: HTML DOM Rozcestník is used!
       this.hudMesh.visible = false;
       this.goMesh.visible = false;
       return;
@@ -206,8 +229,8 @@ export class UIManager {
     if (state === GameState.PLAYING) {
       this.hudMesh.visible = true;
       this.goMesh.visible = false;
-      this.hudCtx.clearRect(0, 0, 1024, 256);
-      this.drawHUD(this.hudCtx, score, laneHealth, urgentLane, time, isVR);
+      this.hudCtx.clearRect(0, 0, 1024, 320);
+      this.drawHUD(this.hudCtx, score, laneHealth, urgentLane, time, isVR, vrMode);
       this.hudTexture.needsUpdate = true;
       return;
     }
@@ -217,7 +240,7 @@ export class UIManager {
       if (isVR) {
         this.goMesh.visible = true;
         this.goCtx.clearRect(0, 0, 1024, 1024);
-        this.drawGameOver(this.goCtx, score, onRestart, onHome || onRestart, time, true);
+        this.drawGameOver(this.goCtx, score, onRestart, onHome || onRestart, time, true, vrMode);
         this.goTexture.needsUpdate = true;
       } else {
         this.goMesh.visible = false;
@@ -232,33 +255,37 @@ export class UIManager {
     laneHealth: number[],
     urgentLane: number,
     time: number,
-    isVR: boolean = false
+    isVR: boolean = false,
+    vrMode: VRMode = VRMode.NONE
   ): void {
-    // Upper HUD ribbon (only covers top visor of screen, track is 100% visible)
-    ctx.fillStyle = 'rgba(10, 8, 25, 0.82)';
-    this.roundRect(ctx, 24, 12, 976, 232, 24);
+    // Upper HUD ribbon
+    ctx.fillStyle = 'rgba(10, 8, 25, 0.85)';
+    this.roundRect(ctx, 16, 10, 992, 300, 24);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 2.5;
     ctx.stroke();
 
     // Mode Banner
     ctx.textAlign = 'center';
-    ctx.font = '700 20px system-ui, sans-serif';
-    ctx.fillStyle = '#00d4ff';
-    ctx.fillText(
-      isVR
-        ? '🥽 VR: NA TOHLE MUSÍŠ HLAVOU! • TRHNI VPŘED = BODNUTÍ 🦄'
-        : '🦄 STAB THE RAINBOW • BĚŽ A ZACHRAŇ DUHU 🌈',
-      512,
-      46
-    );
+    ctx.font = '800 21px system-ui, sans-serif';
+    ctx.fillStyle = vrMode === VRMode.UNICORN_HARD ? '#ffdd00' : '#00d4ff';
+
+    let bannerText = '🦄 STAB THE RAINBOW • BĚŽ A ZACHRAŇ DUHU 🌈';
+    if (isVR) {
+      if (vrMode === VRMode.UNICORN_HARD) {
+        bannerText = '⚡ TY JSI JEDNOROŽEC! • NÁKLON = SMĚR • TRHNUTÍ = BODNUTÍ • VÝSKOK = SKOK 🦄';
+      } else {
+        bannerText = '🦄 JEZDEC NA JEDNOROŽCI • ROH V RUCE • SPOUŠŤ = BODNUTÍ • GRIP = SKOK 🥽';
+      }
+    }
+    ctx.fillText(bannerText, 512, 42);
 
     // Score
     ctx.textAlign = 'left';
-    ctx.font = '900 40px system-ui, sans-serif';
+    ctx.font = '900 42px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`SKÓRE: ${score}`, 48, 104);
+    ctx.fillText(`SKÓRE: ${score}`, 40, 98);
 
     // Urgent Alert
     if (urgentLane >= 0 && urgentLane < LANE_COUNT) {
@@ -267,15 +294,30 @@ export class UIManager {
       const blink = sin(time * 16) > 0;
 
       ctx.textAlign = 'right';
-      ctx.font = '700 24px system-ui, sans-serif';
+      ctx.font = '800 24px system-ui, sans-serif';
       ctx.fillStyle = blink ? uCol : '#ffffff';
-      ctx.fillText(`⚡ ZACHRAŇ ${uName.toUpperCase()}!`, 976, 104);
+      ctx.fillText(`⚡ ZACHRAŇ ${uName.toUpperCase()}!`, 984, 98);
+    }
+
+    // Dynamic Funny Quip Banner (if active in Hard Mode or milestone)
+    if (this.currentQuip) {
+      ctx.fillStyle = 'rgba(255, 221, 0, 0.16)';
+      this.roundRect(ctx, 40, 114, 944, 44, 12);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 221, 0, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.font = 'italic 700 20px system-ui, sans-serif';
+      ctx.fillStyle = '#fffae0';
+      ctx.fillText(`💬 "${this.currentQuip}"`, 512, 143);
     }
 
     // 7 Rainbow Lane Health Gems / Indicators
-    const barStartY = 142;
-    const barStartX = 48;
-    const totalW = 928;
+    const barStartY = 176;
+    const barStartX = 40;
+    const totalW = 944;
     const itemW = totalW / LANE_COUNT;
 
     for (let i = 0; i < LANE_COUNT; i++) {
@@ -315,11 +357,12 @@ export class UIManager {
     onRestart: () => void,
     onHome: () => void,
     time: number,
-    isVR: boolean = false
+    isVR: boolean = false,
+    vrMode: VRMode = VRMode.NONE
   ): void {
     // Dark dramatic panel for VR
-    ctx.fillStyle = 'rgba(20, 5, 15, 0.92)';
-    this.roundRect(ctx, 162, 140, 700, 720, 36);
+    ctx.fillStyle = 'rgba(20, 5, 18, 0.94)';
+    this.roundRect(ctx, 140, 110, 744, 760, 36);
     ctx.fill();
 
     ctx.strokeStyle = '#ff2a4b';
@@ -328,42 +371,52 @@ export class UIManager {
 
     // Game Over Title
     ctx.textAlign = 'center';
-    ctx.font = '900 54px system-ui, sans-serif';
+    ctx.font = '900 52px system-ui, sans-serif';
     ctx.fillStyle = '#ff2a4b';
     ctx.shadowColor = '#ff2a4b';
     ctx.shadowBlur = 24;
-    ctx.fillText('FELL INTO THE VOID', 512, 245);
+    ctx.fillText('💀 PÁD DO PROPASTI 💀', 512, 215);
     ctx.shadowBlur = 0;
 
     // Death quote
-    ctx.font = 'italic 500 24px system-ui, sans-serif';
+    ctx.font = 'italic 600 23px system-ui, sans-serif';
     ctx.fillStyle = '#ffd2d9';
-    ctx.fillText(`"${this.lastQuote || 'Gravity always wins.'}"`, 512, 305);
+    ctx.fillText(`"${this.lastQuote || 'Gravitace: 1, Jednorožec: 0'}"`, 512, 280);
 
     // Final Score
     ctx.font = '900 48px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`FINAL SCORE: ${score}`, 512, 395);
+    ctx.fillText(`SKÓRE: ${score}`, 512, 370);
 
     const isNewHigh = score >= this.highScore && score > 0;
     if (isNewHigh) {
-      ctx.font = '700 28px system-ui, sans-serif';
+      ctx.font = '800 28px system-ui, sans-serif';
       ctx.fillStyle = '#ffdd00';
-      ctx.fillText('🎉 NEW HIGH RECORD! 🎉', 512, 445);
+      ctx.fillText('🎉 NOVÝ REKORD! 🎉', 512, 420);
     } else {
-      ctx.font = '600 24px system-ui, sans-serif';
+      ctx.font = '700 24px system-ui, sans-serif';
       ctx.fillStyle = '#ffdd00';
-      ctx.fillText(`BEST RECORD: ${this.highScore}`, 512, 445);
+      ctx.fillText(`NEJLEPŠÍ SKÓRE: ${this.highScore}`, 512, 420);
     }
 
-    // VR instructions
-    ctx.font = '700 26px system-ui, sans-serif';
-    ctx.fillStyle = '#10e052';
-    ctx.fillText('Stiskni SPOUŠŤ pro nový běh', 512, 540);
+    // Mode-specific VR instructions
+    if (vrMode === VRMode.UNICORN_HARD) {
+      ctx.font = '700 26px system-ui, sans-serif';
+      ctx.fillStyle = '#10e052';
+      ctx.fillText('Kývni prudce hlavou pro nový běh! 🦄', 512, 530);
 
-    ctx.font = '600 22px system-ui, sans-serif';
-    ctx.fillStyle = '#00d4ff';
-    ctx.fillText('Stiskni ÚCHOP (Grip) pro Hlavní Rozcestník', 512, 600);
+      ctx.font = '600 22px system-ui, sans-serif';
+      ctx.fillStyle = '#00d4ff';
+      ctx.fillText('(Nebo stiskni spoušť na ovladači)', 512, 580);
+    } else {
+      ctx.font = '700 26px system-ui, sans-serif';
+      ctx.fillStyle = '#10e052';
+      ctx.fillText('Stiskni SPOUŠŤ (Trigger) pro nový běh', 512, 530);
+
+      ctx.font = '600 22px system-ui, sans-serif';
+      ctx.fillStyle = '#00d4ff';
+      ctx.fillText('Stiskni ÚCHOP (Grip) pro Hlavní Rozcestník', 512, 590);
+    }
   }
 
   private roundRect(

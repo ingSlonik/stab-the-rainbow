@@ -126,6 +126,16 @@ h2 {
   box-shadow: 0 0 24px rgba(0, 212, 255, 0.45);
 }
 
+.vr-hard-btn {
+  border-color: #ffdd00;
+  background: rgba(255, 221, 0, 0.12);
+  box-shadow: 0 0 16px rgba(255, 221, 0, 0.25);
+}
+.vr-hard-btn:hover {
+  background: rgba(255, 221, 0, 0.22);
+  box-shadow: 0 0 24px rgba(255, 221, 0, 0.45);
+}
+
 .pc-btn {
   border-color: #10e052;
   background: rgba(16, 224, 82, 0.12);

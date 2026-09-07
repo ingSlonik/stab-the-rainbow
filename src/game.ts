@@ -1,5 +1,6 @@
 import {
   GameState,
+  VRMode,
   LANE_COUNT,
   RAINBOW_COLORS,
   RAINBOW_HEX_STRINGS,
@@ -15,6 +16,12 @@ import {
   getAudioMuted,
   getSfxMuted,
 } from './audio';
+import {
+  speakQuip,
+  getRandomStartQuip,
+  getRandomStabQuip,
+  getRandomComboQuip,
+} from './quips';
 import { TrackManager } from './track';
 import { CloudManager } from './clouds';
 import { Player } from './player';
@@ -31,6 +38,7 @@ export class Game {
   public ui: UIManager;
 
   public state: GameState = GameState.MENU;
+  public currentVRMode: VRMode = VRMode.NONE;
   public score = 0;
   public combo = 1;
   public speed = 18;
@@ -242,8 +250,8 @@ export class Game {
 
     // Magical point light that illuminates the road from the horn
     const hornLight = new THREE.PointLight(0xfff2b0, 1.4, 15);
-    hornLight.position.set(0, 0, -1.2);
-    this.camera.add(hornLight);
+    hornLight.position.set(0, 0, -0.6);
+    this.player.horn.add(hornLight);
   }
 
   private async initWebXR(): Promise<void> {
@@ -281,11 +289,25 @@ export class Game {
   }
 
   private initDOM(): void {
-    const vrBtn = document.getElementById('btn-vr');
-    if (vrBtn) {
-      vrBtn.addEventListener('click', () => {
+    const vrEasyBtn = document.getElementById('btn-vr-easy');
+    if (vrEasyBtn) {
+      vrEasyBtn.addEventListener('click', () => {
         if (this.hasWebXR) {
-          this.requestVRSession();
+          this.requestVRSession(VRMode.RIDER_EASY);
+        } else {
+          alert(
+            'WebXR brýle nebyly detekovány. Pro plný VR zážitek otevřete tuto stránku v prohlížeči v Meta Quest.\n\nHra se nyní spustí na desktopu.'
+          );
+          this.startGame();
+        }
+      });
+    }
+
+    const vrHardBtn = document.getElementById('btn-vr-hard');
+    if (vrHardBtn) {
+      vrHardBtn.addEventListener('click', () => {
+        if (this.hasWebXR) {
+          this.requestVRSession(VRMode.UNICORN_HARD);
         } else {
           alert(
             'WebXR brýle nebyly detekovány. Pro plný VR zážitek otevřete tuto stránku v prohlížeči v Meta Quest.\n\nHra se nyní spustí na desktopu.'
@@ -353,12 +375,13 @@ export class Game {
     }
   }
 
-  public async requestVRSession(): Promise<void> {
+  public async requestVRSession(mode: VRMode = VRMode.RIDER_EASY): Promise<void> {
     if (!this.hasWebXR) return;
     try {
       initAudio();
+      this.currentVRMode = mode;
       const session = await (navigator as any).xr.requestSession('immersive-vr', {
-        optionalFeatures: ['local-floor', 'bounded-floor', 'layers', 'hand-tracking'],
+        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'],
       });
       this.vrSession = session;
       await this.renderer.xr.setSession(session);
@@ -368,14 +391,27 @@ export class Game {
       this.camera.rotation.set(0, 0, 0);
       this.camera.quaternion.set(0, 0, 0, 1);
 
+      // Configure player with chosen VR mode and primary controller
+      const primaryController = this.renderer.xr.getController(0);
+      this.player.setVRMode(mode, primaryController);
+
       const modal = document.getElementById('modal');
       if (modal) modal.style.display = 'none';
       const goModal = document.getElementById('go-modal');
       if (goModal) goModal.style.display = 'none';
 
+      // If Hard mode, speak funny start quip
+      if (mode === VRMode.UNICORN_HARD) {
+        const startQuip = getRandomStartQuip();
+        this.ui.setQuip(startQuip);
+        speakQuip(startQuip, true);
+      }
+
       session.addEventListener('end', () => {
         this.vrSession = null;
-        this.camera.position.set(0, 1.6, 0);
+        this.currentVRMode = VRMode.NONE;
+        this.player.setVRMode(VRMode.NONE);
+        this.camera.position.set(0, 0.15, 0);
         this.camera.rotation.set(-0.10, 0, 0);
         if (this.state === GameState.MENU) {
           const m = document.getElementById('modal');
@@ -545,6 +581,12 @@ export class Game {
     this.track.reset();
     this.clouds.reset();
     this.player.reset();
+
+    if (this.currentVRMode === VRMode.UNICORN_HARD) {
+      const startQuip = getRandomStartQuip();
+      this.ui.setQuip(startQuip);
+      speakQuip(startQuip, true);
+    }
   }
 
   public restartGame(): void {
@@ -572,7 +614,9 @@ export class Game {
       const dz = hornTipPos.z - c.z;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-      const hitDist = this.player.isStabbing ? 1.6 : 0.88;
+      const hitDist = this.player.isStabbing
+        ? (this.currentVRMode === VRMode.RIDER_EASY ? 1.85 : 1.6)
+        : 0.88;
       if (dist < hitDist) {
         if (this.player.isStabbing || isAirborne) {
           c.stabbed = true;
@@ -582,6 +626,19 @@ export class Game {
           playStabSound(c.colorIdx);
           this.score += 150 * this.combo;
           this.combo = min(8, this.combo + 1);
+
+          // Hard mode humorous quips on cloud stabbing
+          if (this.currentVRMode === VRMode.UNICORN_HARD) {
+            if (this.combo >= 3 && Math.random() < 0.6) {
+              const q = getRandomComboQuip();
+              this.ui.setQuip(q);
+              speakQuip(q);
+            } else if (Math.random() < 0.4) {
+              const q = getRandomStabQuip();
+              this.ui.setQuip(q);
+              speakQuip(q);
+            }
+          }
           break;
         }
       }
@@ -590,9 +647,7 @@ export class Game {
 
   private checkTrackFall(): void {
     if (this.player.isGrounded && !this.player.isFalling) {
-      const effectiveX =
-        this.player.x +
-        (this.renderer.xr.isPresenting ? this.camera.position.x : 0);
+      const effectiveX = this.player.x;
       const laneIdx = this.track.getLaneIndexFromX(effectiveX);
       this.player.currentLane = laneIdx;
 
@@ -602,7 +657,11 @@ export class Game {
         this.fallTimer = 0;
         this.player.startFalling();
         playFallSound();
-        this.ui.setGameOverDeathQuote();
+        const isHard = this.currentVRMode === VRMode.UNICORN_HARD;
+        this.ui.setGameOverDeathQuote(isHard);
+        if (isHard) {
+          speakQuip(this.ui.getLastQuote(), true);
+        }
         this.ui.saveHighScore(this.score);
       }
     }
@@ -614,25 +673,17 @@ export class Game {
 
     const isVR = this.renderer?.xr?.isPresenting || false;
 
-    // 0. VR 6DOF Head Motion & Controller Input
+    // VR Controls
     if (isVR) {
-      // Head forward thrust = STAB!
-      const curHeadZ = this.camera.position.z;
-      const headVelZ = (curHeadZ - this.prevHeadZ) / max(0.001, dt);
-      this.prevHeadZ = curHeadZ;
-      if (headVelZ < -0.35 && this.state === GameState.PLAYING) {
-        this.player.stab();
+      // 1. Easy mode: VR Controller steering with hand or thumbstick
+      if (this.currentVRMode === VRMode.RIDER_EASY && this.player.vrController) {
+        const handX = this.player.vrController.position.x;
+        if (Math.abs(handX) > 0.18) {
+          this.player.moveLateral(handX * dt * 3.5);
+        }
       }
 
-      // Head upward motion = physical JUMP!
-      const curHeadY = this.camera.position.y;
-      const headVelY = (curHeadY - this.prevHeadY) / max(0.001, dt);
-      this.prevHeadY = curHeadY;
-      if (headVelY > 1.3 && this.state === GameState.PLAYING) {
-        this.player.jump();
-      }
-
-      // VR Controller Thumbstick support for lane shifting
+      // 2. Thumbstick support for lane shifting
       const session = this.renderer.xr.getSession();
       if (session) {
         for (const source of session.inputSources) {
@@ -654,9 +705,19 @@ export class Game {
           }
         }
       }
+
+      // 3. Hard mode: Head nod in GameOver restarts
+      if (this.currentVRMode === VRMode.UNICORN_HARD && this.state === GameState.GAMEOVER) {
+        const curHeadZ = this.camera.position.z;
+        const headVelZ = (curHeadZ - this.prevHeadZ) / max(0.001, dt);
+        this.prevHeadZ = curHeadZ;
+        if (headVelZ < -0.38) {
+          this.restartGame();
+        }
+      }
     }
 
-    // Sky and hills follow player world lateral coordinate so player is always centered in the world
+    // Sky and hills follow player world lateral coordinate
     if (this.skyMesh) {
       this.skyMesh.position.set(this.player.x, this.player.y, 0);
     }
@@ -674,7 +735,6 @@ export class Game {
 
     // State-specific logic
     if (this.state === GameState.MENU) {
-      // Attract/Demo mode: Gentle auto-gallop and scenic sway in the background
       const demoSpeed = 15;
       const demoAutoX = sin(totalTime * 0.8) * 2.2;
       this.player.setTargetX(demoAutoX / 3.5);
@@ -688,17 +748,18 @@ export class Game {
         this.track.laneHealth,
         -1,
         totalTime,
+        dt,
         this.hasWebXR,
         () => this.startGame(),
-        () => this.requestVRSession(),
+        (m) => this.requestVRSession(m),
         () => this.restartGame(),
         () => this.goToMenu(),
         () => this.toggleFullscreen(),
-        isVR
+        isVR,
+        this.currentVRMode
       );
     } else if (this.state === GameState.PLAYING) {
       this.runTime += dt;
-      // Progressive difficulty acceleration
       this.speed = min(36, 18 + this.runTime * 0.28);
       this.score += floor(this.speed * dt * 2.5);
 
@@ -720,13 +781,15 @@ export class Game {
         this.track.laneHealth,
         this.track.getUrgentLane(),
         totalTime,
+        dt,
         this.hasWebXR,
         () => this.startGame(),
-        () => this.requestVRSession(),
+        (m) => this.requestVRSession(m),
         () => this.restartGame(),
         () => this.goToMenu(),
         () => this.toggleFullscreen(),
-        isVR
+        isVR,
+        this.currentVRMode
       );
     } else if (this.state === GameState.FALLING) {
       this.fallTimer += dt;
@@ -758,13 +821,15 @@ export class Game {
         this.track.laneHealth,
         -1,
         totalTime,
+        dt,
         this.hasWebXR,
         () => this.startGame(),
-        () => this.requestVRSession(),
+        (m) => this.requestVRSession(m),
         () => this.restartGame(),
         () => this.goToMenu(),
         () => this.toggleFullscreen(),
-        isVR
+        isVR,
+        this.currentVRMode
       );
     } else if (this.state === GameState.GAMEOVER) {
       this.ui.renderUI(
@@ -773,13 +838,15 @@ export class Game {
         this.track.laneHealth,
         -1,
         totalTime,
+        dt,
         this.hasWebXR,
         () => this.startGame(),
-        () => this.requestVRSession(),
+        (m) => this.requestVRSession(m),
         () => this.restartGame(),
         () => this.goToMenu(),
         () => this.toggleFullscreen(),
-        isVR
+        isVR,
+        this.currentVRMode
       );
     }
 
