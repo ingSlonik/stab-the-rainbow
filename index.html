@@ -5,6 +5,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Stab the Rainbow</title>
+  <script>
+    // Enforce standard WebXR XRWebGLLayer on Meta Quest (matches https://immersive-web.github.io/webxr-samples/immersive-vr-session.html)
+    try {
+      if (typeof XRWebGLBinding !== 'undefined') {
+        delete XRWebGLBinding.prototype.createProjectionLayer;
+        try {
+          Object.defineProperty(XRWebGLBinding.prototype, 'createProjectionLayer', {
+            value: undefined,
+            configurable: true,
+          });
+        } catch (_) {}
+      }
+    } catch (_) {}
+    try {
+      Object.defineProperty(window, 'XRWebGLBinding', {
+        value: undefined,
+        configurable: true,
+      });
+    } catch (_) {}
+  </script>
   <link rel="stylesheet" href="./src/style.css">
 </head>
 
