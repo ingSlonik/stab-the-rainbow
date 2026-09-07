@@ -99,34 +99,45 @@ export class CloudManager {
   }
 
   private initStars(): void {
-    this.starPosArr = new Float32Array(this.STAR_COUNT * 3);
+    // 2 vertices per streak (head & tail) for vivid hyperspace motion
+    this.starPosArr = new Float32Array(this.STAR_COUNT * 6);
     for (let i = 0; i < this.STAR_COUNT; i++) {
-      this.resetStar(i, randRange(-100, 10));
+      this.resetStar(i, randRange(-65, 5));
     }
 
     this.starGeom = new THREE.BufferGeometry();
-    this.starGeom.setAttribute(
-      'position',
-      new THREE.BufferAttribute(this.starPosArr, 3)
-    );
+    const posAttr = new THREE.BufferAttribute(this.starPosArr, 3);
+    posAttr.setUsage(THREE.DynamicDrawUsage);
+    this.starGeom.setAttribute('position', posAttr);
 
-    const mat = new THREE.PointsMaterial({
-      size: 0.16,
-      color: 0xffffff,
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xd8f0ff,
       transparent: true,
-      opacity: 0.75,
+      opacity: 0.85,
       blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
 
-    this.starPoints = new THREE.Points(this.starGeom, mat);
+    this.starPoints = new THREE.LineSegments(this.starGeom, mat);
+    this.starPoints.frustumCulled = false;
     this.scene.add(this.starPoints);
   }
 
   private resetStar(idx: number, z: number): void {
-    const i3 = idx * 3;
-    this.starPosArr[i3] = randRange(-16, 16);
-    this.starPosArr[i3 + 1] = randRange(-3, 16);
-    this.starPosArr[i3 + 2] = z;
+    const base = idx * 6;
+    const x = randRange(-7.5, 7.5);
+    const y = randRange(0.2, 5.2);
+    const streakLen = randRange(0.8, 2.0);
+
+    // Head vertex
+    this.starPosArr[base] = x;
+    this.starPosArr[base + 1] = y;
+    this.starPosArr[base + 2] = z;
+
+    // Tail vertex (behind head along Z)
+    this.starPosArr[base + 3] = x;
+    this.starPosArr[base + 4] = y;
+    this.starPosArr[base + 5] = z - streakLen;
   }
 
   public spawnBurst(x: number, y: number, z: number, colorHex: number): void {
@@ -340,13 +351,16 @@ export class CloudManager {
     posAttr.needsUpdate = true;
     colAttr.needsUpdate = true;
 
-    // 4. Update Cosmic Speed Stars
+    // 4. Update Cosmic Speed Stars (Hyperspace Streaks)
     const starPos = this.starGeom.attributes.position;
+    const starVel = max(18, speed) * dt * 2.5;
     for (let s = 0; s < this.STAR_COUNT; s++) {
-      const s3 = s * 3;
-      this.starPosArr[s3 + 2] += speed * dt * 1.5;
-      if (this.starPosArr[s3 + 2] > 8) {
-        this.resetStar(s, randRange(-90, -80));
+      const base = s * 6;
+      this.starPosArr[base + 2] += starVel;
+      this.starPosArr[base + 5] += starVel;
+
+      if (this.starPosArr[base + 2] > 6) {
+        this.resetStar(s, randRange(-75, -60));
       }
     }
     starPos.needsUpdate = true;
