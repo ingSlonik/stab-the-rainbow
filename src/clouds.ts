@@ -125,18 +125,26 @@ export class CloudManager {
 
   private resetStar(idx: number, z: number): void {
     const base = idx * 6;
-    const x = randRange(-7.5, 7.5);
-    const y = randRange(0.2, 5.2);
-    const streakLen = randRange(0.8, 2.0);
+    // Radial distribution around the player's view corridor (center: x=0, y=2.0)
+    const angle = random() * Math.PI * 2;
+    const dist = randRange(1.8, 14.0);
+    const x = cos(angle) * dist;
+    const y = 2.0 + sin(angle) * dist * 0.75;
+    const streakLen = randRange(1.8, 4.2);
+
+    // Radial expansion: streaks point backward along the 3D divergence vector
+    const radialScale = 0.28;
+    const dx = (x / max(1.0, dist)) * radialScale;
+    const dy = ((y - 2.0) / max(1.0, dist)) * radialScale;
 
     // Head vertex
     this.starPosArr[base] = x;
     this.starPosArr[base + 1] = y;
     this.starPosArr[base + 2] = z;
 
-    // Tail vertex (behind head along Z)
-    this.starPosArr[base + 3] = x;
-    this.starPosArr[base + 4] = y;
+    // Tail vertex (behind head along Z, trailing inwards towards vanishing point)
+    this.starPosArr[base + 3] = x - dx * streakLen;
+    this.starPosArr[base + 4] = y - dy * streakLen;
     this.starPosArr[base + 5] = z - streakLen;
   }
 
@@ -353,14 +361,24 @@ export class CloudManager {
 
     // 4. Update Cosmic Speed Stars (Hyperspace Streaks)
     const starPos = this.starGeom.attributes.position;
-    const starVel = max(18, speed) * dt * 2.5;
+    const starVel = max(18, speed) * dt * 2.8;
     for (let s = 0; s < this.STAR_COUNT; s++) {
       const base = s * 6;
       this.starPosArr[base + 2] += starVel;
       this.starPosArr[base + 5] += starVel;
 
-      if (this.starPosArr[base + 2] > 6) {
-        this.resetStar(s, randRange(-75, -60));
+      // Radial outward flow as star approaches the player
+      const x = this.starPosArr[base];
+      const y = this.starPosArr[base + 1];
+      const outX = (x * 0.12) * dt * (starVel / 6);
+      const outY = ((y - 2.0) * 0.12) * dt * (starVel / 6);
+      this.starPosArr[base] += outX;
+      this.starPosArr[base + 1] += outY;
+      this.starPosArr[base + 3] += outX;
+      this.starPosArr[base + 4] += outY;
+
+      if (this.starPosArr[base + 2] > 7) {
+        this.resetStar(s, randRange(-85, -70));
       }
     }
     starPos.needsUpdate = true;
