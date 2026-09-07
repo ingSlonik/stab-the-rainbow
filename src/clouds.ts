@@ -7,15 +7,13 @@ import {
 } from './types';
 import { sin, cos, max, min, floor, random, randRange } from './math';
 import {
-  createCloudVoice,
-  updateCloudVoice,
-  stopCloudVoice,
+  playCloudEcho,
   CloudAudioVoice,
 } from './audio';
 
 export class CloudManager {
   public group: any;
-  public clouds: (CloudData & { voice: CloudAudioVoice | null })[] = [];
+  public clouds: (CloudData & { voice?: CloudAudioVoice | null; echoed?: boolean })[] = [];
   private scene: any;
   private cloudGeom: any;
 
@@ -185,7 +183,7 @@ export class CloudManager {
     }
   }
 
-  public popCloud(c: CloudData & { voice: CloudAudioVoice | null }): void {
+  public popCloud(c: CloudData & { voice?: CloudAudioVoice | null; echoed?: boolean }): void {
     if (c.stabbed) return;
     c.stabbed = true;
     c.popping = true;
@@ -215,8 +213,6 @@ export class CloudManager {
     mesh.position.set(x, baseY, z);
     this.group.add(mesh);
 
-    const voice = createCloudVoice(colorIdx);
-
     this.clouds.push({
       mesh,
       lane,
@@ -234,13 +230,12 @@ export class CloudManager {
       popping: false,
       popTimer: 0,
       popDuration: 0.32,
-      voice,
+      echoed: false,
     });
   }
 
   public reset(): void {
     this.clouds.forEach((c) => {
-      stopCloudVoice(c.voice);
       this.group.remove(c.mesh);
     });
     this.clouds = [];
@@ -264,7 +259,6 @@ export class CloudManager {
       if (c.popping) {
         c.popTimer -= dt;
         if (c.popTimer <= 0) {
-          stopCloudVoice(c.voice);
           this.group.remove(c.mesh);
           this.clouds.splice(i, 1);
           continue;
@@ -307,12 +301,14 @@ export class CloudManager {
       c.mesh.rotation.y = sin(time * 0.8 + c.phaseX) * 0.2;
       c.mesh.rotation.z = cos(time * 0.6 + c.phaseY) * 0.1;
 
-      // Update spatial audio
-      updateCloudVoice(c.voice, c.x, c.z);
+      // Spatial pass-by echo ("dozvuk") if cloud rushes past the player
+      if (c.z > -4 && c.z < 2 && !c.echoed && !c.stabbed) {
+        c.echoed = true;
+        playCloudEcho(c.colorIdx, c.x / 4, 0.22);
+      }
 
       // Passed behind player without being stabbed
       if (c.z > 5) {
-        stopCloudVoice(c.voice);
         this.group.remove(c.mesh);
         this.clouds.splice(i, 1);
       }

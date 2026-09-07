@@ -9,6 +9,9 @@ import {
   initAudio,
   playStabSound,
   playFallSound,
+  setAudioState,
+  toggleAudio,
+  toggleSfx,
 } from './audio';
 import { TrackManager } from './track';
 import { CloudManager } from './clouds';
@@ -455,6 +458,12 @@ export class Game {
       } else if (e.code === 'KeyF') {
         e.preventDefault();
         this.toggleFullscreen();
+      } else if (e.code === 'KeyM') {
+        e.preventDefault();
+        toggleAudio();
+      } else if (e.code === 'KeyN') {
+        e.preventDefault();
+        toggleSfx();
       } else if (e.code === 'KeyH' || e.code === 'Escape') {
         if (this.state === GameState.GAMEOVER) {
           this.goToMenu();
@@ -640,6 +649,9 @@ export class Game {
       this.hillsGroup.position.x = this.camera.position.x;
       this.hillsGroup.position.z = this.camera.position.z;
     }
+
+    // Sync audio engine with state, airborne jumping status, and run speed
+    setAudioState(this.state, this.player.isGrounded, this.speed ? this.speed / 18 : 1.0);
 
     // State-specific logic
     if (this.state === GameState.MENU) {
