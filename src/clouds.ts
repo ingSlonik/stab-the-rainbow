@@ -74,8 +74,10 @@ export class CloudManager {
     const mat = new THREE.MeshLambertMaterial({
       color: colorHex,
       emissive: colorHex,
-      emissiveIntensity: 0.28,
+      emissiveIntensity: 0.32,
       flatShading: true,
+      transparent: true,
+      opacity: 0.95,
     });
 
     const spheres = [
@@ -162,9 +164,9 @@ export class CloudManager {
     const g = ((colorHex >> 8) & 255) / 255;
     const b = (colorHex & 255) / 255;
 
-    const count = 35;
+    const count = 45;
     for (let i = 0; i < count; i++) {
-      const speed = randRange(2.5, 7.0);
+      const speed = randRange(3.0, 9.0);
       const theta = random() * Math.PI * 2;
       const phi = randRange(-Math.PI / 3, Math.PI / 3);
 
@@ -173,14 +175,23 @@ export class CloudManager {
         y,
         z,
         vx: cos(phi) * sin(theta) * speed,
-        vy: sin(phi) * speed + randRange(1, 3),
+        vy: sin(phi) * speed + randRange(1, 4),
         vz: cos(phi) * cos(theta) * speed,
         life: 0,
-        maxLife: randRange(0.4, 0.9),
+        maxLife: randRange(0.45, 0.95),
         color: colorHex,
-        size: randRange(0.12, 0.28),
+        size: randRange(0.14, 0.32),
       });
     }
+  }
+
+  public popCloud(c: CloudData & { voice: CloudAudioVoice | null }): void {
+    if (c.stabbed) return;
+    c.stabbed = true;
+    c.popping = true;
+    c.popTimer = 0.32;
+    c.popDuration = 0.32;
+    this.spawnBurst(c.x, c.y, c.z, RAINBOW_COLORS[c.colorIdx]);
   }
 
   public spawnCloud(preferredColorIdx?: number): void {
@@ -197,7 +208,9 @@ export class CloudManager {
     const colHex = RAINBOW_COLORS[colorIdx];
     const mesh = this.createCloudMesh(colHex);
     const z = randRange(-85, -75);
-    const baseY = randRange(1.1, 2.5);
+    // ~40% high clouds (must jump to reach: 2.5 - 3.25m), 60% ground height (1.3 - 1.75m)
+    const isHigh = random() < 0.4;
+    const baseY = isHigh ? randRange(2.5, 3.25) : randRange(1.3, 1.75);
 
     mesh.position.set(x, baseY, z);
     this.group.add(mesh);
@@ -216,8 +229,11 @@ export class CloudManager {
       freqY: randRange(1.5, 3.0),
       phaseX: random() * Math.PI * 2,
       phaseY: random() * Math.PI * 2,
-      radius: 0.92,
+      radius: 0.85,
       stabbed: false,
+      popping: false,
+      popTimer: 0,
+      popDuration: 0.32,
       voice,
     });
   }
@@ -245,6 +261,39 @@ export class CloudManager {
     for (let i = this.clouds.length - 1; i >= 0; i--) {
       const c = this.clouds[i];
 
+      if (c.popping) {
+        c.popTimer -= dt;
+        if (c.popTimer <= 0) {
+          stopCloudVoice(c.voice);
+          this.group.remove(c.mesh);
+          this.clouds.splice(i, 1);
+          continue;
+        }
+
+        const progress = 1 - c.popTimer / c.popDuration;
+        const scale = 1 + progress * 0.9;
+        c.mesh.scale.set(scale, scale, scale);
+
+        const fade = max(0, 1 - progress);
+        c.mesh.traverse((child: any) => {
+          if (child.material) {
+            if (progress < 0.35) {
+              child.material.emissive.setHex(0xffffff);
+              child.material.emissiveIntensity = 1.0 + (1 - progress / 0.35) * 2.2;
+              child.material.opacity = 1.0;
+            } else {
+              child.material.opacity = fade * 0.9;
+              child.material.emissiveIntensity = fade * 0.7;
+            }
+          }
+        });
+
+        c.y += dt * 2.2;
+        c.z += speed * dt * 0.2;
+        c.mesh.position.set(c.x, c.y, c.z);
+        continue;
+      }
+
       // Move toward player
       c.z += speed * dt;
 
@@ -261,8 +310,8 @@ export class CloudManager {
       // Update spatial audio
       updateCloudVoice(c.voice, c.x, c.z);
 
-      // Passed behind player or already stabbed
-      if (c.z > 5 || c.stabbed) {
+      // Passed behind player without being stabbed
+      if (c.z > 5) {
         stopCloudVoice(c.voice);
         this.group.remove(c.mesh);
         this.clouds.splice(i, 1);

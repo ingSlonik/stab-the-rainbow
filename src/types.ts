@@ -54,6 +54,9 @@ export interface CloudData {
   phaseY: number;
   radius: number;
   stabbed: boolean;
+  popping: boolean;
+  popTimer: number;
+  popDuration: number;
   panner?: any;
   gainNode?: any;
 }
