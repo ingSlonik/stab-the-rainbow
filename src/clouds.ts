@@ -14,7 +14,6 @@ export class CloudManager {
   public group: any;
   public clouds: (CloudData & { echoed?: boolean })[] = [];
   private scene: any;
-  private cloudGeom: any;
 
   // Particle System
   private burstParticles: Particle[] = [];
@@ -36,34 +35,8 @@ export class CloudManager {
     this.group = new THREE.Group();
     scene.add(this.group);
 
-    this.initCloudGeometry();
     this.initParticles();
     this.initStars();
-  }
-
-  private initCloudGeometry(): void {
-    // Composite cloud geometry out of overlapping spheres
-    const parts = [
-      { r: 0.65, x: 0, y: 0, z: 0 },
-      { r: 0.48, x: -0.52, y: -0.05, z: 0.1 },
-      { r: 0.52, x: 0.52, y: -0.05, z: -0.1 },
-      { r: 0.44, x: 0.15, y: 0.38, z: 0.05 },
-      { r: 0.38, x: -0.25, y: 0.3, z: -0.08 },
-    ];
-
-    const groupGeom = new THREE.BufferGeometry();
-    const geoms: any[] = [];
-
-    parts.forEach((p) => {
-      const g = new THREE.SphereGeometry(p.r, 8, 8);
-      g.translate(p.x, p.y, p.z);
-      geoms.push(g);
-    });
-
-    // Merge geometries into a single fast buffer
-    this.cloudGeom = geoms[0]; // fallback base
-    // Manual merge for cloud geometry:
-    // Simple hierarchy mesh is tiny in code size and very fast:
   }
 
   private createCloudMesh(colorHex: number): any {

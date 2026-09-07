@@ -9,12 +9,6 @@ import {
 import { sin, max, min, floor, randChoice } from './math';
 import { getRandomDeathQuip } from './quips';
 
-const DEATH_QUOTES = [
-  'Gravity: 1, Unicorn: 0',
-  'Rainbow out of order. Please insert 1 cloud.',
-  'Lost forever in the cyan-deprived astral abyss.',
-];
-
 export interface UIButton {
   id: string;
   x: number;
@@ -186,12 +180,8 @@ export class UIManager {
     return false;
   }
 
-  public setGameOverDeathQuote(isHardVR = false): void {
-    if (isHardVR) {
-      this.lastQuote = getRandomDeathQuip();
-    } else {
-      this.lastQuote = randChoice(DEATH_QUOTES);
-    }
+  public setGameOverDeathQuote(_isHardVR = false): void {
+    this.lastQuote = getRandomDeathQuip();
   }
 
   public renderUI(
