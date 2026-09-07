@@ -46,7 +46,7 @@
     <a-light type="ambient" color="#c4b8ea" intensity="0.8"></a-light>
     <a-light type="directional" color="#fff0d0" intensity="1.15" position="0 25 -100"></a-light>
     <a-entity id="rig" position="0 2.25 0">
-      <a-camera id="camera" position="0 0 0" rotation="-14 0 0" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera>
+      <a-camera id="camera" position="0 0 0" look-controls="mouseEnabled: false; touchEnabled: false" wasd-controls="enabled: false"></a-camera>
       <a-entity id="left-controller" oculus-touch-controls="hand: left" meta-touch-controls="hand: left"></a-entity>
       <a-entity id="right-controller" oculus-touch-controls="hand: right" meta-touch-controls="hand: right"></a-entity>
     </a-entity>
