@@ -10,68 +10,28 @@
 </head>
 
 <body>
-  <!-- Rozcestník Menu Modal -->
+  <!-- Vstupní brána do Imerzivního Režimu -->
   <div id="modal" class="overlay">
     <div class="card">
       <h1>✨ STAB THE RAINBOW ✨</h1>
       <p class="sub">🦄 Ethereal Unicorn Gallop & Cloud Piercer 🌈</p>
 
-      <div id="high-score" class="badge">🏆 NEJLEPŠÍ SKÓRE: 0</div>
-
       <div class="choices">
-        <button id="btn-vr-easy" class="choice-btn vr-btn">
-          <span class="btn-icon">🦄</span>
-          <span class="btn-text">
-            <strong>VR: JEZDEC NA JEDNOROŽCI (EASY)</strong>
-            <small>Roh v ruce • Ovladač: Spoušť = Bodnutí • Grip = Skok</small>
-          </span>
-        </button>
-
-        <button id="btn-vr-hard" class="choice-btn vr-hard-btn">
-          <span class="btn-icon">⚡</span>
-          <span class="btn-text">
-            <strong>VR: TY JSI JEDNOROŽEC! (HARD)</strong>
-            <small>Pohyb těla a hlavy • Trhnutí = Bodnutí • Výskok • Hlášky</small>
-          </span>
+        <button id="btn-enter-vr" class="choice-btn vr-btn">
+          <strong>🥽 VSTOUPIT DO VR (IMERZIVNÍ REŽIM)</strong>
+          <small>3D rozcestník a výběr úrovně v headsetu</small>
         </button>
 
         <button id="btn-desktop" class="choice-btn pc-btn">
-          <span class="btn-icon">💻</span>
-          <span class="btn-text">
-            <strong>HRÁT NA DESKTOPU</strong>
-            <small>Myš: Pohyb = řízení • L-klik = Bodnutí • P-klik = Skok</small>
-          </span>
+          <strong>💻 HRÁT NA DESKTOPU</strong>
+          <small>Myš: řízení • L-klik: bodnutí • P-klik: skok</small>
         </button>
-      </div>
-
-      <div class="controls-guide">
-        <p>🎯 <strong>Ovládání:</strong> VR Easy: ovladače • VR Hard: pohyby těla • Desktop: myš / klávesnice
-          (šipky/mezerník/S)</p>
       </div>
 
       <div class="bottom-bar">
         <button id="btn-music" class="mini-btn">🎵 HUDBA: ZAP</button>
         <button id="btn-sfx" class="mini-btn">🔊 ZVUKY: ZAP</button>
         <button id="btn-fs" class="mini-btn">⛶ CELÁ OBRAZOVKA (F)</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Game Over Modal -->
-  <div id="go-modal" class="overlay" style="display:none">
-    <div class="card go-card">
-      <h2>💀 PÁD DO PROPASTI 💀</h2>
-      <p id="go-quote" class="sub"></p>
-      <div id="go-score" class="badge">SKÓRE: 0</div>
-      <div class="choices">
-        <button id="btn-retry" class="choice-btn pc-btn">
-          <span class="btn-icon">🔄</span>
-          <span class="btn-text"><strong>HRÁT ZNOVU</strong></span>
-        </button>
-        <button id="btn-home" class="choice-btn vr-btn">
-          <span class="btn-icon">🏠</span>
-          <span class="btn-text"><strong>HLAVNÍ ROZCESTNÍK</strong></span>
-        </button>
       </div>
     </div>
   </div>

@@ -1,27 +1,24 @@
 import { randChoice } from './math';
 
 export const UNICORN_START_QUIPS = [
-  'Teď jsi jednorožec!',
   'Hlava vpřed, rohy nabrousit!',
   'Maká celé tělo!',
 ];
 
 export const UNICORN_STAB_QUIPS = [
   'Trk!',
-  'Trefa na komoru!',
-  'Král duhy!',
+  'Trefa!',
   'Prásk!',
 ];
 
 export const UNICORN_COMBO_QUIPS = [
   'Duhové kombo!',
-  'Magie na maximum!',
+  'Magie!',
 ];
 
 export const UNICORN_DEATH_QUIPS = [
   'Gravitace: 1, Ty: 0.',
   'Pád do propasti!',
-  'Zkus to znova!',
 ];
 
 let lastSpokenTime = 0;
