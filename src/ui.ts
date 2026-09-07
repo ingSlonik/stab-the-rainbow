@@ -165,22 +165,23 @@ export class UIManager {
     this.hudTexture = new THREE.CanvasTexture(this.hudCanvas);
     this.hudTexture.minFilter = THREE.LinearFilter;
 
-    const hudGeom = new THREE.PlaneGeometry(1.30, 0.325);
+    const hudGeom = new THREE.PlaneGeometry(2.4, 0.60);
     const hudMat = new THREE.MeshBasicMaterial({
       map: this.hudTexture,
       transparent: true,
+      side: THREE.DoubleSide,
       depthTest: false,
       depthWrite: false,
     });
 
     this.hudMesh = new THREE.Mesh(hudGeom, hudMat);
-    this.hudMesh.position.set(0, -0.44, -1.55);
-    this.hudMesh.rotation.set(-0.22, 0, 0);
+    this.hudMesh.position.set(0, 2.45, -3.2);
+    this.hudMesh.rotation.set(0.12, 0, 0);
     this.hudMesh.renderOrder = 9999;
     this.hudMesh.visible = false;
-    this.camera.add(this.hudMesh);
+    this.group.add(this.hudMesh);
 
-    // 2. Rainbow track health percentages: written directly on the rainbow track below the player!
+    // 2. Rainbow track health percentages: written directly on the rainbow track in front of the player!
     this.trackPercentCanvas = document.createElement('canvas');
     this.trackPercentCanvas.width = 1024;
     this.trackPercentCanvas.height = 160;
@@ -189,7 +190,7 @@ export class UIManager {
     this.trackPercentTexture = new THREE.CanvasTexture(this.trackPercentCanvas);
     this.trackPercentTexture.minFilter = THREE.LinearFilter;
 
-    const trackGeom = new THREE.PlaneGeometry(7.7, 1.25);
+    const trackGeom = new THREE.PlaneGeometry(7.7, 1.45);
     const trackMat = new THREE.MeshBasicMaterial({
       map: this.trackPercentTexture,
       transparent: true,
@@ -198,9 +199,9 @@ export class UIManager {
     });
 
     this.trackPercentMesh = new THREE.Mesh(trackGeom, trackMat);
-    this.trackPercentMesh.position.set(0, 0.08, -3.6);
-    this.trackPercentMesh.rotation.x = -Math.PI / 2 + 0.18;
-    this.trackPercentMesh.visible = false;
+    this.trackPercentMesh.position.set(0, 0.08, -5.2);
+    this.trackPercentMesh.rotation.x = -Math.PI / 2 + 0.35;
+    this.trackPercentMesh.visible = true;
     this.group.add(this.trackPercentMesh);
 
     // 3. Centered 3D Dialog panel (Menu & Game Over) in 3D world space (comfortable VR reading distance)
@@ -228,7 +229,7 @@ export class UIManager {
     this.dialogMesh.visible = true;
     this.group.add(this.dialogMesh);
 
-    // 4. Glowing 3D Laser Reticle Ring on dialog board
+    // 4. Glowing 3D Laser Reticle Ring on dialog board (child of dialogMesh so it moves with it)
     const reticleGeom = new THREE.RingGeometry(0.045, 0.065, 32);
     const reticleMat = new THREE.MeshBasicMaterial({
       color: 0x00ffff,
@@ -240,7 +241,7 @@ export class UIManager {
     this.reticle3DMesh = new THREE.Mesh(reticleGeom, reticleMat);
     this.reticle3DMesh.renderOrder = 3000;
     this.reticle3DMesh.visible = false;
-    this.group.add(this.reticle3DMesh);
+    this.dialogMesh.add(this.reticle3DMesh);
   }
 
   public updateHoverRay(origin: any, direction: any): { hit: boolean; point?: any } {
@@ -257,15 +258,17 @@ export class UIManager {
     const res = this.processIntersects(intersects);
     if (this.reticle3DMesh) {
       if (res.hit && res.point) {
-        this.reticle3DMesh.position.copy(res.point);
-        this.reticle3DMesh.position.z += 0.015;
-        this.reticle3DMesh.rotation.copy(this.dialogMesh.rotation);
+        const local = new THREE.Vector3();
+        this.dialogMesh.worldToLocal(local.copy(res.point));
+        this.reticle3DMesh.position.set(local.x, local.y, 0.02);
+        this.reticle3DMesh.rotation.set(0, 0, 0);
         const isHover = !!this.hoveredButtonId;
         this.reticle3DMesh.scale.set(isHover ? 1.3 : 1.0, isHover ? 1.3 : 1.0, 1.0);
         this.reticle3DMesh.material.color.setHex(isHover ? 0xffdd00 : 0x00ffff);
         this.reticle3DMesh.visible = true;
       } else {
         this.reticle3DMesh.visible = false;
+        this.reticle3DMesh.position.set(0, -999, 0);
       }
     }
     return res;
@@ -276,7 +279,10 @@ export class UIManager {
       this.hoveredButtonId = null;
       this.pointerX = -100;
       this.pointerY = -100;
-      if (this.reticle3DMesh) this.reticle3DMesh.visible = false;
+      if (this.reticle3DMesh) {
+        this.reticle3DMesh.visible = false;
+        this.reticle3DMesh.position.set(0, -999, 0);
+      }
       return { hit: false };
     }
     this.dialogMesh.updateMatrixWorld(true);
@@ -286,15 +292,17 @@ export class UIManager {
     const res = this.processIntersects(intersects);
     if (this.reticle3DMesh) {
       if (res.hit && res.point) {
-        this.reticle3DMesh.position.copy(res.point);
-        this.reticle3DMesh.position.z += 0.015;
-        this.reticle3DMesh.rotation.copy(this.dialogMesh.rotation);
+        const local = new THREE.Vector3();
+        this.dialogMesh.worldToLocal(local.copy(res.point));
+        this.reticle3DMesh.position.set(local.x, local.y, 0.02);
+        this.reticle3DMesh.rotation.set(0, 0, 0);
         const isHover = !!this.hoveredButtonId;
         this.reticle3DMesh.scale.set(isHover ? 1.3 : 1.0, isHover ? 1.3 : 1.0, 1.0);
         this.reticle3DMesh.material.color.setHex(isHover ? 0xffdd00 : 0x00ffff);
         this.reticle3DMesh.visible = true;
       } else {
         this.reticle3DMesh.visible = false;
+        this.reticle3DMesh.position.set(0, -999, 0);
       }
     }
     return res;
@@ -371,6 +379,7 @@ export class UIManager {
     }
     if (this.reticle3DMesh) {
       this.reticle3DMesh.visible = false;
+      this.reticle3DMesh.position.set(0, -999, 0);
     }
   }
 
@@ -402,9 +411,18 @@ export class UIManager {
       }
     }
 
+    // Always keep track percentages updated and visible on the rainbow road
+    if (this.trackPercentMesh) {
+      this.trackPercentMesh.visible = true;
+      this.trackPercentMesh.position.set(0, 0.08, -5.2);
+      this.trackPercentMesh.rotation.x = -Math.PI / 2 + 0.35;
+      this.drawTrackPercentages(this.trackPercentCtx, laneHealth, urgentLane, time);
+      this.trackPercentTexture.needsUpdate = true;
+    }
+
     if (state === GameState.MENU) {
       this.hudMesh.visible = false;
-      if (this.trackPercentMesh) this.trackPercentMesh.visible = false;
+      this.hudMesh.position.set(0, -999, 0);
       this.dialogMesh.visible = true;
       this.setMenuPosition(isVR);
       this.dialogCtx.clearRect(0, 0, 1024, 1024);
@@ -416,42 +434,44 @@ export class UIManager {
 
     if (state === GameState.PLAYING) {
       if (isVR) {
-        this.hudMesh.position.set(0, -0.38, -1.30);
-        this.hudMesh.rotation.set(-0.25, 0, 0);
+        // Floating 3D arcade scoreboard banner right above the rainbow track in front of player
+        this.hudMesh.position.set(0, 2.45, -3.2);
+        this.hudMesh.rotation.set(0.12, 0, 0);
+        this.hudMesh.scale.set(1.35, 1.35, 1.35);
       } else {
-        this.hudMesh.position.set(0, -0.44, -1.55);
-        this.hudMesh.rotation.set(-0.22, 0, 0);
-      }
-      if (this.trackPercentMesh) {
-        this.trackPercentMesh.position.set(0, 0.08, -3.6);
-        this.trackPercentMesh.rotation.x = -Math.PI / 2 + 0.18;
+        // Lower view on desktop screen
+        this.hudMesh.position.set(0, 0.72, -2.5);
+        this.hudMesh.rotation.set(-0.16, 0, 0);
+        this.hudMesh.scale.set(1.0, 1.0, 1.0);
       }
 
       this.hudMesh.visible = true;
-      if (this.trackPercentMesh) this.trackPercentMesh.visible = true;
       this.dialogMesh.visible = false;
       this.dialogMesh.position.set(0, -999, 0);
-      if (this.reticle3DMesh) this.reticle3DMesh.visible = false;
+      if (this.reticle3DMesh) {
+        this.reticle3DMesh.visible = false;
+        this.reticle3DMesh.position.set(0, -999, 0);
+      }
       this.drawHUD(this.hudCtx, score, combo, laneHealth, urgentLane, time, vrMode);
       this.hudTexture.needsUpdate = true;
-
-      this.drawTrackPercentages(this.trackPercentCtx, laneHealth, urgentLane, time);
-      this.trackPercentTexture.needsUpdate = true;
       return;
     }
 
     if (state === GameState.FALLING) {
       this.hudMesh.visible = false;
-      if (this.trackPercentMesh) this.trackPercentMesh.visible = false;
+      this.hudMesh.position.set(0, -999, 0);
       this.dialogMesh.visible = false;
       this.dialogMesh.position.set(0, -999, 0);
-      if (this.reticle3DMesh) this.reticle3DMesh.visible = false;
+      if (this.reticle3DMesh) {
+        this.reticle3DMesh.visible = false;
+        this.reticle3DMesh.position.set(0, -999, 0);
+      }
       return;
     }
 
     if (state === GameState.GAMEOVER) {
       this.hudMesh.visible = false;
-      if (this.trackPercentMesh) this.trackPercentMesh.visible = false;
+      this.hudMesh.position.set(0, -999, 0);
       this.dialogMesh.visible = true;
       this.dialogCtx.clearRect(0, 0, 1024, 1024);
       this.drawGameOver(this.dialogCtx, score, onRestart, onHome, onToggleMode, time, isVR, vrMode);
