@@ -60,6 +60,7 @@ export class Game {
   private hasWebXR = false;
   private prevHeadZ = 0;
   private thumbstickDebounce = false;
+  private triggerWasPressed = false;
   private isReady = false;
 
   // Desktop Pointer state
@@ -99,7 +100,7 @@ export class Game {
     this.scenery = new SceneryManager(this.scene);
     this.player = new Player(this.scene, this.camera, this.rigEl, this.rightControllerEl);
     this.ui = new UIManager(this.scene, this.camera);
-    this.player.setMenuMode(this.sceneEl.is('vr-mode') ? this.rightControllerEl?.object3D : null);
+    this.player.setMenuMode(this.sceneEl.is('vr-mode'), this.sceneEl.is('vr-mode') ? this.rightControllerEl?.object3D : null);
 
     if (this.camera) {
       this.camera.rotation.x = -0.24;
@@ -134,6 +135,16 @@ export class Game {
 
     bindController(this.leftControllerEl, true);
     bindController(this.rightControllerEl, false);
+
+    this.rightControllerEl?.addEventListener('controllerconnected', () => {
+      if (this.player && this.rightControllerEl?.object3D) {
+        this.player.setVRController(this.rightControllerEl.object3D);
+        const isVR = this.sceneEl.is('vr-mode');
+        if (isVR && (this.state === GameState.MENU || this.currentVRMode === GameMode.VR_EASY)) {
+          this.player.attachHornToHand(this.rightControllerEl.object3D);
+        }
+      }
+    });
   }
 
   private onTriggerDown(isLeft: boolean = false): void {
@@ -212,7 +223,9 @@ export class Game {
     // Enter 3D VR menu directly in A-Frame over the rainbow
     this.state = GameState.MENU;
     this.currentVRMode = GameMode.VR_EASY;
-    this.player.setMenuMode(this.rightControllerEl?.object3D);
+    this.player.setVRMode(GameMode.VR_EASY, this.rightControllerEl?.object3D);
+    this.player.setMenuMode(true, this.rightControllerEl?.object3D);
+    this.clouds?.reset();
   }
 
   private onExitVR(): void {
@@ -237,12 +250,12 @@ export class Game {
     on('btn-music', () => {
       toggleAudio();
       const b = document.getElementById('btn-music');
-      if (b) b.textContent = `🎵 HUDBA: ${getAudioMuted() ? 'VYP' : 'ZAP'}`;
+      if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
     });
     on('btn-sfx', () => {
       toggleSfx();
       const b = document.getElementById('btn-sfx');
-      if (b) b.textContent = `🔊 ZVUKY: ${getSfxMuted() ? 'VYP' : 'ZAP'}`;
+      if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
     });
     on('btn-fs', () => this.toggleFullscreen());
   }
@@ -276,7 +289,7 @@ export class Game {
 
     if (!isSupported) {
       if (warningEl) {
-        warningEl.innerHTML = '⚠️ <strong>VR režim není podporován</strong><br>Váš prohlížeč nebo zařízení nepodporuje WebXR imerzivní VR.<br>Připojte VR headset (např. Meta Quest) nebo zvolte <em>Hrát na desktopu</em>.';
+        warningEl.innerHTML = '⚠️ <strong>VR Mode Not Supported</strong><br>Your browser or device does not support WebXR immersive VR.<br>Connect a VR headset (e.g. Meta Quest) or choose <em>Play on Desktop</em>.';
         warningEl.style.display = 'block';
       }
       return;
@@ -293,7 +306,7 @@ export class Game {
     } catch (err) {
       console.warn('Enter VR error:', err);
       if (warningEl) {
-        warningEl.innerHTML = '⚠️ <strong>Nepodařilo se spustit VR relaci</strong><br>Zkontrolujte připojení headsetu nebo oprávnění prohlížeče.';
+        warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>Check headset connection or browser permissions.';
         warningEl.style.display = 'block';
       }
     }
@@ -383,12 +396,12 @@ export class Game {
         e.preventDefault();
         toggleAudio();
         const b = document.getElementById('btn-music');
-        if (b) b.textContent = `🎵 HUDBA: ${getAudioMuted() ? 'VYP' : 'ZAP'}`;
+        if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
       } else if (c === 'KeyN') {
         e.preventDefault();
         toggleSfx();
         const b = document.getElementById('btn-sfx');
-        if (b) b.textContent = `🔊 ZVUKY: ${getSfxMuted() ? 'VYP' : 'ZAP'}`;
+        if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
       } else if (c === 'KeyH' || c === 'Escape') {
         // Return to menu at any time
         this.goToMenu();
@@ -430,8 +443,8 @@ export class Game {
     this.track?.reset();
     this.clouds?.reset();
     this.scenery?.reset();
-    this.player?.reset();
-    this.player?.setMenuMode(isVR ? this.rightControllerEl?.object3D : null);
+    this.player?.reset(isVR);
+    this.player?.setMenuMode(isVR, isVR ? this.rightControllerEl?.object3D : null);
 
     if (this.camera && !isVR) {
       this.camera.rotation.x = -0.18;
@@ -576,24 +589,39 @@ export class Game {
         }
       }
 
-      // 2. Thumbstick support for lane shifting
+      // 2. Controller trigger & thumbstick support via Gamepad API
       const session = this.sceneEl.xrSession;
       if (session && session.inputSources) {
         for (const source of session.inputSources) {
-          if (source.gamepad && source.gamepad.axes) {
-            const axes = source.gamepad.axes;
-            const stickX = axes.length >= 3 ? axes[2] : (axes.length >= 1 ? axes[0] : 0);
-            if (Math.abs(stickX) > 0.55) {
-              if (!this.thumbstickDebounce && this.state === GameState.PLAYING) {
-                this.player.shiftLane(stickX > 0 ? 1 : -1);
-                this.thumbstickDebounce = true;
-                setTimeout(() => (this.thumbstickDebounce = false), 220);
+          if (source.gamepad) {
+            // Trigger check
+            if (source.gamepad.buttons && source.gamepad.buttons[0]) {
+              const triggerBtn = source.gamepad.buttons[0];
+              const isTrigger = triggerBtn.pressed || triggerBtn.value > 0.5;
+              if (isTrigger && !this.triggerWasPressed) {
+                this.triggerWasPressed = true;
+                this.onTriggerDown(source.handedness === 'left');
+              } else if (!isTrigger && this.triggerWasPressed) {
+                this.triggerWasPressed = false;
               }
             }
 
-            const stickY = axes.length >= 4 ? axes[3] : (axes.length >= 2 ? axes[1] : 0);
-            if (stickY < -0.65 && this.state === GameState.PLAYING && !isHard) {
-              this.player.jump();
+            // Thumbstick check
+            if (source.gamepad.axes) {
+              const axes = source.gamepad.axes;
+              const stickX = axes.length >= 3 ? axes[2] : (axes.length >= 1 ? axes[0] : 0);
+              if (Math.abs(stickX) > 0.55) {
+                if (!this.thumbstickDebounce && this.state === GameState.PLAYING) {
+                  this.player.shiftLane(stickX > 0 ? 1 : -1);
+                  this.thumbstickDebounce = true;
+                  setTimeout(() => (this.thumbstickDebounce = false), 220);
+                }
+              }
+
+              const stickY = axes.length >= 4 ? axes[3] : (axes.length >= 2 ? axes[1] : 0);
+              if (stickY < -0.65 && this.state === GameState.PLAYING && !isHard) {
+                this.player.jump();
+              }
             }
           }
         }
@@ -624,7 +652,7 @@ export class Game {
       this.player.setTargetX(demoAutoX / 3.5);
       this.player.update(dt, demoSpeed, true, isVR);
       this.track.update(dt, demoSpeed, totalTime, 60, true);
-      this.clouds.update(dt, demoSpeed, totalTime);
+      this.clouds.update(dt, demoSpeed, totalTime, undefined, true);
       this.scenery.update(dt, demoSpeed, totalTime);
     } else if (this.state === GameState.PLAYING) {
       this.runTime += dt;
@@ -637,7 +665,8 @@ export class Game {
         dt,
         this.speed,
         totalTime,
-        this.track.getUrgentLane()
+        this.track.getUrgentLane(),
+        false
       );
       this.scenery.update(dt, this.speed, totalTime);
 
@@ -653,17 +682,19 @@ export class Game {
 
       this.player.update(dt, this.speed * 0.35, false, isVR);
       this.track.update(dt, this.speed * 0.35, totalTime, this.runTime);
-      this.clouds.update(dt, this.speed * 0.35, totalTime);
+      this.clouds.update(dt, this.speed * 0.35, totalTime, undefined, true);
       this.scenery.update(dt, this.speed * 0.35, totalTime);
 
       if (this.fallTimer >= 1.05) {
         this.player.stopFalling();
         this.state = GameState.GAMEOVER;
         this.ui.setGameOverPosition(this.player.x, this.player.root.position.y, isVR);
-        this.player.setMenuMode(isVR ? this.rightControllerEl?.object3D : null);
+        this.player.setMenuMode(isVR, isVR ? this.rightControllerEl?.object3D : null);
       }
     } else if (this.state === GameState.GAMEOVER) {
       this.player.update(dt, 0, false, isVR);
+      this.clouds.update(dt, 10, totalTime, undefined, true);
+      this.scenery.update(dt, 10, totalTime);
     }
 
     // 3D UI raycasting from unicorn horn in VR, or mouse pointer on desktop
@@ -671,8 +702,10 @@ export class Game {
       if (isVR && this.player) {
         const origin = new THREE.Vector3();
         const dir = new THREE.Vector3();
-        this.player.getHornRay(origin, dir);
-        this.ui.updateHoverRay(origin, dir);
+        if (this.player.getHornRay(origin, dir)) {
+          const hitResult = this.ui.updateHoverRay(origin, dir);
+          this.player.updatePointerBeam(hitResult?.point);
+        }
       } else {
         this.ui.updateHoverNdc(this.pointerNdcX, this.pointerNdcY);
       }
@@ -681,6 +714,7 @@ export class Game {
     this.ui.renderUI(
       this.state,
       this.score,
+      this.combo,
       this.track.laneHealth,
       this.state === GameState.PLAYING ? this.track.getUrgentLane() : -1,
       totalTime,
