@@ -17,6 +17,7 @@ export class TrackManager {
   private trackTexture: any;
   private timeUntilNextTarget = 0;
   private currentUrgentLane = -1;
+  private laneRespawnTimer: number[];
 
   constructor(scene: any) {
     this.group = new THREE.Group();
@@ -24,11 +25,13 @@ export class TrackManager {
 
     this.laneHealth = new Array(LANE_COUNT).fill(1.0);
     this.laneFlash = new Array(LANE_COUNT).fill(0.0);
+    this.laneRespawnTimer = new Array(LANE_COUNT).fill(0.0);
     this.activeDecayLanes = [];
 
     this.initTexture();
     this.initMeshes();
-    this.pickNextUrgentLane();
+    this.timeUntilNextTarget = 14.0;
+    this.currentUrgentLane = -1;
   }
 
   private initTexture(): void {
@@ -150,11 +153,13 @@ export class TrackManager {
     for (let i = 0; i < LANE_COUNT; i++) {
       this.laneHealth[i] = 1.0;
       this.laneFlash[i] = 0.0;
+      this.laneRespawnTimer[i] = 0.0;
     }
-    this.pickNextUrgentLane();
+    this.timeUntilNextTarget = 14.0;
+    this.currentUrgentLane = -1;
   }
 
-  public update(dt: number, speed: number, time: number): void {
+  public update(dt: number, speed: number, time: number, runTime = 60, isMenu = false): void {
     // Scroll texture backwards to simulate high-speed running
     if (this.trackTexture) {
       this.trackTexture.offset.y += speed * dt * 0.12;
@@ -162,16 +167,32 @@ export class TrackManager {
 
     // Update target urgency
     this.timeUntilNextTarget -= dt;
-    if (this.timeUntilNextTarget <= 0 || this.laneHealth[this.currentUrgentLane] <= 0.05) {
+    if (this.timeUntilNextTarget <= 0 || (this.currentUrgentLane >= 0 && this.laneHealth[this.currentUrgentLane] <= 0.05)) {
       this.pickNextUrgentLane();
     }
 
-    // Decay rate scales slightly with speed
-    const baseDecay = 0.022 + speed * 0.001;
+    // Early game grace scaling: decay starts 3x slower and ramps up over 50s
+    const ramp = min(1.0, 0.32 + (runTime / 50) * 0.68);
+    const baseDecay = (0.016 + speed * 0.0008) * ramp;
+    const urgentMult = 1.4 + 1.4 * ramp;
 
     for (let i = 0; i < LANE_COUNT; i++) {
+      // In menu mode, when a lane completely dissolves, revive it after a brief moment with a flash
+      if (isMenu) {
+        if (this.laneHealth[i] <= 0.04) {
+          this.laneRespawnTimer[i] += dt;
+          if (this.laneRespawnTimer[i] >= 1.8) {
+            this.replenishLane(i);
+            this.laneRespawnTimer[i] = 0;
+            continue;
+          }
+        } else {
+          this.laneRespawnTimer[i] = 0;
+        }
+      }
+
       // Urgent lane decays faster
-      const rate = i === this.currentUrgentLane ? baseDecay * 2.8 : baseDecay;
+      const rate = i === this.currentUrgentLane ? baseDecay * urgentMult : baseDecay;
       this.laneHealth[i] = max(0, this.laneHealth[i] - rate * dt);
 
       // Flash decay
