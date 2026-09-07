@@ -2,7 +2,7 @@ import {
   LANE_COUNT,
   RAINBOW_COLORS,
   RAINBOW_HEX_STRINGS,
-  COLOR_NAMES_CZ,
+  COLOR_NAMES_EN,
   GameState,
   VRMode,
   GameMode,
@@ -76,7 +76,7 @@ export class UIManager {
     try {
       this.highScoreDesktop = parseInt(localStorage.getItem('str_h_desktop') || '0', 10) || 0;
       this.highScoreEasy =
-        parseInt(localStorage.getItem('str_h_easy') || localStorage.getItem('str_high') || '0', 10) || 0;
+        parseInt(localStorage.getItem('str_h_easy') || '0', 10) || 0;
       this.highScoreHard = parseInt(localStorage.getItem('str_h_hard') || '0', 10) || 0;
     } catch (_) {
       this.highScoreDesktop = 0;
@@ -94,7 +94,7 @@ export class UIManager {
         this.highScoreHard = score;
         try {
           localStorage.setItem('str_h_hard', score.toString());
-        } catch (_) {}
+        } catch (_) { }
         return true;
       }
     } else if (isEasy) {
@@ -102,8 +102,7 @@ export class UIManager {
         this.highScoreEasy = score;
         try {
           localStorage.setItem('str_h_easy', score.toString());
-          localStorage.setItem('str_high', score.toString());
-        } catch (_) {}
+        } catch (_) { }
         return true;
       }
     } else {
@@ -111,7 +110,7 @@ export class UIManager {
         this.highScoreDesktop = score;
         try {
           localStorage.setItem('str_h_desktop', score.toString());
-        } catch (_) {}
+        } catch (_) { }
         return true;
       }
     }
@@ -125,7 +124,7 @@ export class UIManager {
   }
 
   public getLastQuote(): string {
-    return this.lastQuote || 'Gravitace byla tentokrát rychlejší.';
+    return this.lastQuote || 'Gravity was faster this time.';
   }
 
   public setQuip(text: string): void {
@@ -136,31 +135,36 @@ export class UIManager {
   public setGameOverPosition(playerX: number, playerY: number, isVR: boolean = false): void {
     if (!this.dialogMesh) return;
     if (isVR) {
-      this.dialogMesh.position.set(playerX, playerY + 0.35, -5.5);
-      this.dialogMesh.rotation.x = -0.04;
+      this.dialogMesh.position.set(playerX, playerY + 0.35, -2.8);
+      this.dialogMesh.rotation.x = -0.05;
     } else {
-      this.dialogMesh.position.set(0, playerY - 0.70, -5.5);
-      this.dialogMesh.rotation.x = -0.18;
+      this.dialogMesh.position.set(0, playerY - 0.20, -3.2);
+      this.dialogMesh.rotation.x = -0.08;
     }
   }
 
-  public setMenuPosition(): void {
+  public setMenuPosition(isVR: boolean = false): void {
     if (!this.dialogMesh) return;
-    this.dialogMesh.position.set(0, 2.8, -5.5);
-    this.dialogMesh.rotation.x = -0.12;
+    if (isVR) {
+      this.dialogMesh.position.set(0, 1.65, -2.8);
+      this.dialogMesh.rotation.x = -0.05;
+    } else {
+      this.dialogMesh.position.set(0, 1.75, -3.2);
+      this.dialogMesh.rotation.x = -0.08;
+    }
   }
 
   private initCanvasMesh(): void {
-    // 1. Sleek top-left HUD: attached to camera so it is static relative to the eye, only score text
+    // 1. Sleek lower-view HUD: attached to camera so it is static in the lower viewport in VR and Desktop
     this.hudCanvas = document.createElement('canvas');
-    this.hudCanvas.width = 512;
-    this.hudCanvas.height = 128;
+    this.hudCanvas.width = 1024;
+    this.hudCanvas.height = 256;
     this.hudCtx = this.hudCanvas.getContext('2d')!;
 
     this.hudTexture = new THREE.CanvasTexture(this.hudCanvas);
     this.hudTexture.minFilter = THREE.LinearFilter;
 
-    const hudGeom = new THREE.PlaneGeometry(0.72, 0.18);
+    const hudGeom = new THREE.PlaneGeometry(1.30, 0.325);
     const hudMat = new THREE.MeshBasicMaterial({
       map: this.hudTexture,
       transparent: true,
@@ -169,8 +173,8 @@ export class UIManager {
     });
 
     this.hudMesh = new THREE.Mesh(hudGeom, hudMat);
-    this.hudMesh.position.set(-0.60, 0.58, -1.5);
-    this.hudMesh.rotation.set(0, 0, 0);
+    this.hudMesh.position.set(0, -0.44, -1.55);
+    this.hudMesh.rotation.set(-0.22, 0, 0);
     this.hudMesh.renderOrder = 9999;
     this.hudMesh.visible = false;
     this.camera.add(this.hudMesh);
@@ -198,7 +202,7 @@ export class UIManager {
     this.trackPercentMesh.visible = false;
     this.group.add(this.trackPercentMesh);
 
-    // 3. Centered 3D Dialog panel (Menu & Game Over) in 3D world space
+    // 3. Centered 3D Dialog panel (Menu & Game Over) in 3D world space (comfortable VR reading distance)
     this.dialogCanvas = document.createElement('canvas');
     this.dialogCanvas.width = 1024;
     this.dialogCanvas.height = 1024;
@@ -207,41 +211,54 @@ export class UIManager {
     this.dialogTexture = new THREE.CanvasTexture(this.dialogCanvas);
     this.dialogTexture.minFilter = THREE.LinearFilter;
 
-    const dialogGeom = new THREE.PlaneGeometry(4.2, 4.0);
+    const dialogGeom = new THREE.PlaneGeometry(2.4, 2.4);
     const dialogMat = new THREE.MeshBasicMaterial({
       map: this.dialogTexture,
       transparent: true,
       side: THREE.DoubleSide,
+      depthTest: true,
       depthWrite: false,
     });
 
     this.dialogMesh = new THREE.Mesh(dialogGeom, dialogMat);
-    this.dialogMesh.position.set(0, 2.8, -5.5);
-    this.dialogMesh.rotation.x = -0.12;
+    this.dialogMesh.position.set(0, 1.65, -2.8);
+    this.dialogMesh.rotation.x = -0.05;
+    this.dialogMesh.renderOrder = 2000;
     this.dialogMesh.visible = true;
     this.group.add(this.dialogMesh);
   }
 
-  public updateHoverRay(origin: any, direction: any): void {
-    if (!this.dialogMesh || !this.dialogMesh.visible) return;
+  public updateHoverRay(origin: any, direction: any): { hit: boolean; point?: any } {
+    if (!this.dialogMesh || !this.dialogMesh.visible) {
+      this.hoveredButtonId = null;
+      this.pointerX = -100;
+      this.pointerY = -100;
+      return { hit: false };
+    }
     this.dialogMesh.updateMatrixWorld(true);
     this.raycaster.set(origin, direction);
     const intersects = this.raycaster.intersectObject(this.dialogMesh);
-    this.processIntersects(intersects);
+    return this.processIntersects(intersects);
   }
 
-  public updateHoverNdc(pointerNdcX: number, pointerNdcY: number): void {
-    if (!this.dialogMesh || !this.dialogMesh.visible) return;
+  public updateHoverNdc(pointerNdcX: number, pointerNdcY: number): { hit: boolean; point?: any } {
+    if (!this.dialogMesh || !this.dialogMesh.visible) {
+      this.hoveredButtonId = null;
+      this.pointerX = -100;
+      this.pointerY = -100;
+      return { hit: false };
+    }
     this.dialogMesh.updateMatrixWorld(true);
     this.mouseVec.set(pointerNdcX, pointerNdcY);
     this.raycaster.setFromCamera(this.mouseVec, this.camera);
     const intersects = this.raycaster.intersectObject(this.dialogMesh);
-    this.processIntersects(intersects);
+    return this.processIntersects(intersects);
   }
 
-  private processIntersects(intersects: any[]): void {
+  private processIntersects(intersects: any[]): { hit: boolean; point?: any } {
     if (intersects.length > 0 && intersects[0].uv) {
-      const uv = intersects[0].uv;
+      const hit = intersects[0];
+      const uv = hit.uv;
       const cx = uv.x * 1024;
       const cy = (1 - uv.y) * 1024;
       this.pointerX = cx;
@@ -260,10 +277,12 @@ export class UIManager {
         }
       }
       this.hoveredButtonId = found;
+      return { hit: true, point: hit.point };
     } else {
       this.hoveredButtonId = null;
       this.pointerX = -100;
       this.pointerY = -100;
+      return { hit: false };
     }
   }
 
@@ -285,6 +304,7 @@ export class UIManager {
   public renderUI(
     state: GameState,
     score: number,
+    combo: number,
     laneHealth: number[],
     urgentLane: number,
     time: number,
@@ -309,7 +329,7 @@ export class UIManager {
       this.hudMesh.visible = false;
       if (this.trackPercentMesh) this.trackPercentMesh.visible = false;
       this.dialogMesh.visible = true;
-      this.setMenuPosition();
+      this.setMenuPosition(isVR);
       this.dialogCtx.clearRect(0, 0, 1024, 1024);
       this.drawMenu(this.dialogCtx, onStartGame, time, isVR, vrMode);
       this.drawPointerReticle(this.dialogCtx);
@@ -321,7 +341,7 @@ export class UIManager {
       this.hudMesh.visible = true;
       if (this.trackPercentMesh) this.trackPercentMesh.visible = true;
       this.dialogMesh.visible = false;
-      this.drawHUD(this.hudCtx, score);
+      this.drawHUD(this.hudCtx, score, combo, laneHealth, urgentLane, time, vrMode);
       this.hudTexture.needsUpdate = true;
 
       this.drawTrackPercentages(this.trackPercentCtx, laneHealth, urgentLane, time);
@@ -350,16 +370,28 @@ export class UIManager {
 
   private drawPointerReticle(ctx: CanvasRenderingContext2D): void {
     if (this.pointerX >= 0 && this.pointerY >= 0) {
+      const isHovering = !!this.hoveredButtonId;
+      const ringRadius = isHovering ? 22 : 15;
+      const dotRadius = isHovering ? 7 : 5;
+
+      ctx.save();
+      // Outer glowing pulse ring
       ctx.beginPath();
-      ctx.arc(this.pointerX, this.pointerY, 8, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffdd00';
-      ctx.shadowColor = '#ffdd00';
-      ctx.shadowBlur = 12;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      ctx.arc(this.pointerX, this.pointerY, ringRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = isHovering ? '#ffffff' : '#00d4ff';
+      ctx.lineWidth = isHovering ? 4 : 2.5;
+      ctx.shadowColor = isHovering ? '#00d4ff' : '#ffffff';
+      ctx.shadowBlur = 16;
       ctx.stroke();
+
+      // Inner solid dot
+      ctx.beginPath();
+      ctx.arc(this.pointerX, this.pointerY, dotRadius, 0, Math.PI * 2);
+      ctx.fillStyle = isHovering ? '#ffdd00' : '#ffffff';
+      ctx.shadowColor = '#ffdd00';
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.restore();
     }
   }
 
@@ -425,13 +457,13 @@ export class UIManager {
     // Subtitle
     ctx.font = '700 21px system-ui, sans-serif';
     ctx.fillStyle = '#ffdd00';
-    ctx.fillText('VÝBĚR VR ÚROVNĚ NAD DUHOU', 512, 206);
+    ctx.fillText('CHOOSE DIFFICULTY ABOVE THE RAINBOW', 512, 206);
 
     // High Scores - Easy & Hard separated
     ctx.font = '700 21px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff';
     ctx.fillText(
-      `REKORDY:   EASY: ${this.highScoreEasy}   •   HARD: ${this.highScoreHard}`,
+      `HIGH SCORES:   EASY: ${this.highScoreEasy}   •   HARD: ${this.highScoreHard}`,
       512,
       258
     );
@@ -452,8 +484,8 @@ export class UIManager {
       320,
       784,
       130,
-      'JEZDEC NA JEDNOROŽCI (EASY)',
-      'Roh v ruce • Ovladač: směr • Spoušť = bodnutí • Grip = skok',
+      'UNICORN RIDER (EASY)',
+      'Horn in hand • Controller steers • Trigger = stab • Grip / Stick = jump',
       '#00d4ff',
       () => onStartGame(GameMode.VR_EASY)
     );
@@ -465,8 +497,8 @@ export class UIManager {
       480,
       784,
       130,
-      'TY JSI JEDNOROŽEC! (HARD)',
-      'Roh na čele • Hlava: náklon řídí • trhnutí bodá • výskok skáče',
+      'YOU ARE THE UNICORN! (HARD)',
+      'Horn on forehead • Head lean steers • Head thrust stabs • Jump jumps',
       '#ffdd00',
       () => onStartGame(GameMode.VR_HARD)
     );
@@ -474,11 +506,11 @@ export class UIManager {
     // Instructions
     ctx.font = '600 18px system-ui, sans-serif';
     ctx.fillStyle = '#c0cedf';
-    ctx.fillText('🎯 Namiř paprskem z ovladače a stiskni spoušť (Trigger) pro výběr', 512, 670);
+    ctx.fillText('🎯 Point with controller beam and press Trigger to select', 512, 670);
 
     ctx.font = '500 16px system-ui, sans-serif';
     ctx.fillStyle = '#8e9eb5';
-    ctx.fillText('Návrat do menu kdykoliv: Grip (L) / ESC', 512, 715);
+    ctx.fillText('Return to menu anytime: Left Grip / ESC', 512, 715);
   }
 
   private drawGameOver(
@@ -513,27 +545,27 @@ export class UIManager {
     ctx.fillStyle = '#ff7b00';
     ctx.shadowColor = '#ff7b00';
     ctx.shadowBlur = 20;
-    ctx.fillText('PÁD DO PROPASTI', 512, 160);
+    ctx.fillText('FELL INTO THE ABYSS', 512, 160);
     ctx.shadowBlur = 0;
 
     // Death quote
     ctx.font = 'italic 600 22px system-ui, sans-serif';
     ctx.fillStyle = '#ffd2d9';
-    ctx.fillText(`"${this.lastQuote || 'Gravitace byla tentokrát rychlejší.'}"`, 512, 218);
+    ctx.fillText(`"${this.lastQuote || 'Gravity was faster this time.'}"`, 512, 218);
 
     // Final Score
     ctx.font = '900 46px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`SKÓRE (${modeName}): ${score}`, 512, 290);
+    ctx.fillText(`SCORE (${modeName}): ${score.toLocaleString()}`, 512, 290);
 
     if (isNewHigh) {
       ctx.font = '800 26px system-ui, sans-serif';
       ctx.fillStyle = '#ffdd00';
-      ctx.fillText('NOVÝ REKORD!', 512, 335);
+      ctx.fillText('NEW HIGH SCORE!', 512, 335);
     } else {
       ctx.font = '700 22px system-ui, sans-serif';
       ctx.fillStyle = '#ffdd00';
-      ctx.fillText(`NEJLEPŠÍ SKÓRE (${modeName}): ${highScore}`, 512, 335);
+      ctx.fillText(`BEST SCORE (${modeName}): ${highScore.toLocaleString()}`, 512, 335);
     }
 
     // Action Buttons
@@ -544,7 +576,7 @@ export class UIManager {
       390,
       744,
       100,
-      `HRÁT ZNOVU (${modeName})`,
+      `PLAY AGAIN (${modeName})`,
       '',
       '#10e052',
       () => onRestart()
@@ -557,7 +589,7 @@ export class UIManager {
       515,
       744,
       100,
-      'HLAVNÍ MENU',
+      'MAIN MENU',
       '',
       '#00d4ff',
       () => onHome()
@@ -571,7 +603,7 @@ export class UIManager {
         640,
         744,
         100,
-        `PŘEPNOUT NA ${otherModeName}`,
+        `SWITCH TO ${otherModeName}`,
         '',
         '#ffdd00',
         () => onToggleMode()
@@ -581,25 +613,119 @@ export class UIManager {
 
   private drawHUD(
     ctx: CanvasRenderingContext2D,
-    score: number
+    score: number,
+    combo: number,
+    laneHealth: number[],
+    urgentLane: number,
+    time: number,
+    vrMode: VRMode | GameMode
   ): void {
-    ctx.clearRect(0, 0, 512, 128);
+    ctx.clearRect(0, 0, 1024, 256);
 
+    // Sleek dark container background
+    ctx.fillStyle = 'rgba(8, 5, 20, 0.88)';
+    this.roundRect(ctx, 12, 10, 1000, 236, 24);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // TOP ROW: Score, Combo, Mode
     ctx.save();
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.font = '900 44px system-ui, sans-serif';
+    ctx.font = '900 36px system-ui, sans-serif';
 
-    // Dark stroke outline so white text is crisp over any background
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.lineWidth = 6;
-    ctx.lineJoin = 'round';
-    ctx.strokeText(`SKÓRE: ${score}`, 16, 64);
-
-    // Glowing white text - pure score text, no frames, no extra text
+    // Glowing Score
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`SKÓRE: ${score}`, 16, 64);
+    ctx.shadowColor = '#00d4ff';
+    ctx.shadowBlur = 12;
+    ctx.fillText(`SCORE: ${score.toLocaleString()}`, 36, 44);
+    ctx.shadowBlur = 0;
+
+    // Combo
+    if (combo > 1) {
+      ctx.textAlign = 'center';
+      ctx.font = '900 32px system-ui, sans-serif';
+      ctx.fillStyle = '#ffdd00';
+      ctx.shadowColor = '#ffdd00';
+      ctx.shadowBlur = 10;
+      ctx.fillText(`COMBO x${combo}!`, 512, 44);
+      ctx.shadowBlur = 0;
+    }
+
+    // Mode badge
+    const isHard = vrMode === (VRMode.UNICORN_HARD as any) || (vrMode as any) === GameMode.VR_HARD;
+    const isEasy = vrMode === (VRMode.RIDER_EASY as any) || (vrMode as any) === GameMode.VR_EASY;
+    const modeLabel = isHard ? 'VR HARD' : (isEasy ? 'VR EASY' : 'DESKTOP');
+    ctx.textAlign = 'right';
+    ctx.font = '700 24px system-ui, sans-serif';
+    ctx.fillStyle = '#a0b8d8';
+    ctx.fillText(modeLabel, 988, 44);
     ctx.restore();
+
+    // Separator line
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(32, 74);
+    ctx.lineTo(992, 74);
+    ctx.stroke();
+
+    // BOTTOM ROW: 7 Rainbow Track Health Percentages
+    const laneW = 960 / LANE_COUNT;
+    const startX = 32;
+
+    for (let i = 0; i < LANE_COUNT; i++) {
+      const h = laneHealth[i] ?? 1.0;
+      const x = startX + i * laneW;
+      const col = RAINBOW_HEX_STRINGS[i];
+      const isUrgent = i === urgentLane;
+      const isCritical = h < 0.32;
+
+      // Lane Card
+      ctx.fillStyle = 'rgba(18, 12, 36, 0.85)';
+      this.roundRect(ctx, x + 4, 86, laneW - 8, 146, 14);
+      ctx.fill();
+
+      // Health Fill
+      if (h > 0.04) {
+        ctx.fillStyle = col;
+        ctx.globalAlpha = 0.45;
+        const fillH = 138 * h;
+        this.roundRect(ctx, x + 6, 86 + 142 - fillH, laneW - 12, fillH, 10);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+      }
+
+      // Card Border
+      const blink = sin(time * 18) > 0;
+      ctx.strokeStyle = isUrgent
+        ? (blink ? '#ffffff' : col)
+        : isCritical
+          ? (blink ? '#ffffff' : '#ff2a4b')
+          : col;
+      ctx.lineWidth = isUrgent || isCritical ? 3.5 : 1.5;
+      this.roundRect(ctx, x + 4, 86, laneW - 8, 146, 14);
+      ctx.stroke();
+
+      // Color Label
+      ctx.fillStyle = col;
+      ctx.font = '800 16px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(COLOR_NAMES_EN[i].toUpperCase(), x + laneW / 2, 114);
+
+      // Percentage / EMPTY
+      if (h > 0.04) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 34px system-ui, sans-serif';
+        ctx.fillText(`${Math.round(h * 100)}%`, x + laneW / 2, 172);
+      } else {
+        ctx.fillStyle = '#ff2a4b';
+        ctx.font = '900 22px system-ui, sans-serif';
+        ctx.fillText('EMPTY', x + laneW / 2, 168);
+      }
+    }
   }
 
   private drawTrackPercentages(
@@ -639,8 +765,8 @@ export class UIManager {
       ctx.strokeStyle = isUrgent
         ? (blink ? '#ffffff' : col)
         : isCritical
-        ? (blink ? '#ffffff' : '#ff2a4b')
-        : col;
+          ? (blink ? '#ffffff' : '#ff2a4b')
+          : col;
       ctx.lineWidth = isUrgent || isCritical ? 4.5 : 2.0;
       this.roundRect(ctx, x + 5, 8, laneW - 10, 144, 16);
       ctx.stroke();
@@ -649,7 +775,7 @@ export class UIManager {
       ctx.fillStyle = col;
       ctx.font = '800 20px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(COLOR_NAMES_CZ[i].toUpperCase(), x + laneW / 2, 42);
+      ctx.fillText(COLOR_NAMES_EN[i].toUpperCase(), x + laneW / 2, 42);
 
       // Percentage or EMPTY label
       if (h > 0.04) {
@@ -659,7 +785,7 @@ export class UIManager {
       } else {
         ctx.fillStyle = '#ff2a4b';
         ctx.font = '900 28px system-ui, sans-serif';
-        ctx.fillText('PRÁZDNO', x + laneW / 2, 100);
+        ctx.fillText('EMPTY', x + laneW / 2, 100);
       }
     }
   }
