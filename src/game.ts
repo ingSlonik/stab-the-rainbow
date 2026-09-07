@@ -98,6 +98,7 @@ export class Game {
     this.scenery = new SceneryManager(this.scene);
     this.player = new Player(this.scene, this.camera, this.rigEl, this.rightControllerEl);
     this.ui = new UIManager(this.scene, this.camera);
+    this.player.setMenuMode(this.rightControllerEl?.object3D);
 
     if (this.camera) {
       this.camera.rotation.x = -0.24;
@@ -120,33 +121,55 @@ export class Game {
     this.sceneEl.addEventListener('enter-vr', () => this.onEnterVR());
     this.sceneEl.addEventListener('exit-vr', () => this.onExitVR());
 
-    const bindController = (el: any) => {
+    const bindController = (el: any, isLeft: boolean) => {
       if (!el) return;
-      el.addEventListener('triggerdown', () => this.onTriggerDown());
-      el.addEventListener('selectstart', () => this.onTriggerDown());
-      el.addEventListener('gripdown', () => this.onGripDown());
-      el.addEventListener('squeezestart', () => this.onGripDown());
+      el.addEventListener('triggerdown', () => this.onTriggerDown(isLeft));
+      el.addEventListener('selectstart', () => this.onTriggerDown(isLeft));
+      el.addEventListener('gripdown', () => this.onGripDown(isLeft));
+      el.addEventListener('squeezestart', () => this.onGripDown(isLeft));
       el.addEventListener('thumbstickmoved', (e: any) => this.onThumbstick(e.detail));
       el.addEventListener('axismove', (e: any) => this.onAxisMove(e.detail));
     };
 
-    bindController(this.leftControllerEl);
-    bindController(this.rightControllerEl);
+    bindController(this.leftControllerEl, true);
+    bindController(this.rightControllerEl, false);
   }
 
-  private onTriggerDown(): void {
-    if (this.state === GameState.PLAYING) {
-      this.player.stab();
-    } else if (this.state === GameState.GAMEOVER) {
-      this.restartGame();
+  private onTriggerDown(isLeft: boolean = false): void {
+    if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
+      if (!this.ui.triggerClick() && this.state === GameState.GAMEOVER) {
+        this.restartGame();
+      }
+    } else if (this.state === GameState.PLAYING) {
+      if (isLeft) {
+        // Return to menu at any time
+        this.goToMenu();
+      } else {
+        // In Hard mode, button controls are disabled - head motion only!
+        if (this.currentVRMode === VRMode.UNICORN_HARD) {
+          this.goToMenu();
+        } else {
+          this.player.stab();
+        }
+      }
     }
   }
 
-  private onGripDown(): void {
-    if (this.state === GameState.PLAYING) {
-      this.player.jump();
-    } else if (this.state === GameState.GAMEOVER) {
+  private onGripDown(isLeft: boolean = false): void {
+    if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
       this.goToMenu();
+    } else if (this.state === GameState.PLAYING) {
+      if (isLeft) {
+        // Return to menu at any time
+        this.goToMenu();
+      } else {
+        // In Hard mode, button controls are disabled - head motion only!
+        if (this.currentVRMode === VRMode.UNICORN_HARD) {
+          this.goToMenu();
+        } else {
+          this.player.jump();
+        }
+      }
     }
   }
 
@@ -158,7 +181,8 @@ export class Game {
       this.thumbstickDebounce = true;
       setTimeout(() => (this.thumbstickDebounce = false), 220);
     }
-    if (y < -0.65 && this.state === GameState.PLAYING) {
+    // Only in Easy mode does thumbstick jump; in Hard mode, jumping is head motion only
+    if (y < -0.65 && this.state === GameState.PLAYING && this.currentVRMode !== VRMode.UNICORN_HARD) {
       this.player.jump();
     }
   }
@@ -171,7 +195,7 @@ export class Game {
       this.thumbstickDebounce = true;
       setTimeout(() => (this.thumbstickDebounce = false), 220);
     }
-    if (y < -0.65 && this.state === GameState.PLAYING) {
+    if (y < -0.65 && this.state === GameState.PLAYING && this.currentVRMode !== VRMode.UNICORN_HARD) {
       this.player.jump();
     }
   }
@@ -179,28 +203,16 @@ export class Game {
   private onEnterVR(): void {
     const modal = document.getElementById('modal');
     if (modal) modal.style.display = 'none';
-    const goModal = document.getElementById('go-modal');
-    if (goModal) goModal.style.display = 'none';
 
-    const rightObj = this.rightControllerEl?.object3D;
-    this.player.setVRMode(this.currentVRMode, rightObj);
-
-    if (this.currentVRMode === VRMode.UNICORN_HARD) {
-      const startQuip = getRandomStartQuip();
-      this.ui.setQuip(startQuip);
-      speakQuip(startQuip, true);
-    }
-
-    this.startGame();
+    // Enter 3D VR menu directly in A-Frame
+    this.state = GameState.MENU;
+    this.player.setMenuMode(this.rightControllerEl?.object3D);
   }
 
   private onExitVR(): void {
     this.currentVRMode = VRMode.NONE;
     this.player.setVRMode(VRMode.NONE);
-    if (this.state === GameState.MENU) {
-      const m = document.getElementById('modal');
-      if (m) m.style.display = 'flex';
-    }
+    this.goToMenu();
   }
 
   private initDOM(): void {
@@ -209,30 +221,13 @@ export class Game {
       if (el) el.addEventListener('click', fn);
     };
 
-    const noVR = () => {
-      alert('VR nenalezeno, spouštím desktop.');
-      this.startGame();
-    };
-
-    on('btn-vr-easy', () => {
-      if (this.hasWebXR) {
-        this.requestVRSession(VRMode.RIDER_EASY);
-      } else {
-        noVR();
-      }
+    on('btn-enter-vr', () => {
+      this.requestVRSession(VRMode.RIDER_EASY);
+    });
+    on('btn-desktop', () => {
+      this.startGame(VRMode.RIDER_EASY);
     });
 
-    on('btn-vr-hard', () => {
-      if (this.hasWebXR) {
-        this.requestVRSession(VRMode.UNICORN_HARD);
-      } else {
-        noVR();
-      }
-    });
-
-    on('btn-desktop', () => this.startGame());
-    on('btn-retry', () => this.restartGame());
-    on('btn-home', () => this.goToMenu());
     on('btn-music', () => {
       toggleAudio();
       const b = document.getElementById('btn-music');
@@ -244,11 +239,6 @@ export class Game {
       if (b) b.textContent = `🔊 ZVUKY: ${getSfxMuted() ? 'VYP' : 'ZAP'}`;
     });
     on('btn-fs', () => this.toggleFullscreen());
-
-    const highBadge = document.getElementById('high-score');
-    if (highBadge) {
-      highBadge.textContent = `🏆 NEJLEPŠÍ SKÓRE: ${this.ui?.getHighScore() || 0}`;
-    }
   }
 
   public toggleFullscreen(): void {
@@ -302,11 +292,18 @@ export class Game {
     );
 
     // Prevent context menu on right click
-    window.addEventListener('contextmenu', (e) => e.preventDefault());
+    const blockContext = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
+    window.addEventListener('contextmenu', blockContext);
+    document.addEventListener('contextmenu', blockContext);
 
     window.addEventListener('mousedown', (e) => {
       initAudio();
-      if (this.state === GameState.PLAYING && this.player) {
+      if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
+        this.ui?.triggerClick();
+      } else if (this.state === GameState.PLAYING && this.player) {
         if (e.button === 2 || e.button === 1) {
           this.player.jump();
         } else if (e.button === 0) {
@@ -331,9 +328,18 @@ export class Game {
         e.preventDefault();
         if (isPlay) this.player?.jump();
         else if (this.state === GameState.GAMEOVER && c === 'Space') this.restartGame();
+        else if (this.state === GameState.MENU && c === 'Space') {
+          if (!this.ui?.triggerClick()) this.startGame(VRMode.RIDER_EASY);
+        }
       } else if (['ArrowDown', 'KeyS', 'KeyE', 'Enter', 'ShiftLeft', 'ShiftRight'].includes(c)) {
         e.preventDefault();
         if (isPlay) this.player?.stab();
+        else if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
+          if (!this.ui?.triggerClick()) {
+            if (this.state === GameState.GAMEOVER) this.restartGame();
+            else this.startGame(VRMode.RIDER_EASY);
+          }
+        }
       } else if (c === 'KeyF') {
         e.preventDefault();
         this.toggleFullscreen();
@@ -348,7 +354,12 @@ export class Game {
         const b = document.getElementById('btn-sfx');
         if (b) b.textContent = `🔊 ZVUKY: ${getSfxMuted() ? 'VYP' : 'ZAP'}`;
       } else if (c === 'KeyH' || c === 'Escape') {
-        if (this.state === GameState.GAMEOVER) this.goToMenu();
+        // Return to menu at any time
+        this.goToMenu();
+      } else if (c === 'Digit1') {
+        if (this.state === GameState.MENU) this.startGame(VRMode.RIDER_EASY);
+      } else if (c === 'Digit2') {
+        if (this.state === GameState.MENU) this.startGame(VRMode.UNICORN_HARD);
       }
     });
 
@@ -366,15 +377,8 @@ export class Game {
   }
 
   public goToMenu(): void {
-    const goModal = document.getElementById('go-modal');
-    if (goModal) goModal.style.display = 'none';
     const modal = document.getElementById('modal');
-    if (modal) modal.style.display = 'flex';
-
-    const highBadge = document.getElementById('high-score');
-    if (highBadge && this.ui) {
-      highBadge.textContent = `🏆 NEJLEPŠÍ SKÓRE: ${this.ui.getHighScore()}`;
-    }
+    if (modal && this.sceneEl?.is('vr-mode')) modal.style.display = 'none';
 
     this.state = GameState.MENU;
     this.score = 0;
@@ -386,16 +390,19 @@ export class Game {
     this.clouds?.reset();
     this.scenery?.reset();
     this.player?.reset();
+    this.player?.setMenuMode(this.rightControllerEl?.object3D);
+
     if (this.camera && !this.sceneEl?.is('vr-mode')) {
       this.camera.rotation.x = -0.24;
     }
   }
 
-  public startGame(): void {
+  public startGame(mode: VRMode = this.currentVRMode || VRMode.RIDER_EASY): void {
     const modal = document.getElementById('modal');
     if (modal) modal.style.display = 'none';
-    const goModal = document.getElementById('go-modal');
-    if (goModal) goModal.style.display = 'none';
+
+    this.currentVRMode = mode;
+    this.player?.setVRMode(mode, this.rightControllerEl?.object3D);
 
     this.state = GameState.PLAYING;
     this.score = 0;
@@ -416,7 +423,7 @@ export class Game {
   }
 
   public restartGame(): void {
-    this.startGame();
+    this.startGame(this.currentVRMode || VRMode.RIDER_EASY);
   }
 
   private checkHornCloudCollisions(): void {
@@ -478,12 +485,11 @@ export class Game {
         this.fallTimer = 0;
         this.player.startFalling();
         playFallSound();
-        const isHard = this.currentVRMode === VRMode.UNICORN_HARD;
-        this.ui.setGameOverDeathQuote(isHard);
-        if (isHard) {
+        this.ui.setGameOverDeathQuote();
+        if (this.currentVRMode === VRMode.UNICORN_HARD) {
           speakQuip(this.ui.getLastQuote(), true);
         }
-        this.ui.saveHighScore(this.score);
+        this.ui.saveHighScore(this.score, this.currentVRMode);
       }
     }
   }
@@ -521,7 +527,7 @@ export class Game {
             }
 
             const stickY = axes.length >= 4 ? axes[3] : (axes.length >= 2 ? axes[1] : 0);
-            if (stickY < -0.65 && this.state === GameState.PLAYING) {
+            if (stickY < -0.65 && this.state === GameState.PLAYING && this.currentVRMode !== VRMode.UNICORN_HARD) {
               this.player.jump();
             }
           }
@@ -538,7 +544,6 @@ export class Game {
         }
       }
     }
-
 
     // Sync audio engine with state, airborne jumping status, and run speed
     setAudioState(
@@ -582,20 +587,19 @@ export class Game {
 
       if (this.fallTimer >= 1.2) {
         this.state = GameState.GAMEOVER;
-        if (!isVR) {
-          const goModal = document.getElementById('go-modal');
-          if (goModal) goModal.style.display = 'flex';
-          const goScore = document.getElementById('go-score');
-          if (goScore) {
-            const isHigh =
-              this.score >= this.ui.getHighScore() && this.score > 0;
-            goScore.textContent = isHigh
-              ? `🎉 NOVÝ REKORD: ${this.score}! 🎉`
-              : `SKÓRE: ${this.score}`;
-          }
-          const goQuote = document.getElementById('go-quote');
-          if (goQuote) goQuote.textContent = `"${this.ui.getLastQuote()}"`;
-        }
+        this.player.setMenuMode(this.rightControllerEl?.object3D);
+      }
+    }
+
+    // 3D UI raycasting from unicorn horn in VR, or mouse pointer on desktop
+    if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
+      if (isVR && this.player) {
+        const origin = new THREE.Vector3();
+        const dir = new THREE.Vector3();
+        this.player.getHornRay(origin, dir);
+        this.ui.updateHoverRay(origin, dir);
+      } else {
+        this.ui.updateHoverNdc(this.pointerNdcX, this.pointerNdcY);
       }
     }
 
@@ -606,12 +610,16 @@ export class Game {
       this.state === GameState.PLAYING ? this.track.getUrgentLane() : -1,
       totalTime,
       dt,
-      this.hasWebXR,
-      () => this.startGame(),
-      (m) => this.requestVRSession(m),
+      (m) => this.startGame(m),
       () => this.restartGame(),
       () => this.goToMenu(),
-      () => this.toggleFullscreen(),
+      () => {
+        const toggled =
+          this.currentVRMode === VRMode.UNICORN_HARD
+            ? VRMode.RIDER_EASY
+            : VRMode.UNICORN_HARD;
+        this.startGame(toggled);
+      },
       isVR,
       this.currentVRMode
     );
