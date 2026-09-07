@@ -1,5 +1,6 @@
 import * as esbuild from 'esbuild';
 import { minify as minifyJs } from 'terser';
+import { minify as minifyHtml } from 'html-minifier-terser';
 import { Packer } from 'roadroller';
 import * as csso from 'csso';
 import ect from 'ect-bin';
@@ -103,10 +104,15 @@ async function build() {
   // 5. Construct Final Single HTML File
   console.log('\n📄 Step 5: Generating final dist/index.html...');
   const indexHtmlRaw = fs.readFileSync('index.html', 'utf8');
-  const bodyMatch = indexHtmlRaw.match(/<body>([\s\S]*?)<script/i);
+  const bodyMatch = indexHtmlRaw.match(/<body>([\s\S]*?)<\/body>/i);
   const domHtml = bodyMatch ? bodyMatch[1].trim() : '';
-  const xrSafeguard = `<script>try{if(typeof XRWebGLBinding!=='undefined'){delete XRWebGLBinding.prototype.createProjectionLayer;}Object.defineProperty(window,'XRWebGLBinding',{value:undefined,configurable:true});}catch(e){}</script>`;
-  const finalHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style>${xrSafeguard}</head><body>${domHtml}<script type="module">const j=location.hostname.endsWith('js13kgames.com'),u=j?'https://play.js13kgames.com/2026/webxr/three.js':'./three.js';const T=await import(u);window.THREE=T;if(window.start)window.start();</script><script>window.start=()=>{${roadrolledJs}};if(window.THREE)window.start();</script></body></html>`;
+  const minifiedDomHtml = await minifyHtml(domHtml, {
+    collapseWhitespace: true,
+    removeComments: true,
+    removeAttributeQuotes: true,
+  });
+  const aframeScript = `<script src="https://play.js13kgames.com/2026/webxr/aframe.js"></script><script>if(!window.AFRAME)document.write('<script src="./aframe.js"><\\/script>')</script>`;
+  const finalHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style>${aframeScript}<script>${roadrolledJs}</script></head><body>${minifiedDomHtml}</body></html>`;
 
   const htmlDistPath = path.join(distDir, 'index.html');
   fs.writeFileSync(htmlDistPath, finalHtml, 'utf8');
@@ -114,7 +120,7 @@ async function build() {
   console.log(`   dist/index.html size: ${(htmlSize / 1024).toFixed(2)} KB (${htmlSize} bytes)`);
 
   // Also write uncompressed version for easy debugging
-  const uncompressedHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style>${xrSafeguard}</head><body>${domHtml}<script type="module">const j=location.hostname.endsWith('js13kgames.com'),u=j?'https://play.js13kgames.com/2026/webxr/three.js':'./three.js';const T=await import(u);window.THREE=T;if(window.start)window.start();</script><script>window.start=()=>{${minifiedJs}};if(window.THREE)window.start();</script></body></html>`;
+  const uncompressedHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style>${aframeScript}<script>${minifiedJs}</script></head><body>${domHtml}</body></html>`;
   fs.writeFileSync(path.join(distDir, 'index_debug.html'), uncompressedHtml, 'utf8');
 
   // 6. Compress with ECT for maximum ZIP compression

@@ -20,7 +20,10 @@ const server = http.createServer((req: http.IncomingMessage, res: http.ServerRes
   let reqPath = req.url ? req.url.split('?')[0] : '/';
   if (reqPath === '/') reqPath = '/index.html';
 
-  const filePath = path.join(distDir, reqPath);
+  let filePath = path.join(distDir, reqPath);
+  if (reqPath === '/aframe.js' && !fs.existsSync(filePath)) {
+    filePath = path.resolve('aframe.js');
+  }
 
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
