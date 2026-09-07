@@ -215,7 +215,7 @@ export class CloudManager {
     this.spawnTimer = 0;
   }
 
-  public update(dt: number, speed: number, time: number, urgentLane?: number): void {
+  public update(dt: number, speed: number, time: number, urgentLane?: number, isMenu = false): void {
     // 1. Spawning logic
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
@@ -262,6 +262,13 @@ export class CloudManager {
 
       // Move toward player
       c.z += speed * dt;
+
+      // In menu mode, clouds must never pass in front of the 3D menu dialog
+      if (isMenu && c.z > -4.5) {
+        this.group.remove(c.mesh);
+        this.clouds.splice(i, 1);
+        continue;
+      }
 
       // Harmonic 3D oscillation
       const offsetX = sin(time * c.freqX + c.phaseX) * 0.45;
