@@ -123,7 +123,7 @@ export class Player {
     this.vrController = controller;
   }
 
-  public attachHornToHand(controller?: any): void {
+  public attachHornToHand(controller?: any, showPointer: boolean = false): void {
     const c = controller || this.vrController;
     if (!c) return;
     if (this.horn.parent !== c) {
@@ -133,7 +133,7 @@ export class Player {
     this.horn.position.set(0, -0.02, -0.08);
     this.horn.rotation.set(-0.35, 0, 0);
     this.horn.scale.set(1.0, 1.0, 1.0);
-    if (this.pointerBeam) this.pointerBeam.visible = true;
+    if (this.pointerBeam) this.pointerBeam.visible = showPointer;
   }
 
   public attachHornToHead(): void {
@@ -161,7 +161,7 @@ export class Player {
   public setMenuMode(isVR: boolean, controller?: any): void {
     if (controller) this.vrController = controller;
     if (isVR && (controller || this.vrController)) {
-      this.attachHornToHand(controller || this.vrController);
+      this.attachHornToHand(controller || this.vrController, true);
     } else {
       this.attachHornToDesktop();
     }
@@ -203,7 +203,7 @@ export class Player {
     this.prevHeadPitch = 0;
 
     if (mode === (VRMode.RIDER_EASY as any) || mode === GameMode.VR_EASY) {
-      this.attachHornToHand();
+      this.attachHornToHand(undefined, false);
       this.cameraRig.position.set(0, 1.40, 0);
     } else if (mode === (VRMode.UNICORN_HARD as any) || mode === GameMode.VR_HARD) {
       this.attachHornToHead();
