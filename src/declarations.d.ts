@@ -1,3 +1,4 @@
+declare const AFRAME: any;
 declare const THREE: any;
 
 declare module 'ect-bin' {
@@ -14,6 +15,9 @@ declare module 'roadroller' {
 }
 
 interface Window {
+  AFRAME: any;
   THREE: any;
   webkitAudioContext?: typeof AudioContext;
+  bootGame?: () => void;
+  _g?: any;
 }
