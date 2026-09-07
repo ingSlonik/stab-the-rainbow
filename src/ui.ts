@@ -5,6 +5,7 @@ import {
   COLOR_NAMES_CZ,
   GameState,
   VRMode,
+  GameMode,
 } from './types';
 import { sin, max, min, floor } from './math';
 import { getRandomDeathQuip } from './quips';
@@ -24,12 +25,19 @@ export class UIManager {
   public group: any;
   private camera: any;
 
-  // 3D UI Meshes: Upper HUD ribbon and 3D Dialog panel (Menu & Game Over)
+  // 1. Sleek score HUD attached to camera (static relative to eye)
   private hudMesh: any;
   private hudCanvas: HTMLCanvasElement;
   private hudCtx: CanvasRenderingContext2D;
   private hudTexture: any;
 
+  // 2. Rainbow track health percentages written directly on rainbow track below player
+  private trackPercentMesh: any;
+  private trackPercentCanvas: HTMLCanvasElement;
+  private trackPercentCtx: CanvasRenderingContext2D;
+  private trackPercentTexture: any;
+
+  // 3. 3D Dialog panel (Menu & Game Over)
   private dialogMesh: any;
   private dialogCanvas: HTMLCanvasElement;
   private dialogCtx: CanvasRenderingContext2D;
@@ -43,6 +51,7 @@ export class UIManager {
   private pointerX = -100;
   private pointerY = -100;
 
+  private highScoreDesktop = 0;
   private highScoreEasy = 0;
   private highScoreHard = 0;
   private lastQuote = '';
@@ -65,17 +74,21 @@ export class UIManager {
 
   private loadHighScores(): void {
     try {
+      this.highScoreDesktop = parseInt(localStorage.getItem('str_h_desktop') || '0', 10) || 0;
       this.highScoreEasy =
         parseInt(localStorage.getItem('str_h_easy') || localStorage.getItem('str_high') || '0', 10) || 0;
       this.highScoreHard = parseInt(localStorage.getItem('str_h_hard') || '0', 10) || 0;
     } catch (_) {
+      this.highScoreDesktop = 0;
       this.highScoreEasy = 0;
       this.highScoreHard = 0;
     }
   }
 
-  public saveHighScore(score: number, vrMode: VRMode): boolean {
-    const isHard = vrMode === VRMode.UNICORN_HARD;
+  public saveHighScore(score: number, mode: VRMode | GameMode): boolean {
+    const isHard = mode === (VRMode.UNICORN_HARD as any) || mode === GameMode.VR_HARD;
+    const isEasy = mode === (VRMode.RIDER_EASY as any) || mode === GameMode.VR_EASY;
+
     if (isHard) {
       if (score > this.highScoreHard) {
         this.highScoreHard = score;
@@ -84,7 +97,7 @@ export class UIManager {
         } catch (_) {}
         return true;
       }
-    } else {
+    } else if (isEasy) {
       if (score > this.highScoreEasy) {
         this.highScoreEasy = score;
         try {
@@ -93,12 +106,22 @@ export class UIManager {
         } catch (_) {}
         return true;
       }
+    } else {
+      if (score > this.highScoreDesktop) {
+        this.highScoreDesktop = score;
+        try {
+          localStorage.setItem('str_h_desktop', score.toString());
+        } catch (_) {}
+        return true;
+      }
     }
     return false;
   }
 
-  public getHighScore(vrMode: VRMode): number {
-    return vrMode === VRMode.UNICORN_HARD ? this.highScoreHard : this.highScoreEasy;
+  public getHighScore(mode: VRMode | GameMode): number {
+    if (mode === (VRMode.UNICORN_HARD as any) || mode === GameMode.VR_HARD) return this.highScoreHard;
+    if (mode === (VRMode.RIDER_EASY as any) || mode === GameMode.VR_EASY) return this.highScoreEasy;
+    return this.highScoreDesktop;
   }
 
   public getLastQuote(): string {
@@ -110,17 +133,34 @@ export class UIManager {
     this.quipTimer = 4.0;
   }
 
+  public setGameOverPosition(playerX: number, playerY: number, isVR: boolean = false): void {
+    if (!this.dialogMesh) return;
+    if (isVR) {
+      this.dialogMesh.position.set(playerX, playerY + 0.35, -5.5);
+      this.dialogMesh.rotation.x = -0.04;
+    } else {
+      this.dialogMesh.position.set(0, playerY - 0.70, -5.5);
+      this.dialogMesh.rotation.x = -0.18;
+    }
+  }
+
+  public setMenuPosition(): void {
+    if (!this.dialogMesh) return;
+    this.dialogMesh.position.set(0, 2.8, -5.5);
+    this.dialogMesh.rotation.x = -0.12;
+  }
+
   private initCanvasMesh(): void {
-    // 1. Lower HUD dashboard ribbon: positioned at bottom so it doesn't block the view
+    // 1. Sleek top-left HUD: attached to camera so it is static relative to the eye, only score text
     this.hudCanvas = document.createElement('canvas');
-    this.hudCanvas.width = 1024;
-    this.hudCanvas.height = 320;
+    this.hudCanvas.width = 512;
+    this.hudCanvas.height = 128;
     this.hudCtx = this.hudCanvas.getContext('2d')!;
 
     this.hudTexture = new THREE.CanvasTexture(this.hudCanvas);
     this.hudTexture.minFilter = THREE.LinearFilter;
 
-    const hudGeom = new THREE.PlaneGeometry(1.85, 0.56);
+    const hudGeom = new THREE.PlaneGeometry(0.72, 0.18);
     const hudMat = new THREE.MeshBasicMaterial({
       map: this.hudTexture,
       transparent: true,
@@ -129,13 +169,36 @@ export class UIManager {
     });
 
     this.hudMesh = new THREE.Mesh(hudGeom, hudMat);
-    this.hudMesh.position.set(0, -0.62, -2.0);
-    this.hudMesh.rotation.x = -0.26;
+    this.hudMesh.position.set(-0.60, 0.58, -1.5);
+    this.hudMesh.rotation.set(0, 0, 0);
     this.hudMesh.renderOrder = 9999;
     this.hudMesh.visible = false;
     this.camera.add(this.hudMesh);
 
-    // 2. Centered 3D Dialog panel (Menu & Game Over): always on top
+    // 2. Rainbow track health percentages: written directly on the rainbow track below the player!
+    this.trackPercentCanvas = document.createElement('canvas');
+    this.trackPercentCanvas.width = 1024;
+    this.trackPercentCanvas.height = 160;
+    this.trackPercentCtx = this.trackPercentCanvas.getContext('2d')!;
+
+    this.trackPercentTexture = new THREE.CanvasTexture(this.trackPercentCanvas);
+    this.trackPercentTexture.minFilter = THREE.LinearFilter;
+
+    const trackGeom = new THREE.PlaneGeometry(7.7, 1.25);
+    const trackMat = new THREE.MeshBasicMaterial({
+      map: this.trackPercentTexture,
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+
+    this.trackPercentMesh = new THREE.Mesh(trackGeom, trackMat);
+    this.trackPercentMesh.position.set(0, 0.08, -3.6);
+    this.trackPercentMesh.rotation.x = -Math.PI / 2 + 0.18;
+    this.trackPercentMesh.visible = false;
+    this.group.add(this.trackPercentMesh);
+
+    // 3. Centered 3D Dialog panel (Menu & Game Over) in 3D world space
     this.dialogCanvas = document.createElement('canvas');
     this.dialogCanvas.width = 1024;
     this.dialogCanvas.height = 1024;
@@ -144,30 +207,32 @@ export class UIManager {
     this.dialogTexture = new THREE.CanvasTexture(this.dialogCanvas);
     this.dialogTexture.minFilter = THREE.LinearFilter;
 
-    const dialogGeom = new THREE.PlaneGeometry(1.68, 1.5);
+    const dialogGeom = new THREE.PlaneGeometry(4.2, 4.0);
     const dialogMat = new THREE.MeshBasicMaterial({
       map: this.dialogTexture,
       transparent: true,
-      depthTest: false,
+      side: THREE.DoubleSide,
       depthWrite: false,
     });
 
     this.dialogMesh = new THREE.Mesh(dialogGeom, dialogMat);
-    this.dialogMesh.position.set(0, 0.08, -2.1);
-    this.dialogMesh.renderOrder = 9999;
+    this.dialogMesh.position.set(0, 2.8, -5.5);
+    this.dialogMesh.rotation.x = -0.12;
     this.dialogMesh.visible = true;
-    this.camera.add(this.dialogMesh);
+    this.group.add(this.dialogMesh);
   }
 
   public updateHoverRay(origin: any, direction: any): void {
-    if (!this.dialogMesh.visible) return;
+    if (!this.dialogMesh || !this.dialogMesh.visible) return;
+    this.dialogMesh.updateMatrixWorld(true);
     this.raycaster.set(origin, direction);
     const intersects = this.raycaster.intersectObject(this.dialogMesh);
     this.processIntersects(intersects);
   }
 
   public updateHoverNdc(pointerNdcX: number, pointerNdcY: number): void {
-    if (!this.dialogMesh.visible) return;
+    if (!this.dialogMesh || !this.dialogMesh.visible) return;
+    this.dialogMesh.updateMatrixWorld(true);
     this.mouseVec.set(pointerNdcX, pointerNdcY);
     this.raycaster.setFromCamera(this.mouseVec, this.camera);
     const intersects = this.raycaster.intersectObject(this.dialogMesh);
@@ -224,12 +289,12 @@ export class UIManager {
     urgentLane: number,
     time: number,
     dt: number,
-    onStartGame: (mode: VRMode) => void,
+    onStartGame: (mode: VRMode | GameMode) => void,
     onRestart: () => void,
     onHome: () => void,
     onToggleMode: () => void,
     isVR: boolean = false,
-    vrMode: VRMode = VRMode.NONE
+    vrMode: VRMode | GameMode = GameMode.DESKTOP
   ): void {
     this.buttons = [];
 
@@ -242,7 +307,9 @@ export class UIManager {
 
     if (state === GameState.MENU) {
       this.hudMesh.visible = false;
+      if (this.trackPercentMesh) this.trackPercentMesh.visible = false;
       this.dialogMesh.visible = true;
+      this.setMenuPosition();
       this.dialogCtx.clearRect(0, 0, 1024, 1024);
       this.drawMenu(this.dialogCtx, onStartGame, time, isVR, vrMode);
       this.drawPointerReticle(this.dialogCtx);
@@ -252,15 +319,19 @@ export class UIManager {
 
     if (state === GameState.PLAYING) {
       this.hudMesh.visible = true;
+      if (this.trackPercentMesh) this.trackPercentMesh.visible = true;
       this.dialogMesh.visible = false;
-      this.hudCtx.clearRect(0, 0, 1024, 320);
-      this.drawHUD(this.hudCtx, score, laneHealth, urgentLane, time, isVR, vrMode);
+      this.drawHUD(this.hudCtx, score);
       this.hudTexture.needsUpdate = true;
+
+      this.drawTrackPercentages(this.trackPercentCtx, laneHealth, urgentLane, time);
+      this.trackPercentTexture.needsUpdate = true;
       return;
     }
 
     if (state === GameState.FALLING || state === GameState.GAMEOVER) {
       this.hudMesh.visible = false;
+      if (this.trackPercentMesh) this.trackPercentMesh.visible = false;
       this.dialogMesh.visible = true;
       this.dialogCtx.clearRect(0, 0, 1024, 1024);
       this.drawGameOver(this.dialogCtx, score, onRestart, onHome, onToggleMode, time, isVR, vrMode);
@@ -322,10 +393,10 @@ export class UIManager {
 
   private drawMenu(
     ctx: CanvasRenderingContext2D,
-    onStartGame: (mode: VRMode) => void,
+    onStartGame: (mode: VRMode | GameMode) => void,
     time: number,
     isVR: boolean,
-    currentMode: VRMode
+    currentMode: VRMode | GameMode
   ): void {
     // Elegant dialog card
     ctx.fillStyle = 'rgba(12, 8, 28, 0.94)';
@@ -347,13 +418,13 @@ export class UIManager {
     // Subtitle
     ctx.font = '700 21px system-ui, sans-serif';
     ctx.fillStyle = '#ffdd00';
-    ctx.fillText('BĚŽ A ZACHRAŇ DUHU', 512, 206);
+    ctx.fillText('VÝBĚR VR ÚROVNĚ NAD DUHOU', 512, 206);
 
     // High Scores - Easy & Hard separated
     ctx.font = '700 21px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff';
     ctx.fillText(
-      `REKORD:  EASY: ${this.highScoreEasy}   •   HARD: ${this.highScoreHard}`,
+      `REKORDY:   EASY: ${this.highScoreEasy}   •   HARD: ${this.highScoreHard}`,
       512,
       258
     );
@@ -377,7 +448,7 @@ export class UIManager {
       'JEZDEC NA JEDNOROŽCI (EASY)',
       'Roh v ruce • Ovladač: směr • Spoušť = bodnutí • Grip = skok',
       '#00d4ff',
-      () => onStartGame(VRMode.RIDER_EASY)
+      () => onStartGame(GameMode.VR_EASY)
     );
 
     this.drawButton(
@@ -390,13 +461,13 @@ export class UIManager {
       'TY JSI JEDNOROŽEC! (HARD)',
       'Roh na čele • Hlava: náklon řídí • trhnutí bodá • výskok skáče',
       '#ffdd00',
-      () => onStartGame(VRMode.UNICORN_HARD)
+      () => onStartGame(GameMode.VR_HARD)
     );
 
     // Instructions
     ctx.font = '600 18px system-ui, sans-serif';
     ctx.fillStyle = '#c0cedf';
-    ctx.fillText('🎯 Namiř rohem a stiskni spoušť pro výběr', 512, 670);
+    ctx.fillText('🎯 Namiř paprskem z ovladače a stiskni spoušť (Trigger) pro výběr', 512, 670);
 
     ctx.font = '500 16px system-ui, sans-serif';
     ctx.fillStyle = '#8e9eb5';
@@ -411,12 +482,13 @@ export class UIManager {
     onToggleMode: () => void,
     time: number,
     isVR: boolean,
-    vrMode: VRMode
+    vrMode: VRMode | GameMode
   ): void {
-    const isHard = vrMode === VRMode.UNICORN_HARD;
-    const modeName = isHard ? 'HARD' : 'EASY';
-    const otherModeName = isHard ? 'EASY' : 'HARD';
-    const highScore = isHard ? this.highScoreHard : this.highScoreEasy;
+    const isHard = vrMode === (VRMode.UNICORN_HARD as any) || (vrMode as any) === GameMode.VR_HARD;
+    const isEasy = vrMode === (VRMode.RIDER_EASY as any) || (vrMode as any) === GameMode.VR_EASY;
+    const modeName = isHard ? 'VR HARD' : (isEasy ? 'VR EASY' : 'DESKTOP');
+    const otherModeName = isHard ? 'VR EASY' : 'VR HARD';
+    const highScore = this.getHighScore(vrMode);
     const isNewHigh = score >= highScore && score > 0;
 
     // Dark elegant panel
@@ -428,7 +500,7 @@ export class UIManager {
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Title (soft, no skull emoji)
+    // Title
     ctx.textAlign = 'center';
     ctx.font = '900 50px system-ui, sans-serif';
     ctx.fillStyle = '#ff7b00';
@@ -478,155 +550,111 @@ export class UIManager {
       515,
       744,
       100,
-      'HLAVNÍ OBRAZOVKA (MENU)',
+      'HLAVNÍ MENU',
       '',
       '#00d4ff',
       () => onHome()
     );
 
-    this.drawButton(
-      ctx,
-      'btn-toggle',
-      140,
-      640,
-      744,
-      100,
-      `PŘEPNOUT NA ${otherModeName}`,
-      '',
-      '#ffdd00',
-      () => onToggleMode()
-    );
+    if (isVR) {
+      this.drawButton(
+        ctx,
+        'btn-toggle',
+        140,
+        640,
+        744,
+        100,
+        `PŘEPNOUT NA ${otherModeName}`,
+        '',
+        '#ffdd00',
+        () => onToggleMode()
+      );
+    }
   }
 
   private drawHUD(
     ctx: CanvasRenderingContext2D,
-    score: number,
+    score: number
+  ): void {
+    ctx.clearRect(0, 0, 512, 128);
+
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 44px system-ui, sans-serif';
+
+    // Dark stroke outline so white text is crisp over any background
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.lineWidth = 6;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(`SKÓRE: ${score}`, 16, 64);
+
+    // Glowing white text - pure score text, no frames, no extra text
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`SKÓRE: ${score}`, 16, 64);
+    ctx.restore();
+  }
+
+  private drawTrackPercentages(
+    ctx: CanvasRenderingContext2D,
     laneHealth: number[],
     urgentLane: number,
-    time: number,
-    isVR: boolean = false,
-    vrMode: VRMode = VRMode.NONE
+    time: number
   ): void {
-    // Upper HUD ribbon
-    ctx.fillStyle = 'rgba(10, 8, 25, 0.88)';
-    this.roundRect(ctx, 16, 8, 992, 304, 22);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
+    ctx.clearRect(0, 0, 1024, 160);
 
-    const isHard = vrMode === VRMode.UNICORN_HARD;
-
-    // Mode Banner
-    ctx.textAlign = 'center';
-    ctx.font = '800 20px system-ui, sans-serif';
-    ctx.fillStyle = isHard ? '#ffdd00' : '#00d4ff';
-
-    let bannerText = isHard
-      ? 'TY JSI JEDNOROŽEC • NÁKLON HLAVY = SMĚR • TRHNUTÍ = BODNUTÍ • VÝSKOK = SKOK'
-      : 'JEZDEC NA JEDNOROŽCI • ROH V RUCE • SPOUŠŤ = BODNUTÍ • GRIP = SKOK';
-    ctx.fillText(bannerText, 512, 38);
-
-    // Score and High Score
-    ctx.textAlign = 'left';
-    ctx.font = '900 36px system-ui, sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`SKÓRE: ${score}`, 40, 84);
-
-    const curHigh = this.getHighScore(vrMode);
-    ctx.font = '700 20px system-ui, sans-serif';
-    ctx.fillStyle = '#ffdd00';
-    ctx.fillText(`REKORD (${isHard ? 'HARD' : 'EASY'}): ${curHigh}`, 40, 114);
-
-    // Urgent Alert
-    if (urgentLane >= 0 && urgentLane < LANE_COUNT) {
-      const uName = COLOR_NAMES_CZ[urgentLane];
-      const uCol = RAINBOW_HEX_STRINGS[urgentLane];
-      const blink = sin(time * 16) > 0;
-
-      ctx.textAlign = 'right';
-      ctx.font = '800 26px system-ui, sans-serif';
-      ctx.fillStyle = blink ? uCol : '#ffffff';
-      ctx.fillText(`⚡ ZACHRAŇ: ${uName.toUpperCase()}!`, 984, 84);
-    }
-
-    // Dynamic Quip (if any)
-    if (this.currentQuip) {
-      ctx.fillStyle = 'rgba(255, 221, 0, 0.16)';
-      this.roundRect(ctx, 40, 126, 944, 38, 10);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 221, 0, 0.6)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      ctx.textAlign = 'center';
-      ctx.font = 'italic 700 18px system-ui, sans-serif';
-      ctx.fillStyle = '#fffae0';
-      ctx.fillText(`"${this.currentQuip}"`, 512, 151);
-    }
-
-    // 7 Rainbow Lane Health Indicators - Clearly showing color decay
-    const barStartY = 176;
-    const barStartX = 40;
-    const totalW = 944;
-    const itemW = totalW / LANE_COUNT;
+    const laneW = 1024 / LANE_COUNT;
 
     for (let i = 0; i < LANE_COUNT; i++) {
-      const h = laneHealth[i];
-      const x = barStartX + i * itemW;
+      const h = laneHealth[i] ?? 1.0;
+      const x = i * laneW;
       const col = RAINBOW_HEX_STRINGS[i];
       const isUrgent = i === urgentLane;
       const isCritical = h < 0.32;
 
-      // Slot background
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      this.roundRect(ctx, x + 4, barStartY, itemW - 8, 54, 10);
+      // Dark card on the rainbow lane
+      ctx.fillStyle = 'rgba(10, 8, 25, 0.82)';
+      this.roundRect(ctx, x + 5, 8, laneW - 10, 144, 16);
       ctx.fill();
 
-      // Health fill
+      // Health fill background inside card
       if (h > 0.04) {
         ctx.fillStyle = col;
-        const fillW = (itemW - 8) * h;
-        this.roundRect(ctx, x + 4, barStartY, fillW, 54, 10);
+        ctx.globalAlpha = 0.38;
+        const fillH = 136 * h;
+        this.roundRect(ctx, x + 9, 8 + 140 - fillH, laneW - 18, fillH, 12);
         ctx.fill();
-
-        // Color label & health percentage
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '800 14px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(
-          `${COLOR_NAMES_CZ[i].slice(0, 3).toUpperCase()} ${Math.round(h * 100)}%`,
-          x + itemW / 2,
-          barStartY + 33
-        );
-      } else {
-        ctx.fillStyle = '#ff2a4b';
-        ctx.font = '900 16px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('PRÁZDNO', x + itemW / 2, barStartY + 33);
+        ctx.globalAlpha = 1.0;
       }
 
       // Border: flash white if urgent or critical
-      const blink = sin(time * 20) > 0;
+      const blink = sin(time * 18) > 0;
       ctx.strokeStyle = isUrgent
-        ? blink
-          ? '#ffffff'
-          : col
+        ? (blink ? '#ffffff' : col)
         : isCritical
-        ? blink
-          ? '#ffffff'
-          : '#ff2a4b'
+        ? (blink ? '#ffffff' : '#ff2a4b')
         : col;
-      ctx.lineWidth = isUrgent || isCritical ? 3.5 : 1.5;
-      this.roundRect(ctx, x + 4, barStartY, itemW - 8, 54, 10);
+      ctx.lineWidth = isUrgent || isCritical ? 4.5 : 2.0;
+      this.roundRect(ctx, x + 5, 8, laneW - 10, 144, 16);
       ctx.stroke();
-    }
 
-    // Always-accessible menu hint
-    ctx.font = '600 15px system-ui, sans-serif';
-    ctx.fillStyle = '#a0b0c8';
-    ctx.textAlign = 'center';
-    ctx.fillText(isVR ? 'NÁVRAT DO MENU KDYKOLIV: GRIP (L)' : 'NÁVRAT DO MENU: KLÁVESA ESC / H', 512, 260);
+      // Color name
+      ctx.fillStyle = col;
+      ctx.font = '800 20px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(COLOR_NAMES_CZ[i].toUpperCase(), x + laneW / 2, 42);
+
+      // Percentage or EMPTY label
+      if (h > 0.04) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 48px system-ui, sans-serif';
+        ctx.fillText(`${Math.round(h * 100)}%`, x + laneW / 2, 104);
+      } else {
+        ctx.fillStyle = '#ff2a4b';
+        ctx.font = '900 28px system-ui, sans-serif';
+        ctx.fillText('PRÁZDNO', x + laneW / 2, 100);
+      }
+    }
   }
 
   private roundRect(
