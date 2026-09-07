@@ -17,7 +17,7 @@ export class Player {
   public isStabbing = false;
   public stabTimer = 0;
   private readonly STAB_DURATION = 0.24;
-  private readonly hornBaseZ = -0.28;
+  private readonly hornBaseZ = -0.22;
   private hornMat: any;
 
   private hornTipWorldPos: any;
@@ -36,32 +36,32 @@ export class Player {
   }
 
   private initHorn(camera: any): void {
-    // Construct the magnificent translucent crystal unicorn horn
+    // Construct the slender, elegant translucent crystal unicorn horn
     this.horn = new THREE.Group();
 
-    // Smooth, true cone geometry
-    const coneLength = 1.85;
-    const coneGeom = new THREE.ConeGeometry(0.11, coneLength, 32, 1);
-    // Align so base is at origin, pointing forward along -Z
+    // Smooth cone geometry: 1.15m long, 3.5cm radius base
+    const coneLength = 1.15;
+    const coneGeom = new THREE.ConeGeometry(0.035, coneLength, 24, 1);
+    // Align base at origin, pointing forward along -Z
     coneGeom.rotateX(-Math.PI / 2);
     coneGeom.translate(0, 0, -coneLength / 2);
 
     // Translucent pearlescent crystal material
     this.hornMat = new THREE.MeshStandardMaterial({
-      color: 0xfffcf2,
-      emissive: 0xffe48e,
-      emissiveIntensity: 0.36,
-      roughness: 0.12,
-      metalness: 0.1,
+      color: 0xfffcf5,
+      emissive: 0xffe899,
+      emissiveIntensity: 0.42,
+      roughness: 0.15,
+      metalness: 0.15,
       transparent: true,
-      opacity: 0.74,
+      opacity: 0.88,
     });
 
     const hornMesh = new THREE.Mesh(coneGeom, this.hornMat);
     this.horn.add(hornMesh);
 
     // Glowing crystal tip at the apex of the cone
-    const tipGeom = new THREE.SphereGeometry(0.045, 12, 12);
+    const tipGeom = new THREE.SphereGeometry(0.024, 12, 12);
     const tipMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
     });
@@ -69,9 +69,9 @@ export class Player {
     this.hornTip.position.set(0, 0, -coneLength);
     this.horn.add(this.hornTip);
 
-    // Position horn protruding down into view from forehead (top)
-    this.horn.position.set(0, 0.44, this.hornBaseZ);
-    this.horn.rotation.x = -0.24;
+    // Position horn sprouting from forehead, angled forward above eye line so both eyes can see it stereoscopically
+    this.horn.position.set(0, 0.24, this.hornBaseZ);
+    this.horn.rotation.x = -0.09;
 
     camera.add(this.horn);
   }
@@ -141,7 +141,7 @@ export class Player {
     if (this.hornMat) this.hornMat.emissiveIntensity = 0.36;
   }
 
-  public update(dt: number, speed: number, isMoving: boolean): void {
+  public update(dt: number, speed: number, isMoving: boolean, isVR: boolean = false): void {
     // 0. Horn thrust animation on stab
     let thrustOffset = 0;
     if (this.stabTimer > 0) {
@@ -180,10 +180,10 @@ export class Player {
       }
     }
 
-    // 3. Gallop bobbing when grounded and running
+    // 3. Gallop bobbing when grounded and running (desktop only)
     let gallopY = 0;
     let gallopPitch = 0;
-    if (this.isGrounded && isMoving && !this.isFalling) {
+    if (this.isGrounded && isMoving && !this.isFalling && !isVR) {
       this.gallopTimer += dt * speed * 1.5;
       gallopY = sin(this.gallopTimer) * 0.018;
       gallopPitch = cos(this.gallopTimer) * 0.007;
@@ -193,15 +193,20 @@ export class Player {
     this.root.position.x = this.x;
     this.root.position.y = this.y + gallopY;
 
-    // Banking when turning
-    const turnVel = (this.targetX - this.x);
-    this.root.rotation.z = -turnVel * 0.14;
-    this.root.rotation.x = gallopPitch;
+    if (isVR) {
+      // In VR, the physical headset dictates orientation. Keep camera rig level with the horizon!
+      this.root.rotation.set(0, 0, 0);
+    } else {
+      // Desktop banking when turning
+      const turnVel = (this.targetX - this.x);
+      this.root.rotation.z = -turnVel * 0.14;
+      this.root.rotation.x = gallopPitch;
 
-    // 5. Tumble rotation when falling
-    if (this.isFalling) {
-      this.root.rotation.x += dt * 3.5;
-      this.root.rotation.z += dt * 2.2;
+      // 5. Tumble rotation when falling
+      if (this.isFalling) {
+        this.root.rotation.x += dt * 3.5;
+        this.root.rotation.z += dt * 2.2;
+      }
     }
   }
 }
