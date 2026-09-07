@@ -6,9 +6,9 @@
   "author": "Filip Paulů",
   "license": "MIT",
   "scripts": {
-    "dev": "node scripts/dev.mjs",
-    "preview": "node scripts/preview.mjs",
-    "build": "node build.ts",
+    "dev": "node scripts/dev.ts",
+    "preview": "node scripts/preview.ts",
+    "build": "node scripts/build.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

@@ -5,7 +5,7 @@ import path from 'node:path';
 const PORT = 8080;
 const distDir = path.resolve('dist');
 
-const mimeTypes = {
+const mimeTypes: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -16,7 +16,7 @@ const mimeTypes = {
   '.zip': 'application/zip',
 };
 
-const server = http.createServer((req, res) => {
+const server = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
   let reqPath = req.url ? req.url.split('?')[0] : '/';
   if (reqPath === '/') reqPath = '/index.html';
 

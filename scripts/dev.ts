@@ -6,7 +6,7 @@ import * as esbuild from 'esbuild';
 const PORT = 5173;
 const rootDir = process.cwd();
 
-const mimeTypes = {
+const mimeTypes: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
   '.ts': 'application/javascript; charset=utf-8',
@@ -17,7 +17,7 @@ const mimeTypes = {
   '.json': 'application/json',
 };
 
-const server = http.createServer((req, res) => {
+const server = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
   let reqPath = req.url ? req.url.split('?')[0] : '/';
   if (reqPath === '/') reqPath = '/index.html';
 

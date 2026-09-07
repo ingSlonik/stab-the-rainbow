@@ -2,7 +2,6 @@ import * as esbuild from 'esbuild';
 import { minify as minifyJs } from 'terser';
 import { Packer } from 'roadroller';
 import * as csso from 'csso';
-import { minify as minifyHtml } from 'html-minifier-terser';
 import ect from 'ect-bin';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -109,7 +108,6 @@ async function build() {
   fs.writeFileSync(htmlDistPath, finalHtml, 'utf8');
   const htmlSize = fs.statSync(htmlDistPath).size;
   console.log(`   dist/index.html size: ${(htmlSize / 1024).toFixed(2)} KB (${htmlSize} bytes)`);
-
 
   // Also write uncompressed version for easy debugging
   const uncompressedHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style></head><body><script type="module">const j=location.hostname.endsWith('js13kgames.com'),u=j?'https://play.js13kgames.com/2026/webxr/three.js':'./three.js';const T=await import(u);window.THREE=T;if(window.start)window.start();</script><script>window.start=()=>{${minifiedJs}};if(window.THREE)window.start();</script></body></html>`;
