@@ -36,6 +36,9 @@ export class Game {
   private clock: any;
   private hasWebXR = false;
   private vrSession: any = null;
+  private skyMesh: any;
+  private hillsGroup: any;
+  private prevHeadZ = 0;
 
   // Desktop Pointer state
   private pointerNdcX = 0;
@@ -68,17 +71,174 @@ export class Game {
 
   private initScene(): void {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x060312);
-    this.scene.fog = new THREE.FogExp2(0x080418, 0.015);
 
     this.camera = new THREE.PerspectiveCamera(
       70,
       window.innerWidth / window.innerHeight,
       0.1,
-      160
+      200
     );
-    // Camera default head height
+    // Camera default head height & natural downward bird's-eye glance from the clouds
     this.camera.position.set(0, 1.6, 0);
+    this.camera.rotation.x = -0.10;
+
+    this.initSky();
+  }
+
+  private createMountainRidge(
+    radius: number,
+    baseY: number,
+    peakHeight: number,
+    colorHex: number,
+    freq1: number,
+    freq2: number,
+    phase: number
+  ): any {
+    const segments = 96;
+    const geom = new THREE.BufferGeometry();
+    const pos = new Float32Array((segments + 1) * 2 * 3);
+    const indices: number[] = [];
+
+    for (let i = 0; i <= segments; i++) {
+      const u = i / segments;
+      const angle = u * Math.PI * 2;
+      const x = Math.sin(angle) * radius;
+      const z = Math.cos(angle) * radius;
+
+      const wave =
+        Math.sin(angle * freq1 + phase) * 0.52 +
+        Math.sin(angle * freq2 + phase * 1.6) * 0.36 +
+        Math.cos(angle * 12 + phase) * 0.12;
+      const topY = baseY + wave * peakHeight;
+      const botY = baseY - 65;
+
+      const idx = i * 2;
+      pos[idx * 3] = x;
+      pos[idx * 3 + 1] = topY;
+      pos[idx * 3 + 2] = z;
+
+      pos[(idx + 1) * 3] = x;
+      pos[(idx + 1) * 3 + 1] = botY;
+      pos[(idx + 1) * 3 + 2] = z;
+
+      if (i < segments) {
+        indices.push(idx, idx + 1, idx + 2);
+        indices.push(idx + 2, idx + 1, idx + 3);
+      }
+    }
+
+    geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geom.setIndex(indices);
+    geom.computeVertexNormals();
+
+    const mat = new THREE.MeshBasicMaterial({
+      color: colorHex,
+      side: THREE.DoubleSide,
+      fog: false,
+    });
+    return new THREE.Mesh(geom, mat);
+  }
+
+  private initSky(): void {
+    const cvs = document.createElement('canvas');
+    cvs.width = 512;
+    cvs.height = 512;
+    const ctx = cvs.getContext('2d')!;
+
+    // 1. Smooth atmospheric sky dome gradient
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, 512);
+    skyGrad.addColorStop(0.0, '#010006'); // Cosmic dark void
+    skyGrad.addColorStop(0.12, '#04081c'); // Deep night
+    skyGrad.addColorStop(0.24, '#091c48'); // Midnight blue
+    skyGrad.addColorStop(0.38, '#1450aa'); // Rich royal blue
+    skyGrad.addColorStop(0.48, '#267fe8'); // Vibrant azure sky
+    skyGrad.addColorStop(0.58, '#6ec4ff'); // Bright daylight sky
+    skyGrad.addColorStop(0.68, '#cce8ff'); // Horizon glow
+    skyGrad.addColorStop(0.78, '#ffe4c2'); // Warm twilight glow
+    skyGrad.addColorStop(1.0, '#10221a'); // Lower haze
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, 512, 512);
+
+    // 2. Cosmic stars at the top
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 90; i++) {
+      const sx = (i * 79 + 29) % 512;
+      const sy = ((i * 47 + 13) % 120) + 3;
+      const sr = i % 4 === 0 ? 1.8 : i % 2 === 0 ? 1.2 : 0.8;
+      ctx.beginPath();
+      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 3. Faint cosmic nebula
+    const neb = ctx.createRadialGradient(256, 40, 10, 256, 40, 150);
+    neb.addColorStop(0, 'rgba(170, 70, 255, 0.22)');
+    neb.addColorStop(0.5, 'rgba(60, 130, 255, 0.12)');
+    neb.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = neb;
+    ctx.fillRect(0, 0, 512, 140);
+
+    const skyTex = new THREE.CanvasTexture(cvs);
+    skyTex.wrapS = THREE.RepeatWrapping;
+
+    const skyGeom = new THREE.SphereGeometry(140, 32, 18);
+    const skyMat = new THREE.MeshBasicMaterial({
+      map: skyTex,
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+    });
+    this.skyMesh = new THREE.Mesh(skyGeom, skyMat);
+    this.skyMesh.renderOrder = -1000;
+    this.scene.add(this.skyMesh);
+
+    // 4. Razor-sharp 3D Mountain and Rolling Hill Ridges (viewed from above in the clouds)
+    this.hillsGroup = new THREE.Group();
+
+    // Layer 1: Distant majestic mountain peaks
+    this.hillsGroup.add(
+      this.createMountainRidge(130, -14, 16, 0x224c74, 4, 9, 0)
+    );
+
+    // Layer 2: Mid-distance lush green mountain ridges
+    this.hillsGroup.add(
+      this.createMountainRidge(105, -22, 13, 0x164228, 5, 8, 1.5)
+    );
+
+    // Layer 3: Foreground rolling hill slopes
+    this.hillsGroup.add(
+      this.createMountainRidge(80, -28, 10, 0x0f2c1a, 6, 11, 2.7)
+    );
+
+    // Layer 4: Deep valley floor disk
+    const floorGeom = new THREE.CircleGeometry(135, 32);
+    floorGeom.rotateX(-Math.PI / 2);
+    floorGeom.translate(0, -36, 0);
+    const floorMat = new THREE.MeshBasicMaterial({
+      color: 0x07150d,
+      side: THREE.DoubleSide,
+      fog: false,
+    });
+    this.hillsGroup.add(new THREE.Mesh(floorGeom, floorMat));
+
+    // Layer 5: Cloud Sea floating below the rainbow highway
+    const seaGeom = new THREE.RingGeometry(15, 130, 32);
+    seaGeom.rotateX(-Math.PI / 2);
+    seaGeom.translate(0, -15, 0);
+    const seaMat = new THREE.MeshBasicMaterial({
+      color: 0xd6eeff,
+      transparent: true,
+      opacity: 0.42,
+      side: THREE.DoubleSide,
+      fog: false,
+      depthWrite: false,
+    });
+    this.hillsGroup.add(new THREE.Mesh(seaGeom, seaMat));
+
+    this.scene.add(this.hillsGroup);
+
+    this.scene.background = null;
+    this.scene.fog = new THREE.FogExp2(0x3e719c, 0.007);
   }
 
   private initRenderer(): void {
@@ -162,17 +322,32 @@ export class Game {
         // Steer player with mouse
         this.player.setTargetX(this.pointerNdcX * 1.05);
 
-        // Tilt camera slightly with mouse on desktop
+        // Tilt camera slightly with mouse on desktop (angled downwards to see mountains below)
         if (!this.renderer.xr.isPresenting) {
           this.camera.rotation.y = -this.pointerNdcX * 0.28;
-          this.camera.rotation.x = this.pointerNdcY * 0.2;
+          this.camera.rotation.x = -0.10 + this.pointerNdcY * 0.22;
         }
       }
     });
 
-    window.addEventListener('mousedown', () => {
+    // Prevent context menu on right click
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    window.addEventListener('mousedown', (e) => {
       initAudio();
-      this.handleActionTrigger();
+      if (e.button === 2) {
+        // Right mouse button: JUMP
+        if (this.state === GameState.PLAYING) {
+          this.player.jump();
+        }
+      } else if (e.button === 0) {
+        // Left mouse button: STAB in playing, or click UI in menu/gameover
+        if (this.state === GameState.PLAYING) {
+          this.player.stab();
+        } else {
+          this.handleActionTrigger();
+        }
+      }
     });
 
     window.addEventListener('keydown', (e) => {
@@ -181,7 +356,11 @@ export class Game {
 
       if (e.code === 'Space') {
         e.preventDefault();
-        this.handleActionTrigger();
+        if (this.state === GameState.PLAYING) {
+          this.player.jump();
+        } else {
+          this.handleActionTrigger();
+        }
       } else if (e.code === 'KeyH' || e.code === 'Escape') {
         if (this.state === GameState.GAMEOVER) {
           this.goToMenu();
@@ -202,7 +381,11 @@ export class Game {
         this.pointerNdcY = -(t.clientY / window.innerHeight) * 2 + 1;
         this.ui.updateHover(this.pointerNdcX, this.pointerNdcY);
       }
-      this.handleActionTrigger();
+      if (this.state === GameState.PLAYING) {
+        this.player.stab();
+      } else {
+        this.handleActionTrigger();
+      }
     });
   }
 
@@ -260,7 +443,7 @@ export class Game {
     const hornTipPos = this.player.getHornTipPosition();
 
     for (const c of this.clouds.clouds) {
-      if (c.stabbed) continue;
+      if (c.stabbed || c.popping) continue;
 
       // Distance from horn tip to cloud center
       const dx = hornTipPos.x - c.x;
@@ -268,23 +451,23 @@ export class Game {
       const dz = hornTipPos.z - c.z;
       const distSq = dx * dx + dy * dy + dz * dz;
 
-      const hitRadius = c.radius + 0.55;
+      // True physical contact with cloud boundary
+      const hitRadius = c.radius + 0.1;
       if (distSq <= hitRadius * hitRadius) {
-        // STABBED!
-        c.stabbed = true;
-        this.cloudsStabbed++;
+        // Without active horn stab, the cloud simply passes by and does not count
+        if (this.player.isStabbing) {
+          this.clouds.popCloud(c);
+          this.cloudsStabbed++;
 
-        // Replenish the corresponding color lane
-        this.track.replenishLane(c.colorIdx);
+          // Replenish the corresponding color lane
+          this.track.replenishLane(c.colorIdx);
 
-        // Sound & particles
-        playStabSound(c.colorIdx);
-        this.clouds.spawnBurst(c.x, c.y, c.z, RAINBOW_COLORS[c.colorIdx]);
-
-        // Score bonus
-        this.score += 150 * this.combo;
-        this.combo = min(8, this.combo + 1);
-        break;
+          // Sound & score
+          playStabSound(c.colorIdx);
+          this.score += 150 * this.combo;
+          this.combo = min(8, this.combo + 1);
+          break;
+        }
       }
     }
   }
@@ -310,6 +493,25 @@ export class Game {
     const dt = min(0.08, this.clock.getDelta());
     const totalTime = this.clock.getElapsedTime();
 
+    // 0. VR head forward thrust detection for stabbing
+    if (this.renderer.xr.isPresenting) {
+      const curHeadZ = this.camera.position.z;
+      const headVelZ = (curHeadZ - this.prevHeadZ) / max(0.001, dt);
+      this.prevHeadZ = curHeadZ;
+      if (headVelZ < -0.45 && this.state === GameState.PLAYING) {
+        this.player.stab();
+      }
+    }
+
+    // Sky and hills follow camera position so player is always centered in the world
+    if (this.skyMesh) {
+      this.skyMesh.position.copy(this.camera.position);
+    }
+    if (this.hillsGroup) {
+      this.hillsGroup.position.x = this.camera.position.x;
+      this.hillsGroup.position.z = this.camera.position.z;
+    }
+
     // 1. Keyboard steering
     if (this.state === GameState.PLAYING) {
       if (this.keysDown['ArrowLeft'] || this.keysDown['KeyA']) {
@@ -327,7 +529,7 @@ export class Game {
       const demoAutoX = sin(totalTime * 0.8) * 2.2;
       this.player.setTargetX(demoAutoX / 3.5);
       this.player.update(dt, demoSpeed, true);
-      this.track.update(dt, demoSpeed, totalTime);
+      this.track.update(dt, demoSpeed, totalTime, 60, true);
       this.clouds.update(dt, demoSpeed, totalTime);
 
       this.ui.renderUI(
@@ -348,7 +550,7 @@ export class Game {
       this.score += floor(this.speed * dt * 2.5);
 
       this.player.update(dt, this.speed, true);
-      this.track.update(dt, this.speed, totalTime);
+      this.track.update(dt, this.speed, totalTime, this.runTime);
       this.clouds.update(
         dt,
         this.speed,
@@ -373,7 +575,7 @@ export class Game {
     } else if (this.state === GameState.FALLING) {
       this.fallTimer += dt;
       this.player.update(dt, this.speed * 0.4, false);
-      this.track.update(dt, this.speed * 0.4, totalTime);
+      this.track.update(dt, this.speed * 0.4, totalTime, this.runTime);
       this.clouds.update(dt, this.speed * 0.4, totalTime);
 
       if (this.fallTimer >= 1.2) {
