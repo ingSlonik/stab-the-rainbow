@@ -60,6 +60,7 @@ export class Game {
   private hasWebXR = false;
   private prevHeadZ = 0;
   private thumbstickDebounce = false;
+  private menuButtonDebounce = false;
   private triggerWasPressed = false;
   private isReady = false;
 
@@ -129,6 +130,10 @@ export class Game {
       el.addEventListener('selectstart', () => this.onTriggerDown(isLeft));
       el.addEventListener('gripdown', () => this.onGripDown(isLeft));
       el.addEventListener('squeezestart', () => this.onGripDown(isLeft));
+      el.addEventListener('abuttondown', () => this.goToMenu());
+      el.addEventListener('bbuttondown', () => this.goToMenu());
+      el.addEventListener('xbuttondown', () => this.goToMenu());
+      el.addEventListener('ybuttondown', () => this.goToMenu());
       el.addEventListener('thumbstickmoved', (e: any) => this.onThumbstick(e.detail));
       el.addEventListener('axismove', (e: any) => this.onAxisMove(e.detail));
     };
@@ -153,12 +158,11 @@ export class Game {
         this.restartGame();
       }
     } else if (this.state === GameState.PLAYING) {
-      if (isLeft) {
-        // Return to menu at any time
-        this.goToMenu();
+      const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
+      if (isHard) {
+        this.player.jump();
       } else {
-        const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
-        if (isHard) {
+        if (isLeft) {
           this.goToMenu();
         } else {
           this.player.stab();
@@ -171,12 +175,11 @@ export class Game {
     if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
       this.goToMenu();
     } else if (this.state === GameState.PLAYING) {
-      if (isLeft) {
-        // Return to menu at any time
-        this.goToMenu();
+      const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
+      if (isHard) {
+        this.player.jump();
       } else {
-        const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
-        if (isHard) {
+        if (isLeft) {
           this.goToMenu();
         } else {
           this.player.jump();
@@ -193,8 +196,7 @@ export class Game {
       this.thumbstickDebounce = true;
       setTimeout(() => (this.thumbstickDebounce = false), 220);
     }
-    const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
-    if (y < -0.65 && this.state === GameState.PLAYING && !isHard) {
+    if (y < -0.65 && this.state === GameState.PLAYING) {
       this.player.jump();
     }
   }
@@ -207,8 +209,7 @@ export class Game {
       this.thumbstickDebounce = true;
       setTimeout(() => (this.thumbstickDebounce = false), 220);
     }
-    const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
-    if (y < -0.65 && this.state === GameState.PLAYING && !isHard) {
+    if (y < -0.65 && this.state === GameState.PLAYING) {
       this.player.jump();
     }
   }
@@ -522,11 +523,12 @@ export class Game {
 
       // 3. Track depth reach test:
       // Positive dz = cloud ahead of horn tip; negative dz = cloud touching or passing horn tip
-      const minZ = -0.75;
-      const maxZ = isStabbing ? (isHard ? 1.45 : 1.35) : 0.65;
+      const minZ = -0.85;
+      const maxZ = isHard ? 1.35 : (isStabbing ? 1.35 : 0.65);
 
       if (dz >= minZ && dz <= maxZ) {
-        if (isStabbing || (isAirborne && Math.abs(dz) <= 0.55)) {
+        // In Hard mode, ramming into a cloud automatically pierces and pops it without manual stabbing
+        if (isHard || isStabbing || (isAirborne && Math.abs(dz) <= 0.55)) {
           c.stabbed = true;
           this.clouds.popCloud(c);
           this.track.replenishLane(c.colorIdx);
@@ -596,7 +598,7 @@ export class Game {
         }
       }
 
-      // 2. Controller trigger & thumbstick support via Gamepad API
+      // 2. Controller trigger, A/B buttons, and thumbstick support via Gamepad API
       const session = this.sceneEl.xrSession;
       if (session && session.inputSources) {
         for (const source of session.inputSources) {
@@ -613,6 +615,20 @@ export class Game {
               }
             }
 
+            // A & B Buttons (and X & Y) -> Return to Menu
+            if (source.gamepad.buttons) {
+              const btnA = source.gamepad.buttons[4];
+              const btnB = source.gamepad.buttons[5];
+              const isMenuBtn =
+                (btnA && (btnA.pressed || btnA.value > 0.5)) ||
+                (btnB && (btnB.pressed || btnB.value > 0.5));
+              if (isMenuBtn && !this.menuButtonDebounce) {
+                this.menuButtonDebounce = true;
+                this.goToMenu();
+                setTimeout(() => (this.menuButtonDebounce = false), 350);
+              }
+            }
+
             // Thumbstick check
             if (source.gamepad.axes) {
               const axes = source.gamepad.axes;
@@ -626,7 +642,7 @@ export class Game {
               }
 
               const stickY = axes.length >= 4 ? axes[3] : (axes.length >= 2 ? axes[1] : 0);
-              if (stickY < -0.65 && this.state === GameState.PLAYING && !isHard) {
+              if (stickY < -0.65 && this.state === GameState.PLAYING) {
                 this.player.jump();
               }
             }

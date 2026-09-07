@@ -551,7 +551,7 @@ export class UIManager {
       784,
       130,
       'UNICORN RIDER (EASY)',
-      'Horn in hand • Controller steers • Trigger = stab • Grip / Stick = jump',
+      'Horn in hand • Controller steers • Trigger / ram = pop • Buttons = jump',
       '#00d4ff',
       () => onStartGame(GameMode.VR_EASY)
     );
@@ -564,7 +564,7 @@ export class UIManager {
       784,
       130,
       'YOU ARE THE UNICORN! (HARD)',
-      'Horn on forehead • Head lean steers • Head thrust stabs • Jump jumps',
+      'Head lean steers • Ram clouds to pop! • Controller buttons jump',
       '#ffdd00',
       () => onStartGame(GameMode.VR_HARD)
     );
@@ -576,7 +576,7 @@ export class UIManager {
 
     ctx.font = '500 16px system-ui, sans-serif';
     ctx.fillStyle = '#8e9eb5';
-    ctx.fillText('Return to menu anytime: Left Grip / ESC', 512, 715);
+    ctx.fillText('Return to menu anytime: Controller A or B button / Left Grip / ESC', 512, 715);
   }
 
   private drawGameOver(
