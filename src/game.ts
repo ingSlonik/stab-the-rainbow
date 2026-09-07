@@ -477,6 +477,13 @@ export class Game {
     if (!this.player || !this.clouds || !this.track) return;
     const hornTipPos = this.player.getHornTipPosition();
     const isAirborne = !this.player.isGrounded;
+    const isStabbing = this.player.isStabbing;
+    const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
+
+    // Strict vertical bounds: Cloud vertical half-thickness is ~0.55m.
+    // Horn tip MUST be at the height of the cloud to pierce it!
+    const maxHalfY = isHard ? 0.65 : 0.58;
+    const maxHalfX = isHard ? 0.95 : 0.88;
 
     const clouds = this.clouds.clouds;
     for (let i = 0; i < clouds.length; i++) {
@@ -486,14 +493,20 @@ export class Game {
       const dx = hornTipPos.x - c.x;
       const dy = hornTipPos.y - c.y;
       const dz = hornTipPos.z - c.z;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-      const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
-      const hitDist = this.player.isStabbing
-        ? (isHard ? 1.6 : 1.85)
-        : 0.88;
-      if (dist < hitDist) {
-        if (this.player.isStabbing || isAirborne) {
+      // 1. Vertical height test: Must actually be inside the cloud's vertical span (no hitting clouds from far below!)
+      if (Math.abs(dy) > maxHalfY) continue;
+
+      // 2. Lateral alignment test: Must be within the cloud's lane
+      if (Math.abs(dx) > maxHalfX) continue;
+
+      // 3. Track depth reach test:
+      // Positive dz = cloud ahead of horn tip; negative dz = cloud touching or passing horn tip
+      const minZ = -0.75;
+      const maxZ = isStabbing ? (isHard ? 1.45 : 1.35) : 0.65;
+
+      if (dz >= minZ && dz <= maxZ) {
+        if (isStabbing || (isAirborne && Math.abs(dz) <= 0.55)) {
           c.stabbed = true;
           this.clouds.popCloud(c);
           this.track.replenishLane(c.colorIdx);
