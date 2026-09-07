@@ -266,11 +266,12 @@ export class UIManager {
 
       let found = null;
       for (const btn of this.buttons) {
+        const pad = 12; // Generous hit padding for easy VR laser selection
         if (
-          cx >= btn.x &&
-          cx <= btn.x + btn.w &&
-          cy >= btn.y &&
-          cy <= btn.y + btn.h
+          cx >= btn.x - pad &&
+          cx <= btn.x + btn.w + pad &&
+          cy >= btn.y - pad &&
+          cy <= btn.y + btn.h + pad
         ) {
           found = btn.id;
           break;
@@ -371,17 +372,17 @@ export class UIManager {
   private drawPointerReticle(ctx: CanvasRenderingContext2D): void {
     if (this.pointerX >= 0 && this.pointerY >= 0) {
       const isHovering = !!this.hoveredButtonId;
-      const ringRadius = isHovering ? 22 : 15;
-      const dotRadius = isHovering ? 7 : 5;
+      const ringRadius = isHovering ? 24 : 15;
+      const dotRadius = isHovering ? 8 : 5;
 
       ctx.save();
       // Outer glowing pulse ring
       ctx.beginPath();
       ctx.arc(this.pointerX, this.pointerY, ringRadius, 0, Math.PI * 2);
       ctx.strokeStyle = isHovering ? '#ffffff' : '#00d4ff';
-      ctx.lineWidth = isHovering ? 4 : 2.5;
+      ctx.lineWidth = isHovering ? 4.5 : 2.5;
       ctx.shadowColor = isHovering ? '#00d4ff' : '#ffffff';
-      ctx.shadowBlur = 16;
+      ctx.shadowBlur = 18;
       ctx.stroke();
 
       // Inner solid dot
@@ -389,7 +390,7 @@ export class UIManager {
       ctx.arc(this.pointerX, this.pointerY, dotRadius, 0, Math.PI * 2);
       ctx.fillStyle = isHovering ? '#ffdd00' : '#ffffff';
       ctx.shadowColor = '#ffdd00';
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 12;
       ctx.fill();
       ctx.restore();
     }
@@ -410,23 +411,72 @@ export class UIManager {
     this.buttons.push({ id, x, y, w, h, action });
     const isHover = this.hoveredButtonId === id;
 
-    ctx.fillStyle = isHover ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.07)';
-    this.roundRect(ctx, x, y, w, h, 20);
-    ctx.fill();
+    if (isHover) {
+      // Vivid glowing gradient fill
+      const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+      const colLower = color.toLowerCase();
+      if (colLower.includes('ffdd00') || colLower.includes('yellow') || colLower.includes('ff7b00')) {
+        grad.addColorStop(0, 'rgba(255, 221, 0, 0.48)');
+        grad.addColorStop(1, 'rgba(255, 120, 0, 0.28)');
+      } else if (colLower.includes('00d4ff') || colLower.includes('cyan')) {
+        grad.addColorStop(0, 'rgba(0, 212, 255, 0.48)');
+        grad.addColorStop(1, 'rgba(0, 120, 255, 0.28)');
+      } else if (colLower.includes('10e052') || colLower.includes('green')) {
+        grad.addColorStop(0, 'rgba(16, 224, 82, 0.48)');
+        grad.addColorStop(1, 'rgba(0, 160, 60, 0.28)');
+      } else {
+        grad.addColorStop(0, 'rgba(255, 255, 255, 0.42)');
+        grad.addColorStop(1, 'rgba(200, 220, 255, 0.22)');
+      }
 
-    ctx.strokeStyle = isHover ? '#ffffff' : color;
-    ctx.lineWidth = isHover ? 4 : 2;
-    ctx.stroke();
+      ctx.fillStyle = grad;
+      this.roundRect(ctx, x - 4, y - 4, w + 8, h + 8, 22);
+      ctx.fill();
 
-    ctx.fillStyle = isHover ? '#ffffff' : color;
-    ctx.font = '800 28px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(title, x + w / 2, y + (subtitle ? 42 : h / 2 + 10));
+      // Glowing multi-layer border
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 24;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 5.5;
+      this.roundRect(ctx, x - 4, y - 4, w + 8, h + 8, 22);
+      ctx.stroke();
+      ctx.restore();
 
-    if (subtitle) {
-      ctx.fillStyle = isHover ? '#ffffff' : '#c8d6e5';
-      ctx.font = '600 17px system-ui, sans-serif';
-      ctx.fillText(subtitle, x + w / 2, y + 76);
+      // Highlighted title
+      ctx.save();
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 31px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`✨  ${title}  ✨`, x + w / 2, y + (subtitle ? 43 : h / 2 + 10));
+      ctx.restore();
+
+      if (subtitle) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 18px system-ui, sans-serif';
+        ctx.fillText(subtitle, x + w / 2, y + 78);
+      }
+    } else {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+      this.roundRect(ctx, x, y, w, h, 20);
+      ctx.fill();
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.fillStyle = color;
+      ctx.font = '800 28px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(title, x + w / 2, y + (subtitle ? 42 : h / 2 + 10));
+
+      if (subtitle) {
+        ctx.fillStyle = '#c8d6e5';
+        ctx.font = '600 17px system-ui, sans-serif';
+        ctx.fillText(subtitle, x + w / 2, y + 76);
+      }
     }
   }
 
