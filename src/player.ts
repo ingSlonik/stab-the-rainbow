@@ -1,4 +1,4 @@
-import { LANE_COUNT, LANE_WIDTH, TRACK_WIDTH, VRMode, RAINBOW_COLORS } from './types';
+import { LANE_COUNT, LANE_WIDTH, TRACK_WIDTH, VRMode, RAINBOW_COLORS, GameMode } from './types';
 import { sin, cos, max, min, clamp, lerp } from './math';
 import { playJumpSound } from './audio';
 
@@ -10,7 +10,7 @@ export class Player {
   public camera: any;
   public horn: any;
   public hornTip: any;
-  public vrMode: VRMode = VRMode.NONE;
+  public vrMode: VRMode | GameMode = GameMode.DESKTOP;
   public vrController: any = null;
 
   public currentLane = 3;
@@ -23,12 +23,12 @@ export class Player {
   public isStabbing = false;
   public stabTimer = 0;
   private readonly STAB_DURATION = 0.24;
-  private readonly desktopHornX = 0.35;
-  private readonly desktopHornY = -0.46;
-  private readonly desktopHornZ = -0.42;
-  private readonly desktopRotX = 0.52;
-  private readonly desktopRotY = -0.26;
-  private readonly desktopRotZ = -0.20;
+  private readonly desktopHornX = 0;
+  private readonly desktopHornY = -0.42;
+  private readonly desktopHornZ = -0.48;
+  private readonly desktopRotX = 0.38;
+  private readonly desktopRotY = 0;
+  private readonly desktopRotZ = 0;
   private hornMat: any;
 
   private hornTipWorldPos: any;
@@ -118,32 +118,44 @@ export class Player {
   }
 
   public setMenuMode(controller?: any): void {
-    if (this.horn.parent) {
-      this.horn.parent.remove(this.horn);
-    }
-    const c = controller || this.vrController;
-    if (c) {
-      c.add(this.horn);
-      this.horn.position.set(0, 0, -0.15);
-      this.horn.rotation.set(0, 0, 0);
-      this.horn.scale.set(1.0, 1.0, 1.0);
-    } else {
-      this.camera.add(this.horn);
+    const isDesktop = this.vrMode === (VRMode.NONE as any) || this.vrMode === GameMode.DESKTOP;
+    if (isDesktop || !controller) {
+      if (this.horn.parent !== this.camera) {
+        if (this.horn.parent) {
+          this.horn.parent.remove(this.horn);
+        }
+        this.camera.add(this.horn);
+      }
       this.horn.position.set(this.desktopHornX, this.desktopHornY, this.desktopHornZ);
       this.horn.rotation.set(this.desktopRotX, this.desktopRotY, this.desktopRotZ);
       this.horn.scale.set(1.0, 1.0, 1.0);
+      if (this.pointerBeam) this.pointerBeam.visible = false;
+      return;
     }
+
+    if (this.horn.parent) {
+      this.horn.parent.remove(this.horn);
+    }
+    controller.add(this.horn);
+    this.horn.position.set(0, 0, -0.15);
+    this.horn.rotation.set(0, 0, 0);
+    this.horn.scale.set(1.0, 1.0, 1.0);
     if (this.pointerBeam) this.pointerBeam.visible = true;
   }
 
   public getHornRay(outOrigin: any, outDir: any): void {
     if (this.hornTip) {
+      this.horn.updateMatrixWorld(true);
       this.hornTip.getWorldPosition(outOrigin);
       this.hornTip.getWorldDirection(outDir).negate();
+    } else if (this.camera) {
+      this.camera.updateMatrixWorld(true);
+      this.camera.getWorldPosition(outOrigin);
+      this.camera.getWorldDirection(outDir);
     }
   }
 
-  public setVRMode(mode: VRMode, controller?: any): void {
+  public setVRMode(mode: VRMode | GameMode, controller?: any): void {
     this.vrMode = mode;
     this.vrController = controller || this.vrController || null;
     this.isCalibrated = false;
@@ -156,7 +168,7 @@ export class Player {
       this.horn.parent.remove(this.horn);
     }
 
-    if (mode === VRMode.RIDER_EASY) {
+    if (mode === (VRMode.RIDER_EASY as any) || mode === GameMode.VR_EASY) {
       // 1. Easy Mode: Horn is held in player's hand via VR controller
       const c = controller || this.vrController;
       if (c) {
@@ -171,7 +183,7 @@ export class Player {
       }
       if (this.pointerBeam) this.pointerBeam.visible = false;
       this.cameraRig.position.set(0, 1.40, 0);
-    } else if (mode === VRMode.UNICORN_HARD) {
+    } else if (mode === (VRMode.UNICORN_HARD as any) || mode === GameMode.VR_HARD) {
       // 2. Hard Mode: You ARE the unicorn! Horn on forehead
       this.camera.add(this.horn);
       this.horn.position.set(0, 0.22, -0.15);
@@ -188,7 +200,7 @@ export class Player {
       this.horn.scale.set(1.0, 1.0, 1.0);
       if (this.pointerBeam) this.pointerBeam.visible = false;
 
-      this.cameraRig.position.set(0, 2.25, 0);
+      this.cameraRig.position.set(0, 2.0, 0);
     }
   }
 
@@ -255,10 +267,21 @@ export class Player {
     this.prevHeadZ = 0;
     this.prevHeadY = 0;
     this.prevHeadPitch = 0;
-    this.root.position.set(0, this.vrMode === VRMode.NONE ? 2.25 : 1.45, 0);
+    const isDesktop = this.vrMode === (VRMode.NONE as any) || this.vrMode === GameMode.DESKTOP;
+    this.root.position.set(0, isDesktop ? 2.0 : 1.45, 0);
     this.root.rotation.set(0, 0, 0);
     if (this.hornMat) this.hornMat.emissiveIntensity = 0.36;
     if (this.hornTip) this.hornTip.scale.set(1, 1, 1);
+    if (isDesktop) {
+      if (this.horn.parent !== this.camera) {
+        if (this.horn.parent) this.horn.parent.remove(this.horn);
+        this.camera.add(this.horn);
+      }
+      this.horn.position.set(this.desktopHornX, this.desktopHornY, this.desktopHornZ);
+      this.horn.rotation.set(this.desktopRotX, this.desktopRotY, this.desktopRotZ);
+      this.horn.scale.set(1.0, 1.0, 1.0);
+      if (this.pointerBeam) this.pointerBeam.visible = false;
+    }
   }
 
   public update(dt: number, speed: number, isMoving: boolean, isVR: boolean = false): void {
@@ -280,15 +303,16 @@ export class Player {
     }
 
     if (this.horn) {
-      const isHard = this.vrMode === VRMode.UNICORN_HARD;
-      const isDesktop = this.vrMode === VRMode.NONE;
-      const baseZ = isDesktop ? this.desktopHornZ : (isHard ? -0.15 : -0.15);
+      const isHard = this.vrMode === (VRMode.UNICORN_HARD as any) || this.vrMode === GameMode.VR_HARD;
+      const isDesktop = this.vrMode === (VRMode.NONE as any) || this.vrMode === GameMode.DESKTOP;
+      const baseZ = isDesktop ? this.desktopHornZ : -0.15;
       this.horn.position.z = baseZ - thrustOffset;
 
       if (isDesktop) {
-        this.horn.position.x = this.desktopHornX - thrustOffset * 0.22;
-        this.horn.position.y = this.desktopHornY + thrustOffset * 0.35;
-        this.horn.position.z = this.desktopHornZ - thrustOffset * 0.65;
+        this.horn.position.x = this.desktopHornX;
+        this.horn.position.y = this.desktopHornY + thrustOffset * 0.12;
+        this.horn.position.z = this.desktopHornZ - thrustOffset * 0.75;
+        this.horn.rotation.set(this.desktopRotX, this.desktopRotY, this.desktopRotZ);
       }
       if (this.hornMat) {
         this.hornMat.emissiveIntensity = 0.36 + thrustOffset * 4.0;
@@ -362,16 +386,13 @@ export class Player {
     }
 
     let gallopY = 0;
-    let gallopPitch = 0;
     if (this.isGrounded && isMoving && !this.isFalling && !isVR) {
-      gallopY = sin(this.gallopTimer) * 0.018;
-      gallopPitch = cos(this.gallopTimer) * 0.007;
+      gallopY = sin(this.gallopTimer) * 0.012;
     }
 
-
-
     // 5. Update root position & orientation
-    const baseH = this.vrMode === VRMode.NONE ? 2.25 : 1.45;
+    const isDesktop = this.vrMode === (VRMode.NONE as any) || this.vrMode === GameMode.DESKTOP;
+    const baseH = isDesktop ? 2.0 : 1.45;
     this.root.position.x = this.x;
     this.root.position.y = baseH + this.y + gallopY;
 
@@ -379,16 +400,8 @@ export class Player {
       // In VR, the physical headset dictates orientation. Horizon remains level!
       this.root.rotation.set(0, 0, 0);
     } else {
-      // Desktop banking when turning
-      const turnVel = (this.targetX - this.x);
-      this.root.rotation.z = -turnVel * 0.14;
-      this.root.rotation.x = gallopPitch;
-
-      // Tumble rotation when falling
-      if (this.isFalling) {
-        this.root.rotation.x += dt * 3.5;
-        this.root.rotation.z += dt * 2.2;
-      }
+      // Fall straight down without disorienting tumbling
+      this.root.rotation.set(0, 0, 0);
     }
   }
 }

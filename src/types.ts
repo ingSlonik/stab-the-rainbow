@@ -5,6 +5,12 @@ export const enum GameState {
   GAMEOVER = 3,
 }
 
+export const enum GameMode {
+  DESKTOP = 0,
+  VR_EASY = 1,
+  VR_HARD = 2,
+}
+
 export const enum VRMode {
   NONE = 0,
   RIDER_EASY = 1,
