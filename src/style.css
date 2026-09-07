@@ -21,3 +21,37 @@ canvas {
   display: block;
   touch-action: none;
 }
+
+.hud-btn {
+  position: fixed;
+  z-index: 100000;
+  background: rgba(15, 10, 35, 0.85);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+}
+.hud-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #00d4ff;
+}
+#fs-btn {
+  top: 12px;
+  right: 12px;
+}
+#vr-btn {
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 18px;
+  padding: 12px 28px;
+  border-radius: 14px;
+  border-color: #00d4ff;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+}
+

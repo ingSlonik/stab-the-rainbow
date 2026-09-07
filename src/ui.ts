@@ -166,14 +166,15 @@ export class UIManager {
     onStartGame: () => void,
     onEnterVR: () => void,
     onRestart: () => void,
-    onHome?: () => void
+    onHome?: () => void,
+    onToggleFullscreen?: () => void
   ): void {
     const ctx = this.uiCtx;
     ctx.clearRect(0, 0, 1024, 1024);
     this.buttons = [];
 
     if (state === GameState.MENU) {
-      this.drawMenu(ctx, time, hasWebXR, onStartGame, onEnterVR);
+      this.drawMenu(ctx, time, hasWebXR, onStartGame, onEnterVR, onToggleFullscreen);
     } else if (state === GameState.PLAYING) {
       this.drawHUD(ctx, score, laneHealth, urgentLane, time);
     } else if (state === GameState.FALLING || state === GameState.GAMEOVER) {
@@ -188,15 +189,16 @@ export class UIManager {
     time: number,
     hasWebXR: boolean,
     onStartGame: () => void,
-    onEnterVR: () => void
+    onEnterVR: () => void,
+    onToggleFullscreen?: () => void
   ): void {
     // Backdrop panel
     ctx.fillStyle = 'rgba(15, 10, 35, 0.88)';
-    this.roundRect(ctx, 64, 40, 896, 944, 36);
+    this.roundRect(ctx, 64, 30, 896, 960, 36);
     ctx.fill();
 
     // Rainbow border glow
-    const grad = ctx.createLinearGradient(64, 40, 960, 984);
+    const grad = ctx.createLinearGradient(64, 30, 960, 990);
     RAINBOW_HEX_STRINGS.forEach((col, i) => {
       grad.addColorStop(i / 6, col);
     });
@@ -206,58 +208,71 @@ export class UIManager {
 
     // Title
     ctx.textAlign = 'center';
-    ctx.font = '900 60px system-ui, sans-serif';
+    ctx.font = '900 58px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = '#00d4ff';
     ctx.shadowBlur = 20;
-    ctx.fillText('✨ STAB THE RAINBOW ✨', 512, 130);
+    ctx.fillText('✨ STAB THE RAINBOW ✨', 512, 110);
     ctx.shadowBlur = 0;
 
     // Subtitle
-    ctx.font = '500 24px system-ui, sans-serif';
+    ctx.font = '500 22px system-ui, sans-serif';
     ctx.fillStyle = '#ffd2f6';
-    ctx.fillText('🦄 Ethereal Unicorn Gallop & Cloud Piercer 🌈', 512, 175);
+    ctx.fillText('🦄 Ethereal Unicorn Gallop & Cloud Piercer 🌈', 512, 150);
+
+    // VR Spectator Banner
+    ctx.fillStyle = 'rgba(0, 212, 255, 0.15)';
+    this.roundRect(ctx, 112, 172, 800, 38, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#00d4ff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.font = '700 17px system-ui, sans-serif';
+    ctx.fillStyle = '#00d4ff';
+    ctx.fillText('🥽 PRIMÁRNĚ PRO VR • DESKTOP SLOUŽÍ PRO DIVÁKY VENKU 📺', 512, 197);
 
     // High Score badge
     ctx.fillStyle = 'rgba(255, 221, 0, 0.18)';
-    this.roundRect(ctx, 312, 205, 400, 50, 16);
+    this.roundRect(ctx, 312, 222, 400, 42, 14);
     ctx.fill();
     ctx.strokeStyle = '#ffdd00';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    ctx.font = '700 24px system-ui, sans-serif';
+    ctx.font = '700 22px system-ui, sans-serif';
     ctx.fillStyle = '#ffdd00';
-    ctx.fillText(`🏆 HIGH SCORE: ${this.highScore}`, 512, 239);
+    ctx.fillText(`🏆 HIGH SCORE: ${this.highScore}`, 512, 251);
 
     // How to Play box
     ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
-    this.roundRect(ctx, 112, 280, 800, 350, 24);
+    this.roundRect(ctx, 112, 276, 800, 365, 24);
     ctx.fill();
 
-    ctx.font = '700 26px system-ui, sans-serif';
+    ctx.font = '700 25px system-ui, sans-serif';
     ctx.fillStyle = '#00d4ff';
-    ctx.fillText('📖 HOW TO SURVIVE THE VOID', 512, 325);
+    ctx.fillText('📖 OVLÁDÁNÍ / HOW TO PLAY', 512, 315);
 
     const instructions = [
-      '• MOUSE aims horn. LEFT CLICK to STAB oncoming color clouds!',
-      '• Clouds must be STABBED with horn tip to score & replenish lanes.',
-      '• RIGHT CLICK / SPACEBAR to JUMP for high clouds & over void gaps!',
-      '• In VR: Move HEAD to aim, THRUST HEAD FORWARD to stab!',
-      '• If you step onto a vanished lane, you will fall forever!',
+      '• ŠIPKY [←] [→] / [A] [D]: Posun o pruh vedle (1 stisk = vedlejší pruh)',
+      '• MEZERNÍK / [↑] / [W]: Skok přes propasti i k mrakům',
+      '• ŠIPKA [↓] / [ENTER] / [SHIFT] / Levý klik: Bodnutí rohem (STAB)!',
+      '• KLÁVESA [F]: Celá obrazovka (Fullscreen)',
+      '• VE VR: Otáčením míříte roh, trhnutím vpřed bodnete, páčkou/úkrokem měníte pruh!',
+      '• Mraky obnovují pruhy. Pokud šlápnete do prázdna, propadnete se!',
     ];
 
     ctx.textAlign = 'left';
-    ctx.font = '400 22px system-ui, sans-serif';
+    ctx.font = '400 20px system-ui, sans-serif';
     ctx.fillStyle = '#e8eeff';
     instructions.forEach((line, idx) => {
-      ctx.fillText(line, 140, 375 + idx * 45);
+      ctx.fillText(line, 135, 360 + idx * 45);
     });
 
     // Start / Enter VR Buttons
     const btnW = 380;
-    const btnH = 75;
-    const btnY = 665;
+    const btnH = 72;
+    const btnY = 660;
 
     // Desktop Play Button
     this.drawButton(
@@ -265,7 +280,7 @@ export class UIManager {
       'btn_play',
       hasWebXR ? 112 : 322,
       btnY,
-      hasWebXR ? btnW : btnW,
+      btnW,
       btnH,
       '▶ PLAY (DESKTOP)',
       '#10e052',
@@ -287,17 +302,17 @@ export class UIManager {
       );
     }
 
-    // Audio Toggles
+    // Audio & Fullscreen Toggles
     const isM = getAudioMuted();
     const isSm = getSfxMuted();
 
     this.drawButton(
       ctx,
       'btn_music',
-      242,
-      765,
-      250,
-      56,
+      112,
+      755,
+      240,
+      54,
       `🎵 MUSIC: ${isM ? 'OFF' : 'ON'}`,
       isM ? '#777777' : '#b82bfb',
       () => toggleAudio()
@@ -306,21 +321,35 @@ export class UIManager {
     this.drawButton(
       ctx,
       'btn_sfx',
-      532,
-      765,
-      250,
-      56,
+      392,
+      755,
+      240,
+      54,
       `🔊 SFX: ${isSm ? 'OFF' : 'ON'}`,
       isSm ? '#777777' : '#ff7b00',
       () => toggleSfx()
+    );
+
+    this.drawButton(
+      ctx,
+      'btn_fs',
+      672,
+      755,
+      240,
+      54,
+      '⛶ FULLSCREEN (F)',
+      '#00d4ff',
+      () => {
+        if (onToggleFullscreen) onToggleFullscreen();
+      }
     );
 
     // Credits
     ctx.textAlign = 'center';
     ctx.font = '400 18px system-ui, sans-serif';
     ctx.fillStyle = '#8f9db5';
-    ctx.fillText('Made with Three.js r185 ESM for js13kGames 2026', 512, 860);
-    ctx.fillText('Created by Filip Paulů', 512, 890);
+    ctx.fillText('Made with Three.js r185 ESM for js13kGames 2026 • Created by Filip Paulů', 512, 855);
+    ctx.fillText('https://stab-the-rainbow.paulu.cz/', 512, 885);
   }
 
   private drawHUD(
@@ -338,11 +367,17 @@ export class UIManager {
     ctx.lineWidth = 2;
     ctx.stroke();
 
+    // Spectator view indicator
+    ctx.textAlign = 'center';
+    ctx.font = '700 16px system-ui, sans-serif';
+    ctx.fillStyle = '#00d4ff';
+    ctx.fillText('📺 SPECTATOR VIEW • BEST IN VR 🥽', 512, 60);
+
     // Score
     ctx.textAlign = 'left';
-    ctx.font = '900 42px system-ui, sans-serif';
+    ctx.font = '900 40px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`SCORE: ${score}`, 195, 82);
+    ctx.fillText(`SCORE: ${score}`, 195, 84);
 
     // Urgent Alert
     if (urgentLane >= 0 && urgentLane < LANE_COUNT) {
