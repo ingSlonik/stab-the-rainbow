@@ -1,22 +1,71 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="cs">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Stab the Rainbow - js13k WebXR</title>
+  <title>Stab the Rainbow</title>
   <link rel="stylesheet" href="./src/style.css">
 </head>
 
 <body>
-  <script>
-    try {
-      if (window.XRWebGLBinding && window.XRWebGLBinding.prototype) {
-        delete window.XRWebGLBinding.prototype.createProjectionLayer;
-      }
-      window.XRWebGLBinding = undefined;
-    } catch (_) {}
-  </script>
+  <!-- Rozcestník Menu Modal -->
+  <div id="modal" class="overlay">
+    <div class="card">
+      <h1>✨ STAB THE RAINBOW ✨</h1>
+      <p class="sub">🦄 Ethereal Unicorn Gallop & Cloud Piercer 🌈</p>
+
+      <div id="high-score" class="badge">🏆 NEJLEPŠÍ SKÓRE: 0</div>
+
+      <div class="choices">
+        <button id="btn-vr" class="choice-btn vr-btn">
+          <span class="btn-icon">🥽</span>
+          <span class="btn-text">
+            <strong>HRÁT VE VR</strong>
+            <small>Meta Quest / WebXR • Na tohle musíš hlavou!</small>
+          </span>
+        </button>
+
+        <button id="btn-desktop" class="choice-btn pc-btn">
+          <span class="btn-icon">💻</span>
+          <span class="btn-text">
+            <strong>HRÁT NA DESKTOPU</strong>
+            <small>Ovládání myší: Pohyb = řízení • L-klik = STAB • P-klik = SKOK</small>
+          </span>
+        </button>
+      </div>
+
+      <div class="controls-guide">
+        <p>🎯 <strong>Ovládání:</strong> Primárně <strong>myší</strong> (vodorovný pohyb plynule navádí jednorožce, <strong>Levý klik = bodnutí</strong>, <strong>Pravý klik / Kolečko = skok</strong>). <em>Lze hrát i šipkami.</em></p>
+      </div>
+
+      <div class="bottom-bar">
+        <button id="btn-music" class="mini-btn">🎵 HUDBA: ZAP</button>
+        <button id="btn-sfx" class="mini-btn">🔊 ZVUKY: ZAP</button>
+        <button id="btn-fs" class="mini-btn">⛶ CELÁ OBRAZOVKA (F)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over Modal -->
+  <div id="go-modal" class="overlay" style="display:none">
+    <div class="card go-card">
+      <h2>💀 PÁD DO PROPASTI 💀</h2>
+      <p id="go-quote" class="sub"></p>
+      <div id="go-score" class="badge">SKÓRE: 0</div>
+      <div class="choices">
+        <button id="btn-retry" class="choice-btn pc-btn">
+          <span class="btn-icon">🔄</span>
+          <span class="btn-text"><strong>HRÁT ZNOVU</strong></span>
+        </button>
+        <button id="btn-home" class="choice-btn vr-btn">
+          <span class="btn-icon">🏠</span>
+          <span class="btn-text"><strong>HLAVNÍ ROZCESTNÍK</strong></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import * as THREE from 'three';
     window.THREE = THREE;

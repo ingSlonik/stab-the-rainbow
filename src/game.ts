@@ -1,13 +1,3 @@
-// Fix for Meta Quest WebXR stereoscopy: force standard XRWebGLLayer over experimental createProjectionLayer
-try {
-  if (typeof window !== 'undefined') {
-    if ((window as any).XRWebGLBinding?.prototype) {
-      delete (window as any).XRWebGLBinding.prototype.createProjectionLayer;
-    }
-    (window as any).XRWebGLBinding = undefined;
-  }
-} catch (_) {}
-
 import {
   GameState,
   LANE_COUNT,
@@ -22,6 +12,8 @@ import {
   setAudioState,
   toggleAudio,
   toggleSfx,
+  getAudioMuted,
+  getSfxMuted,
 } from './audio';
 import { TrackManager } from './track';
 import { CloudManager } from './clouds';
@@ -54,13 +46,10 @@ export class Game {
   private prevHeadZ = 0;
   private prevHeadY = 1.6;
   private thumbstickDebounce = false;
-  private vrDomButton: HTMLButtonElement | null = null;
-  private fsDomButton: HTMLButtonElement | null = null;
 
   // Desktop Pointer state
   private pointerNdcX = 0;
   private pointerNdcY = 0;
-  private isPointerLocked = false;
   private keysDown: { [k: string]: boolean } = {};
 
   constructor() {
@@ -76,6 +65,7 @@ export class Game {
 
     this.initLighting();
     this.initWebXR();
+    this.initDOM();
     this.initInput();
 
     window.addEventListener('resize', () => this.onResize());
@@ -158,85 +148,54 @@ export class Game {
 
   private initSky(): void {
     const cvs = document.createElement('canvas');
-    cvs.width = 512;
-    cvs.height = 512;
+    cvs.width = 16;
+    cvs.height = 256;
     const ctx = cvs.getContext('2d')!;
 
-    // 1. Smooth atmospheric sky dome gradient
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, 512);
-    skyGrad.addColorStop(0.0, '#010006'); // Cosmic dark void
-    skyGrad.addColorStop(0.12, '#04081c'); // Deep night
-    skyGrad.addColorStop(0.24, '#091c48'); // Midnight blue
-    skyGrad.addColorStop(0.38, '#1450aa'); // Rich royal blue
-    skyGrad.addColorStop(0.48, '#267fe8'); // Vibrant azure sky
-    skyGrad.addColorStop(0.58, '#6ec4ff'); // Bright daylight sky
-    skyGrad.addColorStop(0.68, '#cce8ff'); // Horizon glow
-    skyGrad.addColorStop(0.78, '#ffe4c2'); // Warm twilight glow
-    skyGrad.addColorStop(1.0, '#10221a'); // Lower haze
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, 512, 512);
+    const grad = ctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0.0, '#040011');
+    grad.addColorStop(0.35, '#150630');
+    grad.addColorStop(0.62, '#2f155c');
+    grad.addColorStop(0.82, '#6c2b7e');
+    grad.addColorStop(0.94, '#b04a75');
+    grad.addColorStop(1.0, '#f28e6b');
 
-    // 2. Cosmic stars at the top
-    ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < 90; i++) {
-      const sx = (i * 79 + 29) % 512;
-      const sy = ((i * 47 + 13) % 120) + 3;
-      const sr = i % 4 === 0 ? 1.8 : i % 2 === 0 ? 1.2 : 0.8;
-      ctx.beginPath();
-      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // 3. Faint cosmic nebula
-    const neb = ctx.createRadialGradient(256, 40, 10, 256, 40, 150);
-    neb.addColorStop(0, 'rgba(170, 70, 255, 0.22)');
-    neb.addColorStop(0.5, 'rgba(60, 130, 255, 0.12)');
-    neb.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = neb;
-    ctx.fillRect(0, 0, 512, 140);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 16, 256);
 
     const skyTex = new THREE.CanvasTexture(cvs);
-    skyTex.wrapS = THREE.RepeatWrapping;
-
-    const skyGeom = new THREE.SphereGeometry(140, 32, 18);
+    const skyGeom = new THREE.SphereGeometry(180, 24, 16);
     const skyMat = new THREE.MeshBasicMaterial({
       map: skyTex,
       side: THREE.BackSide,
-      depthWrite: false,
       fog: false,
+      depthWrite: false,
     });
     this.skyMesh = new THREE.Mesh(skyGeom, skyMat);
-    this.skyMesh.renderOrder = -1000;
     this.scene.add(this.skyMesh);
 
-    // 4. Razor-sharp 3D Mountain and Rolling Hill Ridges (viewed from above in the clouds)
+    // Dynamic Parallax Horizon Mountains
     this.hillsGroup = new THREE.Group();
 
-    // Layer 1: Distant majestic mountain peaks
+    // Layer 1: Distant dark jagged silhouette peaks
     this.hillsGroup.add(
-      this.createMountainRidge(130, -14, 16, 0x224c74, 4, 9, 0)
+      this.createMountainRidge(155, -8, 22, 0x180932, 5, 11, 0.4)
     );
 
-    // Layer 2: Mid-distance lush green mountain ridges
+    // Layer 2: Mid-distance violet twilight ridges
     this.hillsGroup.add(
-      this.createMountainRidge(105, -22, 13, 0x164228, 5, 8, 1.5)
+      this.createMountainRidge(130, -14, 18, 0x2e114d, 7, 13, 1.8)
     );
 
-    // Layer 3: Foreground rolling hill slopes
+    // Layer 3: Closer alpine ridge
     this.hillsGroup.add(
-      this.createMountainRidge(80, -28, 10, 0x0f2c1a, 6, 11, 2.7)
+      this.createMountainRidge(105, -20, 15, 0x481b66, 9, 17, 3.2)
     );
 
-    // Layer 4: Deep valley floor disk
-    const floorGeom = new THREE.CircleGeometry(135, 32);
-    floorGeom.rotateX(-Math.PI / 2);
-    floorGeom.translate(0, -36, 0);
-    const floorMat = new THREE.MeshBasicMaterial({
-      color: 0x07150d,
-      side: THREE.DoubleSide,
-      fog: false,
-    });
-    this.hillsGroup.add(new THREE.Mesh(floorGeom, floorMat));
+    // Layer 4: Soft dreamy magenta foothills
+    this.hillsGroup.add(
+      this.createMountainRidge(80, -25, 12, 0x6e2874, 11, 19, 4.5)
+    );
 
     // Layer 5: Cloud Sea floating below the rainbow highway
     const seaGeom = new THREE.RingGeometry(15, 130, 32);
@@ -298,44 +257,20 @@ export class Game {
       }
     }
 
-    // VR DOM Button for 100% reliable entry from Quest Browser 2D window
-    if (this.hasWebXR) {
-      const vrBtn = document.createElement('button');
-      vrBtn.id = 'vr-btn';
-      vrBtn.className = 'hud-btn';
-      vrBtn.innerHTML = '🥽 ENTER VR';
-      vrBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.requestVRSession();
-      });
-      document.body.appendChild(vrBtn);
-      this.vrDomButton = vrBtn;
-    }
-
-    // Fullscreen DOM Button
-    const fsBtn = document.createElement('button');
-    fsBtn.id = 'fs-btn';
-    fsBtn.className = 'hud-btn';
-    fsBtn.innerHTML = '⛶ FULLSCREEN (F)';
-    fsBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleFullscreen();
-    });
-    document.body.appendChild(fsBtn);
-    this.fsDomButton = fsBtn;
-
-    // Bind VR Controllers: Trigger = stab, Grip = jump
+    // Bind VR Controllers: Trigger = stab (playing) or restart (gameover), Grip = jump (playing) or menu (gameover)
     const setupController = (c: any) => {
       c.addEventListener('selectstart', () => {
         if (this.state === GameState.PLAYING) {
           this.player.stab();
-        } else {
-          this.handleActionTrigger();
+        } else if (this.state === GameState.GAMEOVER) {
+          this.restartGame();
         }
       });
       c.addEventListener('squeezestart', () => {
         if (this.state === GameState.PLAYING) {
           this.player.jump();
+        } else if (this.state === GameState.GAMEOVER) {
+          this.goToMenu();
         }
       });
       this.scene.add(c);
@@ -343,6 +278,71 @@ export class Game {
 
     setupController(this.renderer.xr.getController(0));
     setupController(this.renderer.xr.getController(1));
+  }
+
+  private initDOM(): void {
+    const vrBtn = document.getElementById('btn-vr');
+    if (vrBtn) {
+      vrBtn.addEventListener('click', () => {
+        if (this.hasWebXR) {
+          this.requestVRSession();
+        } else {
+          alert(
+            'WebXR brýle nebyly detekovány. Pro plný VR zážitek otevřete tuto stránku v prohlížeči v Meta Quest.\n\nHra se nyní spustí na desktopu.'
+          );
+          this.startGame();
+        }
+      });
+    }
+
+    const pcBtn = document.getElementById('btn-desktop');
+    if (pcBtn) {
+      pcBtn.addEventListener('click', () => {
+        this.startGame();
+      });
+    }
+
+    const retryBtn = document.getElementById('btn-retry');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => {
+        this.restartGame();
+      });
+    }
+
+    const homeBtn = document.getElementById('btn-home');
+    if (homeBtn) {
+      homeBtn.addEventListener('click', () => {
+        this.goToMenu();
+      });
+    }
+
+    const musicBtn = document.getElementById('btn-music');
+    if (musicBtn) {
+      musicBtn.addEventListener('click', () => {
+        toggleAudio();
+        musicBtn.textContent = `🎵 HUDBA: ${getAudioMuted() ? 'VYP' : 'ZAP'}`;
+      });
+    }
+
+    const sfxBtn = document.getElementById('btn-sfx');
+    if (sfxBtn) {
+      sfxBtn.addEventListener('click', () => {
+        toggleSfx();
+        sfxBtn.textContent = `🔊 ZVUKY: ${getSfxMuted() ? 'VYP' : 'ZAP'}`;
+      });
+    }
+
+    const fsBtn = document.getElementById('btn-fs');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', () => {
+        this.toggleFullscreen();
+      });
+    }
+
+    const highBadge = document.getElementById('high-score');
+    if (highBadge) {
+      highBadge.textContent = `🏆 NEJLEPŠÍ SKÓRE: ${this.ui.getHighScore()}`;
+    }
   }
 
   public toggleFullscreen(): void {
@@ -363,13 +363,17 @@ export class Game {
       this.vrSession = session;
       await this.renderer.xr.setSession(session);
 
-      if (this.vrDomButton) this.vrDomButton.style.display = 'none';
-      if (this.fsDomButton) this.fsDomButton.style.display = 'none';
+      const modal = document.getElementById('modal');
+      if (modal) modal.style.display = 'none';
+      const goModal = document.getElementById('go-modal');
+      if (goModal) goModal.style.display = 'none';
 
       session.addEventListener('end', () => {
         this.vrSession = null;
-        if (this.vrDomButton) this.vrDomButton.style.display = 'block';
-        if (this.fsDomButton) this.fsDomButton.style.display = 'block';
+        if (this.state === GameState.MENU) {
+          const m = document.getElementById('modal');
+          if (m) m.style.display = 'flex';
+        }
       });
 
       this.startGame();
@@ -383,44 +387,43 @@ export class Game {
       this.pointerNdcX = (e.clientX / window.innerWidth) * 2 - 1;
       this.pointerNdcY = -(e.clientY / window.innerHeight) * 2 + 1;
 
-      if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
-        this.ui.updateHover(this.pointerNdcX, this.pointerNdcY);
-      } else if (this.state === GameState.PLAYING) {
-        // Steer with mouse only if active mouse movement detected
-        if (Math.abs(e.movementX) > 1 || Math.abs(e.movementY) > 1) {
-          this.player.setTargetX(this.pointerNdcX * 1.05);
-        }
+      if (this.state === GameState.PLAYING) {
+        // Direct mouse steering across lanes
+        this.player.setTargetX(this.pointerNdcX * 1.05);
 
-        // Tilt camera slightly with mouse on desktop (angled downwards to see mountains below)
+        // Tilt camera slightly with mouse on desktop
         if (!this.renderer.xr.isPresenting) {
-          this.camera.rotation.y = -this.pointerNdcX * 0.28;
-          this.camera.rotation.x = -0.10 + this.pointerNdcY * 0.22;
+          this.camera.rotation.y = -this.pointerNdcX * 0.25;
+          this.camera.rotation.x = -0.10 + this.pointerNdcY * 0.20;
         }
       }
     });
+
+    window.addEventListener(
+      'wheel',
+      (e) => {
+        if (this.state === GameState.PLAYING) {
+          this.player.jump();
+        }
+      },
+      { passive: true }
+    );
 
     // Prevent context menu on right click
     window.addEventListener('contextmenu', (e) => e.preventDefault());
 
     window.addEventListener('mousedown', (e) => {
       initAudio();
-      this.pointerNdcX = (e.clientX / window.innerWidth) * 2 - 1;
-      this.pointerNdcY = -(e.clientY / window.innerHeight) * 2 + 1;
-      if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
-        this.ui.updateHover(this.pointerNdcX, this.pointerNdcY);
-      }
-
-      if (e.button === 2) {
-        // Right mouse button: JUMP
-        if (this.state === GameState.PLAYING) {
+      if (this.state === GameState.PLAYING) {
+        if (e.button === 2) {
+          // Right mouse button: JUMP
           this.player.jump();
-        }
-      } else if (e.button === 0) {
-        // Left mouse button: STAB in playing, or click UI in menu/gameover
-        if (this.state === GameState.PLAYING) {
+        } else if (e.button === 0) {
+          // Left mouse button: STAB
           this.player.stab();
-        } else {
-          this.handleActionTrigger();
+        } else if (e.button === 1) {
+          // Middle click: JUMP
+          this.player.jump();
         }
       }
     });
@@ -460,8 +463,6 @@ export class Game {
         e.preventDefault();
         if (this.state === GameState.PLAYING) {
           this.player.jump();
-        } else if (this.state === GameState.MENU) {
-          this.startGame();
         } else if (this.state === GameState.GAMEOVER) {
           this.restartGame();
         }
@@ -471,9 +472,15 @@ export class Game {
       } else if (e.code === 'KeyM') {
         e.preventDefault();
         toggleAudio();
+        const musicBtn = document.getElementById('btn-music');
+        if (musicBtn)
+          musicBtn.textContent = `🎵 HUDBA: ${getAudioMuted() ? 'VYP' : 'ZAP'}`;
       } else if (e.code === 'KeyN') {
         e.preventDefault();
         toggleSfx();
+        const sfxBtn = document.getElementById('btn-sfx');
+        if (sfxBtn)
+          sfxBtn.textContent = `🔊 ZVUKY: ${getSfxMuted() ? 'VYP' : 'ZAP'}`;
       } else if (e.code === 'KeyH' || e.code === 'Escape') {
         if (this.state === GameState.GAMEOVER) {
           this.goToMenu();
@@ -488,37 +495,23 @@ export class Game {
     // Touch support for mobile
     window.addEventListener('touchstart', (e) => {
       initAudio();
-      if (e.touches.length > 0) {
-        const t = e.touches[0];
-        this.pointerNdcX = (t.clientX / window.innerWidth) * 2 - 1;
-        this.pointerNdcY = -(t.clientY / window.innerHeight) * 2 + 1;
-        if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
-          this.ui.updateHover(this.pointerNdcX, this.pointerNdcY);
-        }
-      }
       if (this.state === GameState.PLAYING) {
         this.player.stab();
-      } else {
-        this.handleActionTrigger();
       }
     });
   }
 
-  private handleActionTrigger(): void {
-    if (this.state === GameState.MENU) {
-      if (!this.ui.triggerClick()) {
-        this.startGame();
-      }
-    } else if (this.state === GameState.PLAYING) {
-      this.player.jump();
-    } else if (this.state === GameState.GAMEOVER) {
-      if (!this.ui.triggerClick()) {
-        this.restartGame();
-      }
-    }
-  }
-
   public goToMenu(): void {
+    const goModal = document.getElementById('go-modal');
+    if (goModal) goModal.style.display = 'none';
+    const modal = document.getElementById('modal');
+    if (modal) modal.style.display = 'flex';
+
+    const highBadge = document.getElementById('high-score');
+    if (highBadge) {
+      highBadge.textContent = `🏆 NEJLEPŠÍ SKÓRE: ${this.ui.getHighScore()}`;
+    }
+
     this.state = GameState.MENU;
     this.score = 0;
     this.combo = 1;
@@ -531,6 +524,11 @@ export class Game {
   }
 
   public startGame(): void {
+    const modal = document.getElementById('modal');
+    if (modal) modal.style.display = 'none';
+    const goModal = document.getElementById('go-modal');
+    if (goModal) goModal.style.display = 'none';
+
     this.state = GameState.PLAYING;
     this.score = 0;
     this.combo = 1;
@@ -555,28 +553,25 @@ export class Game {
 
   private checkHornCloudCollisions(): void {
     const hornTipPos = this.player.getHornTipPosition();
+    const isAirborne = !this.player.isGrounded;
 
-    for (const c of this.clouds.clouds) {
+    const clouds = this.clouds.clouds;
+    for (let i = 0; i < clouds.length; i++) {
+      const c = clouds[i];
       if (c.stabbed || c.popping) continue;
 
-      // Distance from horn tip to cloud center
       const dx = hornTipPos.x - c.x;
       const dy = hornTipPos.y - c.y;
       const dz = hornTipPos.z - c.z;
-      const distSq = dx * dx + dy * dy + dz * dz;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-      // True physical contact with cloud boundary
-      const hitRadius = c.radius + 0.1;
-      if (distSq <= hitRadius * hitRadius) {
-        // Without active horn stab, the cloud simply passes by and does not count
-        if (this.player.isStabbing) {
+      const hitDist = this.player.isStabbing ? 1.6 : 0.88;
+      if (dist < hitDist) {
+        if (this.player.isStabbing || isAirborne) {
+          c.stabbed = true;
           this.clouds.popCloud(c);
-          this.cloudsStabbed++;
-
-          // Replenish the corresponding color lane
           this.track.replenishLane(c.colorIdx);
-
-          // Sound & score
+          this.cloudsStabbed++;
           playStabSound(c.colorIdx);
           this.score += 150 * this.combo;
           this.combo = min(8, this.combo + 1);
@@ -616,7 +611,7 @@ export class Game {
       const curHeadZ = this.camera.position.z;
       const headVelZ = (curHeadZ - this.prevHeadZ) / max(0.001, dt);
       this.prevHeadZ = curHeadZ;
-      if (headVelZ < -0.40 && this.state === GameState.PLAYING) {
+      if (headVelZ < -0.35 && this.state === GameState.PLAYING) {
         this.player.stab();
       }
 
@@ -624,7 +619,7 @@ export class Game {
       const curHeadY = this.camera.position.y;
       const headVelY = (curHeadY - this.prevHeadY) / max(0.001, dt);
       this.prevHeadY = curHeadY;
-      if (headVelY > 1.4 && this.state === GameState.PLAYING) {
+      if (headVelY > 1.3 && this.state === GameState.PLAYING) {
         this.player.jump();
       }
 
@@ -639,9 +634,8 @@ export class Game {
               if (!this.thumbstickDebounce && this.state === GameState.PLAYING) {
                 this.player.shiftLane(stickX > 0 ? 1 : -1);
                 this.thumbstickDebounce = true;
+                setTimeout(() => (this.thumbstickDebounce = false), 220);
               }
-            } else if (Math.abs(stickX) < 0.2) {
-              this.thumbstickDebounce = false;
             }
 
             const stickY = axes.length >= 4 ? axes[3] : 0;
@@ -663,11 +657,15 @@ export class Game {
     }
 
     // Sync audio engine with state, airborne jumping status, and run speed
-    setAudioState(this.state, this.player.isGrounded, this.speed ? this.speed / 18 : 1.0);
+    setAudioState(
+      this.state,
+      this.player.isGrounded,
+      this.speed ? this.speed / 18 : 1.0
+    );
 
     // State-specific logic
     if (this.state === GameState.MENU) {
-      // Attract/Demo mode: Gentle auto-gallop and scenic sway
+      // Attract/Demo mode: Gentle auto-gallop and scenic sway in the background
       const demoSpeed = 15;
       const demoAutoX = sin(totalTime * 0.8) * 2.2;
       this.player.setTargetX(demoAutoX / 3.5);
@@ -729,6 +727,20 @@ export class Game {
 
       if (this.fallTimer >= 1.2) {
         this.state = GameState.GAMEOVER;
+        if (!this.renderer?.xr?.isPresenting) {
+          const goModal = document.getElementById('go-modal');
+          if (goModal) goModal.style.display = 'flex';
+          const goScore = document.getElementById('go-score');
+          if (goScore) {
+            const isHigh =
+              this.score >= this.ui.getHighScore() && this.score > 0;
+            goScore.textContent = isHigh
+              ? `🎉 NOVÝ REKORD: ${this.score}! 🎉`
+              : `SKÓRE: ${this.score}`;
+          }
+          const goQuote = document.getElementById('go-quote');
+          if (goQuote) goQuote.textContent = `"${this.ui.getLastQuote()}"`;
+        }
       }
 
       this.ui.renderUI(
@@ -762,7 +774,7 @@ export class Game {
       );
     }
 
-    // 3. Render Three.js scene
+    // 3. Render 3D scene
     this.renderer.render(this.scene, this.camera);
   }
 }
