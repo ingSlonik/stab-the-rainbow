@@ -1,3 +1,24 @@
+// Enforce standard WebXR XRWebGLLayer on Meta Quest (matches https://immersive-web.github.io/webxr-samples/immersive-vr-session.html)
+if (typeof window !== 'undefined') {
+  try {
+    if (typeof (window as any).XRWebGLBinding !== 'undefined') {
+      delete (window as any).XRWebGLBinding.prototype.createProjectionLayer;
+      try {
+        Object.defineProperty((window as any).XRWebGLBinding.prototype, 'createProjectionLayer', {
+          value: undefined,
+          configurable: true,
+        });
+      } catch (_) {}
+    }
+  } catch (_) {}
+  try {
+    Object.defineProperty(window, 'XRWebGLBinding', {
+      value: undefined,
+      configurable: true,
+    });
+  } catch (_) {}
+}
+
 import {
   GameState,
   VRMode,
@@ -52,7 +73,7 @@ export class Game {
   private skyMesh: any;
   private hillsGroup: any;
   private prevHeadZ = 0;
-  private prevHeadY = 1.6;
+  private prevHeadY = 0;
   private thumbstickDebounce = false;
 
   // Desktop Pointer state
@@ -229,12 +250,13 @@ export class Game {
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: 'high-performance',
+      xrCompatible: true,
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(min(window.devicePixelRatio, 2));
     this.renderer.xr.enabled = true;
     try {
-      this.renderer.xr.setReferenceSpaceType('local-floor');
+      this.renderer.xr.setReferenceSpaceType('local');
     } catch (_) {}
 
     document.body.appendChild(this.renderer.domElement);
@@ -380,10 +402,28 @@ export class Game {
     try {
       initAudio();
       this.currentVRMode = mode;
+
+      // Standard WebXR immersive-vr session matching https://immersive-web.github.io/webxr-samples/immersive-vr-session.html
       const session = await (navigator as any).xr.requestSession('immersive-vr', {
-        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'],
+        optionalFeatures: ['local', 'hand-tracking'],
       });
       this.vrSession = session;
+
+      // Wrap requestReferenceSpace with fallback to 'local' for maximum device compatibility
+      const origRequestReferenceSpace = session.requestReferenceSpace.bind(session);
+      session.requestReferenceSpace = async (type: string) => {
+        try {
+          return await origRequestReferenceSpace(type);
+        } catch (err) {
+          console.warn(`Reference space '${type}' unavailable, falling back to 'local':`, err);
+          return await origRequestReferenceSpace('local');
+        }
+      };
+
+      try {
+        this.renderer.xr.setReferenceSpaceType('local');
+      } catch (_) {}
+
       await this.renderer.xr.setSession(session);
 
       // Reset camera transforms for pristine WebXR headset tracking
