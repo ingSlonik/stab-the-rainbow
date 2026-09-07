@@ -1,4 +1,4 @@
-import { LANE_WIDTH, TRACK_WIDTH } from './types';
+import { LANE_COUNT, LANE_WIDTH, TRACK_WIDTH } from './types';
 import { sin, cos, max, min, clamp, lerp } from './math';
 import { playJumpSound } from './audio';
 
@@ -98,6 +98,13 @@ export class Player {
       this.hornTip.getWorldPosition(this.hornTipWorldPos);
     }
     return this.hornTipWorldPos;
+  }
+
+  public shiftLane(direction: number): void {
+    if (this.isFalling) return;
+    const closest = clamp(Math.round(this.targetX / LANE_WIDTH + 3), 0, LANE_COUNT - 1);
+    this.currentLane = clamp(closest + direction, 0, LANE_COUNT - 1);
+    this.targetX = (this.currentLane - 3) * LANE_WIDTH;
   }
 
   public moveLateral(deltaX: number): void {
