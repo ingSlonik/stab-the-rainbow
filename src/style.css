@@ -104,3 +104,27 @@ h1 {
 .mini-btn:hover {
   border-color: #00d4ff;
 }
+
+.vr-warning {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: rgba(255, 42, 75, 0.16);
+  border: 1.5px solid #ff2a4b;
+  border-radius: 12px;
+  color: #ffc2cc;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.vr-warning strong {
+  color: #fff;
+  font-size: 14px;
+}
+
+.vr-warning em {
+  color: #10e052;
+  font-style: normal;
+  font-weight: 700;
+}
+
