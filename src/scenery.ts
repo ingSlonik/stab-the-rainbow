@@ -71,19 +71,20 @@ export class SceneryManager {
       new THREE.MeshLambertMaterial({ color: 0x140e2a, flatShading: true }),
     ];
 
-    // Layers: [count, xMin, xMax, rMin, rMax, hMin, hMax, baseY, speed, matIdx]
+    // Layers: [count, extraMin, extraMax, rMin, rMax, hMin, hMax, baseY, speed, matIdx]
     const layers = [
-      [10, 8, 15, 6, 11, 5, 9, -4, 1.0, 0],
-      [8, 18, 32, 12, 20, 9, 17, -6, 0.65, 1],
-      [6, 35, 65, 22, 40, 18, 32, -8, 0.35, 2],
+      [10, 2, 8, 4, 8, 6, 12, -4, 1.0, 0],
+      [8, 6, 16, 8, 16, 10, 18, -6, 0.65, 1],
+      [6, 16, 36, 18, 32, 18, 32, -8, 0.35, 2],
     ];
 
-    for (const [count, xMin, xMax, rMin, rMax, hMin, hMax, baseY, speed, mat] of layers) {
+    for (const [count, extraMin, extraMax, rMin, rMax, hMin, hMax, baseY, speed, mat] of layers) {
       for (let i = 0; i < count; i++) {
         const side = i % 2 === 0 ? 1 : -1;
-        const x = side * randRange(xMin, xMax);
-        const z = randRange(-140, 20);
         const r = randRange(rMin, rMax);
+        // Track half-width is 3.85m. (5.6 + r) guarantees hills never intersect the rainbow!
+        const x = side * (5.6 + r + randRange(extraMin, extraMax));
+        const z = randRange(-140, 20);
         const h = randRange(hMin, hMax);
 
         const mesh = new THREE.Mesh(hillGeom, mats[mat]);
