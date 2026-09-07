@@ -63,7 +63,7 @@ export class CloudManager {
 
     // Merge geometries into a single fast buffer
     this.cloudGeom = geoms[0]; // fallback base
-    // Three.js r185 BufferGeometryUtils or manual merge:
+    // Manual merge for cloud geometry:
     // Simple hierarchy mesh is tiny in code size and very fast:
   }
 
