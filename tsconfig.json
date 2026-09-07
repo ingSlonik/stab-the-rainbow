@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src/**/*", "build.ts"]
+}

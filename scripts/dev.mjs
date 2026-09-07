@@ -1,0 +1,70 @@
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import * as esbuild from 'esbuild';
+
+const PORT = 5173;
+const rootDir = process.cwd();
+
+const mimeTypes = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.ts': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.json': 'application/json',
+};
+
+const server = http.createServer((req, res) => {
+  let reqPath = req.url ? req.url.split('?')[0] : '/';
+  if (reqPath === '/') reqPath = '/index.html';
+
+  if (reqPath === '/three.js') {
+    const threePath = path.join(rootDir, 'dist/three.js');
+    if (fs.existsSync(threePath)) {
+      res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+      res.end(fs.readFileSync(threePath));
+      return;
+    }
+  }
+
+  const filePath = path.join(rootDir, reqPath);
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('404 Not Found');
+    return;
+  }
+
+  const ext = path.extname(filePath);
+  const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+  if (ext === '.ts') {
+    // Transpile TypeScript on the fly using esbuild
+    try {
+      const tsCode = fs.readFileSync(filePath, 'utf8');
+      const result = esbuild.transformSync(tsCode, {
+        loader: 'ts',
+        format: 'esm',
+        target: 'es2020',
+      });
+      res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+      res.end(result.code);
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Compilation Error:\n' + String(err));
+    }
+    return;
+  }
+
+  res.writeHead(200, { 'Content-Type': contentType });
+  res.end(fs.readFileSync(filePath));
+});
+
+server.listen(PORT, () => {
+  console.log(`\n🦄 Stab the Rainbow Dev Server running at:`);
+  console.log(`   ➔ Local:   http://localhost:${PORT}/`);
+  console.log(`   ➔ Network: http://127.0.0.1:${PORT}/\n`);
+});
