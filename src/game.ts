@@ -61,7 +61,7 @@ export class Game {
   private prevHeadZ = 0;
   private thumbstickDebounce = false;
   private menuButtonDebounce = false;
-  private triggerWasPressed = false;
+  private triggerPressedMap: { [k: string]: boolean } = {};
   private isReady = false;
 
   // Desktop Pointer state
@@ -145,8 +145,9 @@ export class Game {
       if (this.player && this.rightControllerEl?.object3D) {
         this.player.setVRController(this.rightControllerEl.object3D);
         const isVR = this.sceneEl.is('vr-mode');
-        if (isVR && (this.state === GameState.MENU || this.currentVRMode === GameMode.VR_EASY)) {
-          this.player.attachHornToHand(this.rightControllerEl.object3D);
+        const isMenu = this.state === GameState.MENU || this.state === GameState.GAMEOVER;
+        if (isVR && (isMenu || this.currentVRMode === GameMode.VR_EASY)) {
+          this.player.attachHornToHand(this.rightControllerEl.object3D, isMenu);
         }
       }
     });
@@ -615,6 +616,32 @@ export class Game {
     }
   }
 
+  private getVRPointerRay(outOrigin: any, outDir: any): boolean {
+    if (this.player && this.player.getHornRay(outOrigin, outDir)) {
+      return true;
+    }
+
+    if (this.rightControllerEl && this.rightControllerEl.object3D) {
+      this.rightControllerEl.object3D.updateMatrixWorld(true);
+      this.rightControllerEl.object3D.getWorldPosition(outOrigin);
+      const quat = new THREE.Quaternion();
+      this.rightControllerEl.object3D.getWorldQuaternion(quat);
+      outDir.set(0, 0, -1).applyQuaternion(quat).normalize();
+      return true;
+    }
+
+    if (this.leftControllerEl && this.leftControllerEl.object3D) {
+      this.leftControllerEl.object3D.updateMatrixWorld(true);
+      this.leftControllerEl.object3D.getWorldPosition(outOrigin);
+      const quat = new THREE.Quaternion();
+      this.leftControllerEl.object3D.getWorldQuaternion(quat);
+      outDir.set(0, 0, -1).applyQuaternion(quat).normalize();
+      return true;
+    }
+
+    return false;
+  }
+
   public loop(time: number, timeDelta: number): void {
     if (!this.isReady) return;
     const dt = min(0.08, timeDelta / 1000);
@@ -640,15 +667,16 @@ export class Game {
       if (session && session.inputSources) {
         for (const source of session.inputSources) {
           if (source.gamepad) {
-            // Trigger check
+            // Trigger check with per-controller state
             if (source.gamepad.buttons && source.gamepad.buttons[0]) {
               const triggerBtn = source.gamepad.buttons[0];
               const isTrigger = triggerBtn.pressed || triggerBtn.value > 0.5;
-              if (isTrigger && !this.triggerWasPressed) {
-                this.triggerWasPressed = true;
-                this.onTriggerDown(source.handedness === 'left');
-              } else if (!isTrigger && this.triggerWasPressed) {
-                this.triggerWasPressed = false;
+              const handKey = source.handedness || 'right';
+              if (isTrigger && !this.triggerPressedMap[handKey]) {
+                this.triggerPressedMap[handKey] = true;
+                this.onTriggerDown(handKey === 'left');
+              } else if (!isTrigger && this.triggerPressedMap[handKey]) {
+                this.triggerPressedMap[handKey] = false;
               }
             }
 
@@ -765,13 +793,32 @@ export class Game {
       this.scenery.update(dt, 10, totalTime);
     }
 
-    // 3D UI raycasting from unicorn horn in VR, or mouse pointer on desktop
+    // 3D UI raycasting from VR controller/horn or head gaze in VR, or mouse pointer on desktop
     if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
-      if (isVR && this.player) {
+      if (isVR) {
         const origin = new THREE.Vector3();
         const dir = new THREE.Vector3();
-        if (this.player.getHornRay(origin, dir)) {
-          const hitResult = this.ui.updateHoverRay(origin, dir);
+        let hitResult: any = null;
+
+        // 1. Try horn / controller ray first
+        if (this.getVRPointerRay(origin, dir)) {
+          hitResult = this.ui.updateHoverRay(origin, dir);
+        }
+
+        // 2. Head gaze fallback: if controller ray missed or wasn't pointing at board, use head gaze
+        if ((!hitResult || !hitResult.hit) && this.camera) {
+          const headOrigin = new THREE.Vector3();
+          const headDir = new THREE.Vector3();
+          this.camera.updateMatrixWorld(true);
+          this.camera.getWorldPosition(headOrigin);
+          this.camera.getWorldDirection(headDir);
+          const gazeResult = this.ui.updateHoverRay(headOrigin, headDir);
+          if (gazeResult.hit) {
+            hitResult = gazeResult;
+          }
+        }
+
+        if (this.player) {
           this.player.updatePointerBeam(hitResult?.point);
         }
       } else {

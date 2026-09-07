@@ -131,7 +131,7 @@ export class Player {
       c.add(this.horn);
     }
     this.horn.position.set(0, -0.02, -0.08);
-    this.horn.rotation.set(-0.35, 0, 0);
+    this.horn.rotation.set(0, 0, 0);
     this.horn.scale.set(1.0, 1.0, 1.0);
     if (this.pointerBeam) this.pointerBeam.visible = showPointer;
   }
@@ -169,6 +169,9 @@ export class Player {
 
   public getHornRay(outOrigin: any, outDir: any): boolean {
     if (!this.horn || !this.hornTip) return false;
+    if (this.horn.parent) {
+      this.horn.parent.updateMatrixWorld(true);
+    }
     this.horn.updateMatrixWorld(true);
     this.hornTip.updateMatrixWorld(true);
 
@@ -317,7 +320,7 @@ export class Player {
 
       if (isInHand) {
         this.horn.position.set(0, -0.02, -0.08 - thrustOffset);
-        this.horn.rotation.set(-0.35, 0, 0);
+        this.horn.rotation.set(0, 0, 0);
       } else if (isDesktop) {
         this.horn.position.x = this.desktopHornX;
         this.horn.position.y = this.desktopHornY + thrustOffset * 0.12;
