@@ -1,24 +1,32 @@
 import { randChoice } from './math';
 
 export const UNICORN_START_QUIPS = [
-  'Hlava vpřed, rohy nabrousit!',
-  'Maká celé tělo!',
+  'Horns up, clouds down!',
+  'Gallop into the rainbow!',
+  'Full speed ahead!',
+  'Piercing the sky!',
 ];
 
 export const UNICORN_STAB_QUIPS = [
-  'Trk!',
-  'Trefa!',
-  'Prásk!',
+  'Stab!',
+  'Pierced!',
+  'Pop!',
+  'Direct hit!',
+  'Right through!',
 ];
 
 export const UNICORN_COMBO_QUIPS = [
-  'Duhové kombo!',
-  'Magie!',
+  'Rainbow combo!',
+  'Pure magic!',
+  'Unstoppable!',
+  'Prismatic power!',
 ];
 
 export const UNICORN_DEATH_QUIPS = [
-  'Gravitace: 1, Ty: 0.',
-  'Pád do propasti!',
+  'Gravity: 1, Unicorn: 0.',
+  'Fell into the abyss!',
+  'Gravity was faster this time.',
+  'Watch your step!',
 ];
 
 let lastSpokenTime = 0;
@@ -34,7 +42,7 @@ export function speakQuip(text: string, force = false): void {
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'cs-CZ';
+      utterance.lang = 'en-US';
       utterance.pitch = 1.35;
       utterance.rate = 1.10;
       utterance.volume = 0.9;

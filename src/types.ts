@@ -43,15 +43,16 @@ export const RAINBOW_HEX_STRINGS = [
 ];
 
 
-export const COLOR_NAMES_CZ = [
-  'Červená',
-  'Oranžová',
-  'Žlutá',
-  'Zelená',
-  'Azurová',
-  'Modrá',
-  'Fialová',
+export const COLOR_NAMES_EN = [
+  'Red',
+  'Orange',
+  'Yellow',
+  'Green',
+  'Cyan',
+  'Blue',
+  'Violet',
 ];
+export const COLOR_NAMES_CZ = COLOR_NAMES_EN;
 
 export interface CloudData {
   mesh: any;

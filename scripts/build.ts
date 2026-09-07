@@ -112,7 +112,7 @@ async function build() {
     removeAttributeQuotes: true,
   });
   const aframeScript = `<script src="https://play.js13kgames.com/2026/webxr/aframe.js"></script><script>if(!window.AFRAME)document.write('<script src="./aframe.js"><\\/script>')</script>`;
-  const finalHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style>${aframeScript}<script>${roadrolledJs}</script></head><body>${minifiedDomHtml}</body></html>`;
+  const finalHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style>${aframeScript}<script>${roadrolledJs}</script></head><body>${minifiedDomHtml}</body></html>`;
 
   const htmlDistPath = path.join(distDir, 'index.html');
   fs.writeFileSync(htmlDistPath, finalHtml, 'utf8');
@@ -120,7 +120,7 @@ async function build() {
   console.log(`   dist/index.html size: ${(htmlSize / 1024).toFixed(2)} KB (${htmlSize} bytes)`);
 
   // Also write uncompressed version for easy debugging
-  const uncompressedHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style>${aframeScript}<script>${minifiedJs}</script></head><body>${domHtml}</body></html>`;
+  const uncompressedHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style>${aframeScript}<script>${minifiedJs}</script></head><body>${domHtml}</body></html>`;
   fs.writeFileSync(path.join(distDir, 'index_debug.html'), uncompressedHtml, 'utf8');
 
   // 6. Compress with ECT for maximum ZIP compression
