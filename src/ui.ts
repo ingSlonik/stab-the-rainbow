@@ -76,7 +76,7 @@ export class UIManager {
       this.highScore = score;
       try {
         localStorage.setItem('str_high', score.toString());
-      } catch (_) {}
+      } catch (_) { }
       return true;
     }
     return false;
@@ -106,6 +106,7 @@ export class UIManager {
     });
 
     this.uiMesh = new THREE.Mesh(geom, mat);
+    this.uiMesh.renderOrder = 99999;
     // Position in front of camera view
     this.uiMesh.position.set(0, 0, -2.4);
     this.camera.add(this.uiMesh);
@@ -239,11 +240,11 @@ export class UIManager {
     ctx.fillText('📖 HOW TO SURVIVE THE VOID', 512, 325);
 
     const instructions = [
-      '• Move your HEAD (VR) or MOUSE (Desktop) to aim your crystal horn.',
-      '• STAB oncoming color clouds to replenish decaying rainbow lanes.',
-      '• Stepping on a completely vanished lane sends you falling forever!',
-      '• SPACEBAR / CLICK / VR TRIGGER to JUMP over void gaps.',
-      '• Each cloud sings a spatial chord — listen closely to locate them!',
+      '• MOUSE aims horn. LEFT CLICK to STAB oncoming color clouds!',
+      '• Clouds must be STABBED with horn tip to score & replenish lanes.',
+      '• RIGHT CLICK / SPACEBAR to JUMP for high clouds & over void gaps!',
+      '• In VR: Move HEAD to aim, THRUST HEAD FORWARD to stab!',
+      '• If you step onto a vanished lane, you will fall forever!',
     ];
 
     ctx.textAlign = 'left';
@@ -415,7 +416,7 @@ export class UIManager {
     ctx.fillStyle = '#ff2a4b';
     ctx.shadowColor = '#ff2a4b';
     ctx.shadowBlur = 24;
-    ctx.fillText('💀 FELL INTO THE VOID 💀', 512, 245);
+    ctx.fillText('FELL INTO THE VOID', 512, 245);
     ctx.shadowBlur = 0;
 
     // Death quote
