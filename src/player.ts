@@ -31,9 +31,9 @@ export class Player {
   // Head tracking calibration for Hard mode
   private isCalibrated = false;
   private calibratedHeadX = 0;
-  private calibratedHeadY = 1.6;
+  private calibratedHeadY = 0;
   private prevHeadZ = 0;
-  private prevHeadY = 1.6;
+  private prevHeadY = 0;
 
   constructor(scene: any, camera: any) {
     this.camera = camera;
@@ -177,6 +177,8 @@ export class Player {
     this.vrMode = mode;
     this.vrController = controller || null;
     this.isCalibrated = false;
+    this.prevHeadZ = 0;
+    this.prevHeadY = 0;
 
     // Detach horn from previous parent
     if (this.horn.parent) {
@@ -280,6 +282,8 @@ export class Player {
     this.stabTimer = 0;
     this.currentLane = 3;
     this.isCalibrated = false;
+    this.prevHeadZ = 0;
+    this.prevHeadY = 0;
     this.root.position.set(0, 0, 0);
     this.root.rotation.set(0, 0, 0);
     if (this.hornMat) this.hornMat.emissiveIntensity = 0.36;
@@ -315,7 +319,7 @@ export class Player {
     if (isVR && this.vrMode === VRMode.UNICORN_HARD && this.camera) {
       if (!this.isCalibrated) {
         this.calibratedHeadX = this.camera.position.x;
-        this.calibratedHeadY = this.camera.position.y || 1.6;
+        this.calibratedHeadY = this.camera.position.y ?? 0;
         this.prevHeadZ = this.camera.position.z;
         this.prevHeadY = this.calibratedHeadY;
         this.isCalibrated = true;
