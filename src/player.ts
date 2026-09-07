@@ -14,6 +14,11 @@ export class Player {
   public vy = 0;
   public isGrounded = true;
   public isFalling = false;
+  public isStabbing = false;
+  public stabTimer = 0;
+  private readonly STAB_DURATION = 0.24;
+  private readonly hornBaseZ = -0.28;
+  private hornMat: any;
 
   private hornTipWorldPos: any;
   private gallopTimer = 0;
@@ -42,7 +47,7 @@ export class Player {
     coneGeom.translate(0, 0, -coneLength / 2);
 
     // Translucent pearlescent crystal material
-    const hornMat = new THREE.MeshStandardMaterial({
+    this.hornMat = new THREE.MeshStandardMaterial({
       color: 0xfffcf2,
       emissive: 0xffe48e,
       emissiveIntensity: 0.36,
@@ -52,7 +57,7 @@ export class Player {
       opacity: 0.74,
     });
 
-    const hornMesh = new THREE.Mesh(coneGeom, hornMat);
+    const hornMesh = new THREE.Mesh(coneGeom, this.hornMat);
     this.horn.add(hornMesh);
 
     // Glowing crystal tip at the apex of the cone
@@ -65,10 +70,17 @@ export class Player {
     this.horn.add(this.hornTip);
 
     // Position horn protruding down into view from forehead (top)
-    this.horn.position.set(0, 0.44, -0.28);
+    this.horn.position.set(0, 0.44, this.hornBaseZ);
     this.horn.rotation.x = -0.24;
 
     camera.add(this.horn);
+  }
+
+  public stab(): boolean {
+    if (this.isFalling) return false;
+    this.isStabbing = true;
+    this.stabTimer = this.STAB_DURATION;
+    return true;
   }
 
   public jump(): boolean {
@@ -113,12 +125,39 @@ export class Player {
     this.vy = 0;
     this.isGrounded = true;
     this.isFalling = false;
+    this.isStabbing = false;
+    this.stabTimer = 0;
     this.currentLane = 3;
     this.root.position.set(0, 0, 0);
     this.root.rotation.set(0, 0, 0);
+    if (this.horn) this.horn.position.z = this.hornBaseZ;
+    if (this.hornMat) this.hornMat.emissiveIntensity = 0.36;
   }
 
   public update(dt: number, speed: number, isMoving: boolean): void {
+    // 0. Horn thrust animation on stab
+    let thrustOffset = 0;
+    if (this.stabTimer > 0) {
+      this.stabTimer -= dt;
+      if (this.stabTimer <= 0) {
+        this.stabTimer = 0;
+        this.isStabbing = false;
+      } else {
+        const progress = 1 - (this.stabTimer / this.STAB_DURATION);
+        if (progress < 0.35) {
+          thrustOffset = (progress / 0.35) * 0.55;
+        } else {
+          thrustOffset = (1 - (progress - 0.35) / 0.65) * 0.55;
+        }
+      }
+    }
+    if (this.horn) {
+      this.horn.position.z = this.hornBaseZ - thrustOffset;
+      if (this.hornMat) {
+        this.hornMat.emissiveIntensity = 0.36 + thrustOffset * 1.8;
+      }
+    }
+
     // 1. Lateral smooth gliding towards target lane
     this.x = lerp(this.x, this.targetX, min(1, dt * 14));
 
