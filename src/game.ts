@@ -26,6 +26,7 @@ import {
 } from './quips';
 import { TrackManager } from './track';
 import { CloudManager } from './clouds';
+import { SceneryManager } from './scenery';
 import { Player } from './player';
 import { UIManager } from './ui';
 
@@ -41,6 +42,7 @@ export class Game {
 
   public track!: TrackManager;
   public clouds!: CloudManager;
+  public scenery!: SceneryManager;
   public player!: Player;
   public ui!: UIManager;
 
@@ -93,8 +95,13 @@ export class Game {
 
     this.track = new TrackManager(this.scene);
     this.clouds = new CloudManager(this.scene);
+    this.scenery = new SceneryManager(this.scene);
     this.player = new Player(this.scene, this.camera, this.rigEl, this.rightControllerEl);
     this.ui = new UIManager(this.scene, this.camera);
+
+    if (this.camera) {
+      this.camera.rotation.x = -0.24;
+    }
 
     this.initAFrameWebXR();
 
@@ -279,7 +286,7 @@ export class Game {
         // Tilt camera slightly with mouse on desktop
         if (!this.sceneEl?.is('vr-mode') && this.camera) {
           this.camera.rotation.y = -this.pointerNdcX * 0.25;
-          this.camera.rotation.x = -0.10 + this.pointerNdcY * 0.20;
+          this.camera.rotation.x = -0.24 + this.pointerNdcY * 0.16;
         }
       }
     });
@@ -377,7 +384,11 @@ export class Game {
     this.cloudsStabbed = 0;
     this.track?.reset();
     this.clouds?.reset();
+    this.scenery?.reset();
     this.player?.reset();
+    if (this.camera && !this.sceneEl?.is('vr-mode')) {
+      this.camera.rotation.x = -0.24;
+    }
   }
 
   public startGame(): void {
@@ -394,6 +405,7 @@ export class Game {
     this.cloudsStabbed = 0;
     this.track?.reset();
     this.clouds?.reset();
+    this.scenery?.reset();
     this.player?.reset();
 
     if (this.currentVRMode === VRMode.UNICORN_HARD) {
@@ -543,6 +555,7 @@ export class Game {
       this.player.update(dt, demoSpeed, true, isVR);
       this.track.update(dt, demoSpeed, totalTime, 60, true);
       this.clouds.update(dt, demoSpeed, totalTime);
+      this.scenery.update(dt, demoSpeed, totalTime);
     } else if (this.state === GameState.PLAYING) {
       this.runTime += dt;
       this.speed = min(36, 18 + this.runTime * 0.28);
@@ -556,6 +569,7 @@ export class Game {
         totalTime,
         this.track.getUrgentLane()
       );
+      this.scenery.update(dt, this.speed, totalTime);
 
       this.checkHornCloudCollisions();
       this.checkTrackFall();
@@ -564,6 +578,7 @@ export class Game {
       this.player.update(dt, this.speed * 0.4, false, isVR);
       this.track.update(dt, this.speed * 0.4, totalTime, this.runTime);
       this.clouds.update(dt, this.speed * 0.4, totalTime);
+      this.scenery.update(dt, this.speed * 0.4, totalTime);
 
       if (this.fallTimer >= 1.2) {
         this.state = GameState.GAMEOVER;
