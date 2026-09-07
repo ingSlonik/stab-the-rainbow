@@ -130,10 +130,10 @@ export class Game {
       el.addEventListener('selectstart', () => this.onTriggerDown(isLeft));
       el.addEventListener('gripdown', () => this.onGripDown(isLeft));
       el.addEventListener('squeezestart', () => this.onGripDown(isLeft));
-      el.addEventListener('abuttondown', () => this.goToMenu());
-      el.addEventListener('bbuttondown', () => this.goToMenu());
-      el.addEventListener('xbuttondown', () => this.goToMenu());
-      el.addEventListener('ybuttondown', () => this.goToMenu());
+      el.addEventListener('abuttondown', () => this.onAButtonDown());
+      el.addEventListener('xbuttondown', () => this.onAButtonDown());
+      el.addEventListener('bbuttondown', () => this.onBButtonDown());
+      el.addEventListener('ybuttondown', () => this.onBButtonDown());
       el.addEventListener('thumbstickmoved', (e: any) => this.onThumbstick(e.detail));
       el.addEventListener('axismove', (e: any) => this.onAxisMove(e.detail));
     };
@@ -152,9 +152,44 @@ export class Game {
     });
   }
 
+  private onAButtonDown(): void {
+    if (this.state === GameState.MENU) {
+      const mode = this.ui?.hoveredButtonId === 'btn-hard' ? GameMode.VR_HARD : GameMode.VR_EASY;
+      this.startGame(mode);
+    } else if (this.state === GameState.GAMEOVER) {
+      this.restartGame();
+    } else if (this.state === GameState.PLAYING) {
+      if (this.runTime > 0.8 && !this.menuButtonDebounce) {
+        this.menuButtonDebounce = true;
+        this.goToMenu();
+        setTimeout(() => (this.menuButtonDebounce = false), 500);
+      }
+    }
+  }
+
+  private onBButtonDown(): void {
+    if (this.state === GameState.MENU) {
+      const mode = this.ui?.hoveredButtonId === 'btn-easy' ? GameMode.VR_EASY : GameMode.VR_HARD;
+      this.startGame(mode);
+    } else if (this.state === GameState.GAMEOVER) {
+      this.goToMenu();
+    } else if (this.state === GameState.PLAYING) {
+      if (this.runTime > 0.8 && !this.menuButtonDebounce) {
+        this.menuButtonDebounce = true;
+        this.goToMenu();
+        setTimeout(() => (this.menuButtonDebounce = false), 500);
+      }
+    }
+  }
+
   private onTriggerDown(isLeft: boolean = false): void {
-    if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
-      if (!this.ui.triggerClick() && this.state === GameState.GAMEOVER) {
+    if (this.state === GameState.MENU) {
+      if (!this.ui.triggerClick()) {
+        const mode = this.ui?.hoveredButtonId === 'btn-hard' ? GameMode.VR_HARD : GameMode.VR_EASY;
+        this.startGame(mode);
+      }
+    } else if (this.state === GameState.GAMEOVER) {
+      if (!this.ui.triggerClick()) {
         this.restartGame();
       }
     } else if (this.state === GameState.PLAYING) {
@@ -163,7 +198,7 @@ export class Game {
         this.player.jump();
       } else {
         if (isLeft) {
-          this.goToMenu();
+          this.player.jump();
         } else {
           this.player.stab();
         }
@@ -172,19 +207,12 @@ export class Game {
   }
 
   private onGripDown(isLeft: boolean = false): void {
-    if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
+    if (this.state === GameState.MENU) {
+      return;
+    } else if (this.state === GameState.GAMEOVER) {
       this.goToMenu();
     } else if (this.state === GameState.PLAYING) {
-      const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
-      if (isHard) {
-        this.player.jump();
-      } else {
-        if (isLeft) {
-          this.goToMenu();
-        } else {
-          this.player.jump();
-        }
-      }
+      this.player.jump();
     }
   }
 
@@ -482,6 +510,15 @@ export class Game {
     this.scenery?.reset();
     this.player?.reset();
 
+    // Immediately hide 3D menu dialog
+    this.ui?.hideDialog();
+
+    // Prevent immediate accidental return to menu from the start button press
+    this.menuButtonDebounce = true;
+    setTimeout(() => {
+      this.menuButtonDebounce = false;
+    }, 800);
+
     const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
     if (isHard) {
       const startQuip = getRandomStartQuip();
@@ -615,17 +652,25 @@ export class Game {
               }
             }
 
-            // A & B Buttons (and X & Y) -> Return to Menu
+            // A & B Buttons (and X & Y) -> Return to Menu during run, or select difficulty in menu
             if (source.gamepad.buttons) {
               const btnA = source.gamepad.buttons[4];
               const btnB = source.gamepad.buttons[5];
-              const isMenuBtn =
-                (btnA && (btnA.pressed || btnA.value > 0.5)) ||
-                (btnB && (btnB.pressed || btnB.value > 0.5));
-              if (isMenuBtn && !this.menuButtonDebounce) {
+              const isAPressed = !!(btnA && btnA.pressed === true);
+              const isBPressed = !!(btnB && btnB.pressed === true);
+
+              if ((isAPressed || isBPressed) && !this.menuButtonDebounce) {
                 this.menuButtonDebounce = true;
-                this.goToMenu();
-                setTimeout(() => (this.menuButtonDebounce = false), 350);
+                if (this.state === GameState.PLAYING && this.runTime > 0.8) {
+                  this.goToMenu();
+                } else if (this.state === GameState.MENU) {
+                  if (isAPressed) this.onAButtonDown();
+                  else if (isBPressed) this.onBButtonDown();
+                } else if (this.state === GameState.GAMEOVER) {
+                  if (isAPressed) this.restartGame();
+                  else this.goToMenu();
+                }
+                setTimeout(() => (this.menuButtonDebounce = false), 450);
               }
             }
 
