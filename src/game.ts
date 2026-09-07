@@ -160,11 +160,7 @@ export class Game {
     } else if (this.state === GameState.GAMEOVER) {
       this.restartGame();
     } else if (this.state === GameState.PLAYING) {
-      if (this.runTime > 0.8 && !this.menuButtonDebounce) {
-        this.menuButtonDebounce = true;
-        this.goToMenu();
-        setTimeout(() => (this.menuButtonDebounce = false), 500);
-      }
+      this.player.jump();
     }
   }
 
@@ -175,11 +171,7 @@ export class Game {
     } else if (this.state === GameState.GAMEOVER) {
       this.goToMenu();
     } else if (this.state === GameState.PLAYING) {
-      if (this.runTime > 0.8 && !this.menuButtonDebounce) {
-        this.menuButtonDebounce = true;
-        this.goToMenu();
-        setTimeout(() => (this.menuButtonDebounce = false), 500);
-      }
+      this.player.jump();
     }
   }
 
@@ -320,30 +312,33 @@ export class Game {
     return false;
   }
 
-  public async requestVRSession(): Promise<void> {
+  public requestVRSession(): void {
     const warningEl = document.getElementById('vr-warning');
-    const isSupported = await this.checkVRSupport();
-
-    if (!isSupported) {
-      if (warningEl) {
-        warningEl.innerHTML = '⚠️ <strong>VR Mode Not Supported</strong><br>Your browser or device does not support WebXR immersive VR.<br>Connect a VR headset (e.g. Meta Quest) or choose <em>Play on Desktop</em>.';
-        warningEl.style.display = 'block';
-      }
-      return;
-    }
+    if (warningEl) warningEl.style.display = 'none';
 
     initAudio();
     this.state = GameState.MENU;
+
+    if (this.sceneEl.is('vr-mode')) {
+      this.onEnterVR();
+      return;
+    }
+
     try {
-      if (this.sceneEl.is('vr-mode')) {
-        this.onEnterVR();
-      } else {
-        await this.sceneEl.enterVR();
+      const p = this.sceneEl.enterVR();
+      if (p && typeof p.catch === 'function') {
+        p.catch((err: any) => {
+          console.warn('Enter VR error:', err);
+          if (warningEl) {
+            warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>Ensure WebXR is enabled and headset is connected.';
+            warningEl.style.display = 'block';
+          }
+        });
       }
     } catch (err) {
-      console.warn('Enter VR error:', err);
+      console.warn('Enter VR synchronous error:', err);
       if (warningEl) {
-        warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>Check headset connection or browser permissions.';
+        warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>' + err;
         warningEl.style.display = 'block';
       }
     }
@@ -626,6 +621,8 @@ export class Game {
       this.rightControllerEl.object3D.getWorldPosition(outOrigin);
       const quat = new THREE.Quaternion();
       this.rightControllerEl.object3D.getWorldQuaternion(quat);
+      const offsetQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -0.65);
+      quat.multiply(offsetQ);
       outDir.set(0, 0, -1).applyQuaternion(quat).normalize();
       return true;
     }
@@ -635,6 +632,8 @@ export class Game {
       this.leftControllerEl.object3D.getWorldPosition(outOrigin);
       const quat = new THREE.Quaternion();
       this.leftControllerEl.object3D.getWorldQuaternion(quat);
+      const offsetQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -0.65);
+      quat.multiply(offsetQ);
       outDir.set(0, 0, -1).applyQuaternion(quat).normalize();
       return true;
     }
@@ -680,7 +679,7 @@ export class Game {
               }
             }
 
-            // A & B Buttons (and X & Y) -> Return to Menu during run, or select difficulty in menu
+            // A & B Buttons (and X & Y) -> Jump during play, or select difficulty in menu
             if (source.gamepad.buttons) {
               const btnA = source.gamepad.buttons[4];
               const btnB = source.gamepad.buttons[5];
@@ -689,8 +688,8 @@ export class Game {
 
               if ((isAPressed || isBPressed) && !this.menuButtonDebounce) {
                 this.menuButtonDebounce = true;
-                if (this.state === GameState.PLAYING && this.runTime > 0.8) {
-                  this.goToMenu();
+                if (this.state === GameState.PLAYING) {
+                  this.player.jump();
                 } else if (this.state === GameState.MENU) {
                   if (isAPressed) this.onAButtonDown();
                   else if (isBPressed) this.onBButtonDown();
@@ -698,7 +697,7 @@ export class Game {
                   if (isAPressed) this.restartGame();
                   else this.goToMenu();
                 }
-                setTimeout(() => (this.menuButtonDebounce = false), 450);
+                setTimeout(() => (this.menuButtonDebounce = false), 250);
               }
             }
 
