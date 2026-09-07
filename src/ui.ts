@@ -47,9 +47,9 @@ export class UIManager {
   private raycaster: any;
   private mouseVec: any;
   private buttons: UIButton[] = [];
-  private hoveredButtonId: string | null = null;
-  private pointerX = -100;
-  private pointerY = -100;
+  public hoveredButtonId: string | null = null;
+  public pointerX = -100;
+  public pointerY = -100;
 
   private highScoreDesktop = 0;
   private highScoreEasy = 0;
@@ -266,7 +266,7 @@ export class UIManager {
 
       let found = null;
       for (const btn of this.buttons) {
-        const pad = 12; // Generous hit padding for easy VR laser selection
+        const pad = 18; // Generous hit padding for easy VR laser selection
         if (
           cx >= btn.x - pad &&
           cx <= btn.x + btn.w + pad &&
@@ -277,6 +277,18 @@ export class UIManager {
           break;
         }
       }
+
+      // If pointing anywhere on the menu dialog card, intelligently snap to closest difficulty
+      if (!found && this.dialogMesh && this.dialogMesh.visible) {
+        if (cx >= 80 && cx <= 944) {
+          if (cy >= 180 && cy < 500) {
+            found = 'btn-easy';
+          } else if (cy >= 500 && cy <= 820) {
+            found = 'btn-hard';
+          }
+        }
+      }
+
       this.hoveredButtonId = found;
       return { hit: true, point: hit.point };
     } else {
@@ -295,7 +307,22 @@ export class UIManager {
         return true;
       }
     }
+    // High-confidence fallback if laser hits anywhere on the 3D board:
+    if (this.pointerX >= 60 && this.pointerX <= 964) {
+      const targetId = this.pointerY < 500 ? 'btn-easy' : 'btn-hard';
+      const btn = this.buttons.find((b) => b.id === targetId) || this.buttons[0];
+      if (btn) {
+        btn.action();
+        return true;
+      }
+    }
     return false;
+  }
+
+  public hideDialog(): void {
+    if (this.dialogMesh) {
+      this.dialogMesh.visible = false;
+    }
   }
 
   public setGameOverDeathQuote(): void {
@@ -464,15 +491,16 @@ export class UIManager {
       ctx.shadowColor = '#ffffff';
       ctx.shadowBlur = 14;
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 31px system-ui, sans-serif';
+      ctx.font = '900 32px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`✨  ${title}  ✨`, x + w / 2, y + (subtitle ? 43 : h / 2 + 10));
+      const titleY = subtitle ? y + h * 0.40 : y + h * 0.5 + 10;
+      ctx.fillText(`✨  ${title}  ✨`, x + w / 2, titleY);
       ctx.restore();
 
       if (subtitle) {
         ctx.fillStyle = '#ffffff';
-        ctx.font = '700 18px system-ui, sans-serif';
-        ctx.fillText(subtitle, x + w / 2, y + 78);
+        ctx.font = '700 19px system-ui, sans-serif';
+        ctx.fillText(subtitle, x + w / 2, y + h * 0.72);
       }
     } else {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
@@ -484,14 +512,15 @@ export class UIManager {
       ctx.stroke();
 
       ctx.fillStyle = color;
-      ctx.font = '800 28px system-ui, sans-serif';
+      ctx.font = '800 29px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(title, x + w / 2, y + (subtitle ? 42 : h / 2 + 10));
+      const titleY = subtitle ? y + h * 0.40 : y + h * 0.5 + 10;
+      ctx.fillText(title, x + w / 2, titleY);
 
       if (subtitle) {
         ctx.fillStyle = '#c8d6e5';
-        ctx.font = '600 17px system-ui, sans-serif';
-        ctx.fillText(subtitle, x + w / 2, y + 76);
+        ctx.font = '600 18px system-ui, sans-serif';
+        ctx.fillText(subtitle, x + w / 2, y + h * 0.72);
       }
     }
   }
@@ -542,16 +571,16 @@ export class UIManager {
     ctx.lineTo(884, 286);
     ctx.stroke();
 
-    // Mode Selection Buttons
+    // Mode Selection Buttons - Large, accessible touch targets
     this.drawButton(
       ctx,
       'btn-easy',
-      120,
-      320,
-      784,
-      130,
+      100,
+      300,
+      824,
+      175,
       'UNICORN RIDER (EASY)',
-      'Horn in hand • Controller steers • Trigger / ram = pop • Buttons = jump',
+      'Horn in hand • Controller steers • Ram / Trigger pops • Buttons jump',
       '#00d4ff',
       () => onStartGame(GameMode.VR_EASY)
     );
@@ -559,24 +588,24 @@ export class UIManager {
     this.drawButton(
       ctx,
       'btn-hard',
-      120,
-      480,
-      784,
-      130,
+      100,
+      505,
+      824,
+      175,
       'YOU ARE THE UNICORN! (HARD)',
-      'Head lean steers • Ram clouds to pop! • Controller buttons jump',
+      'Horn on head • Lean to steer • Ram to pop • Buttons jump',
       '#ffdd00',
       () => onStartGame(GameMode.VR_HARD)
     );
 
     // Instructions
-    ctx.font = '600 18px system-ui, sans-serif';
-    ctx.fillStyle = '#c0cedf';
-    ctx.fillText('🎯 Point with controller beam and press Trigger to select', 512, 670);
+    ctx.font = '700 20px system-ui, sans-serif';
+    ctx.fillStyle = '#e0ecff';
+    ctx.fillText('🎯 Point ray & pull Trigger, OR press A (Easy) / B (Hard)', 512, 735);
 
-    ctx.font = '500 16px system-ui, sans-serif';
-    ctx.fillStyle = '#8e9eb5';
-    ctx.fillText('Return to menu anytime: Controller A or B button / Left Grip / ESC', 512, 715);
+    ctx.font = '600 17px system-ui, sans-serif';
+    ctx.fillStyle = '#9cb3d0';
+    ctx.fillText('Return to menu anytime during play: Controller A or B button', 512, 778);
   }
 
   private drawGameOver(
