@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Stab the Rainbow - js13k WebXR</title>
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+  <script type="module">
+    const isJS13k = location.hostname.endsWith('js13kgames.com');
+    const url = isJS13k ? 'https://play.js13kgames.com/2026/webxr/three.js' : './three.js';
+    const T = await import(url);
+    window.THREE = T;
+    if (window.bootGame) window.bootGame();
+  </script>
+  <script type="module" src="./src/game.ts"></script>
+</body>
+</html>
