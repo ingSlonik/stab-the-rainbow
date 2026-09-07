@@ -42,6 +42,7 @@ export class UIManager {
   private dialogCanvas: HTMLCanvasElement;
   private dialogCtx: CanvasRenderingContext2D;
   private dialogTexture: any;
+  private reticle3DMesh: any;
 
   // Interaction & Raycasting (for VR pointer/controller clicks)
   private raycaster: any;
@@ -226,6 +227,20 @@ export class UIManager {
     this.dialogMesh.renderOrder = 2000;
     this.dialogMesh.visible = true;
     this.group.add(this.dialogMesh);
+
+    // 4. Glowing 3D Laser Reticle Ring on dialog board
+    const reticleGeom = new THREE.RingGeometry(0.045, 0.065, 32);
+    const reticleMat = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+    });
+    this.reticle3DMesh = new THREE.Mesh(reticleGeom, reticleMat);
+    this.reticle3DMesh.renderOrder = 3000;
+    this.reticle3DMesh.visible = false;
+    this.group.add(this.reticle3DMesh);
   }
 
   public updateHoverRay(origin: any, direction: any): { hit: boolean; point?: any } {
@@ -233,12 +248,27 @@ export class UIManager {
       this.hoveredButtonId = null;
       this.pointerX = -100;
       this.pointerY = -100;
+      if (this.reticle3DMesh) this.reticle3DMesh.visible = false;
       return { hit: false };
     }
     this.dialogMesh.updateMatrixWorld(true);
     this.raycaster.set(origin, direction);
     const intersects = this.raycaster.intersectObject(this.dialogMesh);
-    return this.processIntersects(intersects);
+    const res = this.processIntersects(intersects);
+    if (this.reticle3DMesh) {
+      if (res.hit && res.point) {
+        this.reticle3DMesh.position.copy(res.point);
+        this.reticle3DMesh.position.z += 0.015;
+        this.reticle3DMesh.rotation.copy(this.dialogMesh.rotation);
+        const isHover = !!this.hoveredButtonId;
+        this.reticle3DMesh.scale.set(isHover ? 1.3 : 1.0, isHover ? 1.3 : 1.0, 1.0);
+        this.reticle3DMesh.material.color.setHex(isHover ? 0xffdd00 : 0x00ffff);
+        this.reticle3DMesh.visible = true;
+      } else {
+        this.reticle3DMesh.visible = false;
+      }
+    }
+    return res;
   }
 
   public updateHoverNdc(pointerNdcX: number, pointerNdcY: number): { hit: boolean; point?: any } {
@@ -246,13 +276,28 @@ export class UIManager {
       this.hoveredButtonId = null;
       this.pointerX = -100;
       this.pointerY = -100;
+      if (this.reticle3DMesh) this.reticle3DMesh.visible = false;
       return { hit: false };
     }
     this.dialogMesh.updateMatrixWorld(true);
     this.mouseVec.set(pointerNdcX, pointerNdcY);
     this.raycaster.setFromCamera(this.mouseVec, this.camera);
     const intersects = this.raycaster.intersectObject(this.dialogMesh);
-    return this.processIntersects(intersects);
+    const res = this.processIntersects(intersects);
+    if (this.reticle3DMesh) {
+      if (res.hit && res.point) {
+        this.reticle3DMesh.position.copy(res.point);
+        this.reticle3DMesh.position.z += 0.015;
+        this.reticle3DMesh.rotation.copy(this.dialogMesh.rotation);
+        const isHover = !!this.hoveredButtonId;
+        this.reticle3DMesh.scale.set(isHover ? 1.3 : 1.0, isHover ? 1.3 : 1.0, 1.0);
+        this.reticle3DMesh.material.color.setHex(isHover ? 0xffdd00 : 0x00ffff);
+        this.reticle3DMesh.visible = true;
+      } else {
+        this.reticle3DMesh.visible = false;
+      }
+    }
+    return res;
   }
 
   private processIntersects(intersects: any[]): { hit: boolean; point?: any } {
@@ -322,6 +367,10 @@ export class UIManager {
   public hideDialog(): void {
     if (this.dialogMesh) {
       this.dialogMesh.visible = false;
+      this.dialogMesh.position.set(0, -999, 0);
+    }
+    if (this.reticle3DMesh) {
+      this.reticle3DMesh.visible = false;
     }
   }
 
@@ -367,24 +416,22 @@ export class UIManager {
 
     if (state === GameState.PLAYING) {
       if (isVR) {
-        this.hudMesh.position.set(0, -0.36, -1.42);
-        this.hudMesh.rotation.set(-0.16, 0, 0);
-        if (this.trackPercentMesh) {
-          this.trackPercentMesh.position.set(0, 0.92, -4.2);
-          this.trackPercentMesh.rotation.x = -0.36;
-        }
+        this.hudMesh.position.set(0, -0.38, -1.30);
+        this.hudMesh.rotation.set(-0.25, 0, 0);
       } else {
         this.hudMesh.position.set(0, -0.44, -1.55);
         this.hudMesh.rotation.set(-0.22, 0, 0);
-        if (this.trackPercentMesh) {
-          this.trackPercentMesh.position.set(0, 0.08, -3.6);
-          this.trackPercentMesh.rotation.x = -Math.PI / 2 + 0.18;
-        }
+      }
+      if (this.trackPercentMesh) {
+        this.trackPercentMesh.position.set(0, 0.08, -3.6);
+        this.trackPercentMesh.rotation.x = -Math.PI / 2 + 0.18;
       }
 
       this.hudMesh.visible = true;
       if (this.trackPercentMesh) this.trackPercentMesh.visible = true;
       this.dialogMesh.visible = false;
+      this.dialogMesh.position.set(0, -999, 0);
+      if (this.reticle3DMesh) this.reticle3DMesh.visible = false;
       this.drawHUD(this.hudCtx, score, combo, laneHealth, urgentLane, time, vrMode);
       this.hudTexture.needsUpdate = true;
 
@@ -397,6 +444,8 @@ export class UIManager {
       this.hudMesh.visible = false;
       if (this.trackPercentMesh) this.trackPercentMesh.visible = false;
       this.dialogMesh.visible = false;
+      this.dialogMesh.position.set(0, -999, 0);
+      if (this.reticle3DMesh) this.reticle3DMesh.visible = false;
       return;
     }
 
@@ -605,7 +654,7 @@ export class UIManager {
 
     ctx.font = '600 17px system-ui, sans-serif';
     ctx.fillStyle = '#9cb3d0';
-    ctx.fillText('Return to menu anytime during play: Controller A or B button', 512, 778);
+    ctx.fillText('Jump: Controller A / X or Thumbstick Up • Pause: Esc', 512, 778);
   }
 
   private drawGameOver(
