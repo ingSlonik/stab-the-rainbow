@@ -215,6 +215,7 @@ export class Player {
       this.attachHornToDesktop();
       this.cameraRig.position.set(0, 2.0, 0);
     }
+    if (this.pointerBeam) this.pointerBeam.visible = false;
   }
 
   public stab(): boolean {
@@ -293,6 +294,7 @@ export class Player {
     this.root.rotation.set(0, 0, 0);
     if (this.hornMat) this.hornMat.emissiveIntensity = 0.36;
     if (this.hornTip) this.hornTip.scale.set(1, 1, 1);
+    if (this.pointerBeam) this.pointerBeam.visible = false;
   }
 
   public update(dt: number, speed: number, isMoving: boolean, isVR: boolean = false): void {
@@ -320,7 +322,7 @@ export class Player {
 
       if (isInHand) {
         this.horn.position.set(0, -0.02, -0.08 - thrustOffset);
-        this.horn.rotation.set(0, 0, 0);
+        this.horn.rotation.set(-0.65, 0, 0);
       } else if (isDesktop) {
         this.horn.position.x = this.desktopHornX;
         this.horn.position.y = this.desktopHornY + thrustOffset * 0.12;
