@@ -39,6 +39,10 @@ export class Game {
   private skyMesh: any;
   private hillsGroup: any;
   private prevHeadZ = 0;
+  private prevHeadY = 1.6;
+  private thumbstickDebounce = false;
+  private vrDomButton: HTMLButtonElement | null = null;
+  private fsDomButton: HTMLButtonElement | null = null;
 
   // Desktop Pointer state
   private pointerNdcX = 0;
@@ -249,6 +253,9 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(min(window.devicePixelRatio, 2));
     this.renderer.xr.enabled = true;
+    try {
+      this.renderer.xr.setReferenceSpaceType('local-floor');
+    } catch (_) {}
 
     document.body.appendChild(this.renderer.domElement);
   }
@@ -278,14 +285,59 @@ export class Game {
       }
     }
 
-    // Bind VR Controller triggers
-    const c1 = this.renderer.xr.getController(0);
-    c1.addEventListener('selectstart', () => this.handleActionTrigger());
-    this.scene.add(c1);
+    // VR DOM Button for 100% reliable entry from Quest Browser 2D window
+    if (this.hasWebXR) {
+      const vrBtn = document.createElement('button');
+      vrBtn.id = 'vr-btn';
+      vrBtn.className = 'hud-btn';
+      vrBtn.innerHTML = '🥽 ENTER VR';
+      vrBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.requestVRSession();
+      });
+      document.body.appendChild(vrBtn);
+      this.vrDomButton = vrBtn;
+    }
 
-    const c2 = this.renderer.xr.getController(1);
-    c2.addEventListener('selectstart', () => this.handleActionTrigger());
-    this.scene.add(c2);
+    // Fullscreen DOM Button
+    const fsBtn = document.createElement('button');
+    fsBtn.id = 'fs-btn';
+    fsBtn.className = 'hud-btn';
+    fsBtn.innerHTML = '⛶ FULLSCREEN (F)';
+    fsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleFullscreen();
+    });
+    document.body.appendChild(fsBtn);
+    this.fsDomButton = fsBtn;
+
+    // Bind VR Controllers: Trigger = stab, Grip = jump
+    const setupController = (c: any) => {
+      c.addEventListener('selectstart', () => {
+        if (this.state === GameState.PLAYING) {
+          this.player.stab();
+        } else {
+          this.handleActionTrigger();
+        }
+      });
+      c.addEventListener('squeezestart', () => {
+        if (this.state === GameState.PLAYING) {
+          this.player.jump();
+        }
+      });
+      this.scene.add(c);
+    };
+
+    setupController(this.renderer.xr.getController(0));
+    setupController(this.renderer.xr.getController(1));
+  }
+
+  public toggleFullscreen(): void {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
   }
 
   public async requestVRSession(): Promise<void> {
@@ -293,25 +345,27 @@ export class Game {
     try {
       initAudio();
       const session = await (navigator as any).xr.requestSession('immersive-vr', {
-        optionalFeatures: ['local-floor', 'bounded-floor'],
+        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'],
       });
       this.vrSession = session;
-      this.renderer.xr.setSession(session);
+      await this.renderer.xr.setSession(session);
+
+      if (this.vrDomButton) this.vrDomButton.style.display = 'none';
+      if (this.fsDomButton) this.fsDomButton.style.display = 'none';
 
       session.addEventListener('end', () => {
         this.vrSession = null;
+        if (this.vrDomButton) this.vrDomButton.style.display = 'block';
+        if (this.fsDomButton) this.fsDomButton.style.display = 'block';
       });
 
       this.startGame();
     } catch (err) {
       console.warn('VR session request error:', err);
-      this.startGame();
     }
   }
 
   private initInput(): void {
-    const canvas = this.renderer.domElement;
-
     window.addEventListener('mousemove', (e) => {
       this.pointerNdcX = (e.clientX / window.innerWidth) * 2 - 1;
       this.pointerNdcY = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -319,8 +373,10 @@ export class Game {
       if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
         this.ui.updateHover(this.pointerNdcX, this.pointerNdcY);
       } else if (this.state === GameState.PLAYING) {
-        // Steer player with mouse
-        this.player.setTargetX(this.pointerNdcX * 1.05);
+        // Steer with mouse only if active mouse movement detected
+        if (Math.abs(e.movementX) > 1 || Math.abs(e.movementY) > 1) {
+          this.player.setTargetX(this.pointerNdcX * 1.05);
+        }
 
         // Tilt camera slightly with mouse on desktop (angled downwards to see mountains below)
         if (!this.renderer.xr.isPresenting) {
@@ -335,6 +391,12 @@ export class Game {
 
     window.addEventListener('mousedown', (e) => {
       initAudio();
+      this.pointerNdcX = (e.clientX / window.innerWidth) * 2 - 1;
+      this.pointerNdcY = -(e.clientY / window.innerHeight) * 2 + 1;
+      if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
+        this.ui.updateHover(this.pointerNdcX, this.pointerNdcY);
+      }
+
       if (e.button === 2) {
         // Right mouse button: JUMP
         if (this.state === GameState.PLAYING) {
@@ -354,13 +416,45 @@ export class Game {
       this.keysDown[e.code] = true;
       initAudio();
 
-      if (e.code === 'Space') {
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+        e.preventDefault();
+        if (this.state === GameState.PLAYING) {
+          this.player.shiftLane(-1);
+        }
+      } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        e.preventDefault();
+        if (this.state === GameState.PLAYING) {
+          this.player.shiftLane(1);
+        }
+      } else if (e.code === 'ArrowUp' || e.code === 'KeyW') {
         e.preventDefault();
         if (this.state === GameState.PLAYING) {
           this.player.jump();
-        } else {
-          this.handleActionTrigger();
         }
+      } else if (
+        e.code === 'ArrowDown' ||
+        e.code === 'KeyS' ||
+        e.code === 'KeyE' ||
+        e.code === 'Enter' ||
+        e.code === 'ShiftLeft' ||
+        e.code === 'ShiftRight'
+      ) {
+        e.preventDefault();
+        if (this.state === GameState.PLAYING) {
+          this.player.stab();
+        }
+      } else if (e.code === 'Space') {
+        e.preventDefault();
+        if (this.state === GameState.PLAYING) {
+          this.player.jump();
+        } else if (this.state === GameState.MENU) {
+          this.startGame();
+        } else if (this.state === GameState.GAMEOVER) {
+          this.restartGame();
+        }
+      } else if (e.code === 'KeyF') {
+        e.preventDefault();
+        this.toggleFullscreen();
       } else if (e.code === 'KeyH' || e.code === 'Escape') {
         if (this.state === GameState.GAMEOVER) {
           this.goToMenu();
@@ -379,7 +473,9 @@ export class Game {
         const t = e.touches[0];
         this.pointerNdcX = (t.clientX / window.innerWidth) * 2 - 1;
         this.pointerNdcY = -(t.clientY / window.innerHeight) * 2 + 1;
-        this.ui.updateHover(this.pointerNdcX, this.pointerNdcY);
+        if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
+          this.ui.updateHover(this.pointerNdcX, this.pointerNdcY);
+        }
       }
       if (this.state === GameState.PLAYING) {
         this.player.stab();
@@ -391,10 +487,7 @@ export class Game {
 
   private handleActionTrigger(): void {
     if (this.state === GameState.MENU) {
-      if (this.ui.triggerClick()) {
-        return;
-      }
-      this.startGame();
+      this.ui.triggerClick();
     } else if (this.state === GameState.PLAYING) {
       this.player.jump();
     } else if (this.state === GameState.GAMEOVER) {
@@ -474,7 +567,10 @@ export class Game {
 
   private checkTrackFall(): void {
     if (this.player.isGrounded && !this.player.isFalling) {
-      const laneIdx = this.track.getLaneIndexFromX(this.player.x);
+      const effectiveX =
+        this.player.x +
+        (this.renderer.xr.isPresenting ? this.camera.position.x : 0);
+      const laneIdx = this.track.getLaneIndexFromX(effectiveX);
       this.player.currentLane = laneIdx;
 
       if (!this.track.isLaneSolid(laneIdx)) {
@@ -493,13 +589,46 @@ export class Game {
     const dt = min(0.08, this.clock.getDelta());
     const totalTime = this.clock.getElapsedTime();
 
-    // 0. VR head forward thrust detection for stabbing
+    // 0. VR 6DOF Head Motion & Controller Input
     if (this.renderer.xr.isPresenting) {
+      // Head forward thrust = STAB!
       const curHeadZ = this.camera.position.z;
       const headVelZ = (curHeadZ - this.prevHeadZ) / max(0.001, dt);
       this.prevHeadZ = curHeadZ;
-      if (headVelZ < -0.45 && this.state === GameState.PLAYING) {
+      if (headVelZ < -0.40 && this.state === GameState.PLAYING) {
         this.player.stab();
+      }
+
+      // Head upward motion = physical JUMP!
+      const curHeadY = this.camera.position.y;
+      const headVelY = (curHeadY - this.prevHeadY) / max(0.001, dt);
+      this.prevHeadY = curHeadY;
+      if (headVelY > 1.4 && this.state === GameState.PLAYING) {
+        this.player.jump();
+      }
+
+      // VR Controller Thumbstick support for lane shifting
+      const session = this.renderer.xr.getSession();
+      if (session) {
+        for (const source of session.inputSources) {
+          if (source.gamepad && source.gamepad.axes) {
+            const axes = source.gamepad.axes;
+            const stickX = axes.length >= 3 ? axes[2] : 0;
+            if (Math.abs(stickX) > 0.55) {
+              if (!this.thumbstickDebounce && this.state === GameState.PLAYING) {
+                this.player.shiftLane(stickX > 0 ? 1 : -1);
+                this.thumbstickDebounce = true;
+              }
+            } else if (Math.abs(stickX) < 0.2) {
+              this.thumbstickDebounce = false;
+            }
+
+            const stickY = axes.length >= 4 ? axes[3] : 0;
+            if (stickY < -0.65 && this.state === GameState.PLAYING) {
+              this.player.jump();
+            }
+          }
+        }
       }
     }
 
@@ -512,17 +641,7 @@ export class Game {
       this.hillsGroup.position.z = this.camera.position.z;
     }
 
-    // 1. Keyboard steering
-    if (this.state === GameState.PLAYING) {
-      if (this.keysDown['ArrowLeft'] || this.keysDown['KeyA']) {
-        this.player.moveLateral(-dt * 6.5);
-      }
-      if (this.keysDown['ArrowRight'] || this.keysDown['KeyD']) {
-        this.player.moveLateral(dt * 6.5);
-      }
-    }
-
-    // 2. State-specific logic
+    // State-specific logic
     if (this.state === GameState.MENU) {
       // Attract/Demo mode: Gentle auto-gallop and scenic sway
       const demoSpeed = 15;
@@ -541,7 +660,9 @@ export class Game {
         this.hasWebXR,
         () => this.startGame(),
         () => this.requestVRSession(),
-        () => this.restartGame()
+        () => this.restartGame(),
+        () => this.goToMenu(),
+        () => this.toggleFullscreen()
       );
     } else if (this.state === GameState.PLAYING) {
       this.runTime += dt;
@@ -570,7 +691,9 @@ export class Game {
         this.hasWebXR,
         () => this.startGame(),
         () => this.requestVRSession(),
-        () => this.restartGame()
+        () => this.restartGame(),
+        () => this.goToMenu(),
+        () => this.toggleFullscreen()
       );
     } else if (this.state === GameState.FALLING) {
       this.fallTimer += dt;
@@ -592,7 +715,8 @@ export class Game {
         () => this.startGame(),
         () => this.requestVRSession(),
         () => this.restartGame(),
-        () => this.goToMenu()
+        () => this.goToMenu(),
+        () => this.toggleFullscreen()
       );
     } else if (this.state === GameState.GAMEOVER) {
       this.ui.renderUI(
@@ -605,7 +729,8 @@ export class Game {
         () => this.startGame(),
         () => this.requestVRSession(),
         () => this.restartGame(),
-        () => this.goToMenu()
+        () => this.goToMenu(),
+        () => this.toggleFullscreen()
       );
     }
 
