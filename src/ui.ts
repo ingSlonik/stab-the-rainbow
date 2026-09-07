@@ -329,7 +329,14 @@ export class UIManager {
       return;
     }
 
-    if (state === GameState.FALLING || state === GameState.GAMEOVER) {
+    if (state === GameState.FALLING) {
+      this.hudMesh.visible = false;
+      if (this.trackPercentMesh) this.trackPercentMesh.visible = false;
+      this.dialogMesh.visible = false;
+      return;
+    }
+
+    if (state === GameState.GAMEOVER) {
       this.hudMesh.visible = false;
       if (this.trackPercentMesh) this.trackPercentMesh.visible = false;
       this.dialogMesh.visible = true;

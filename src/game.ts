@@ -8,7 +8,7 @@ import {
   RAINBOW_COLORS,
   RAINBOW_HEX_STRINGS,
 } from './types';
-import { sin, cos, max, min, floor } from './math';
+import { sin, cos, max, min, floor, lerp } from './math';
 import {
   initAudio,
   playStabSound,
@@ -632,12 +632,19 @@ export class Game {
       this.checkTrackFall();
     } else if (this.state === GameState.FALLING) {
       this.fallTimer += dt;
-      this.player.update(dt, this.speed * 0.4, false, isVR);
-      this.track.update(dt, this.speed * 0.4, totalTime, this.runTime);
-      this.clouds.update(dt, this.speed * 0.4, totalTime);
-      this.scenery.update(dt, this.speed * 0.4, totalTime);
 
-      if (this.fallTimer >= 1.2) {
+      // Soft decelerate vertical falling as we reach the resting point
+      if (this.fallTimer > 0.65) {
+        this.player.vy = lerp(this.player.vy, 0, min(1, dt * 8));
+      }
+
+      this.player.update(dt, this.speed * 0.35, false, isVR);
+      this.track.update(dt, this.speed * 0.35, totalTime, this.runTime);
+      this.clouds.update(dt, this.speed * 0.35, totalTime);
+      this.scenery.update(dt, this.speed * 0.35, totalTime);
+
+      if (this.fallTimer >= 1.05) {
+        this.player.stopFalling();
         this.state = GameState.GAMEOVER;
         this.ui.setGameOverPosition(this.player.x, this.player.root.position.y, isVR);
         this.player.setMenuMode(isVR ? this.rightControllerEl?.object3D : null);

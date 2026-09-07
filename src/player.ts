@@ -20,6 +20,7 @@ export class Player {
   public vy = 0;
   public isGrounded = true;
   public isFalling = false;
+  public isFallen = false;
   public isStabbing = false;
   public stabTimer = 0;
   private readonly STAB_DURATION = 0.24;
@@ -205,14 +206,14 @@ export class Player {
   }
 
   public stab(): boolean {
-    if (this.isFalling) return false;
+    if (this.isFalling || this.isFallen) return false;
     this.isStabbing = true;
     this.stabTimer = this.STAB_DURATION;
     return true;
   }
 
   public jump(): boolean {
-    if (this.isGrounded && !this.isFalling) {
+    if (this.isGrounded && !this.isFalling && !this.isFallen) {
       this.vy = 7.8;
       this.isGrounded = false;
       playJumpSound();
@@ -229,28 +230,35 @@ export class Player {
   }
 
   public shiftLane(direction: number): void {
-    if (this.isFalling) return;
+    if (this.isFalling || this.isFallen) return;
     const closest = clamp(Math.round(this.targetX / LANE_WIDTH + 3), 0, LANE_COUNT - 1);
     this.currentLane = clamp(closest + direction, 0, LANE_COUNT - 1);
     this.targetX = (this.currentLane - 3) * LANE_WIDTH;
   }
 
   public moveLateral(deltaX: number): void {
-    if (this.isFalling) return;
+    if (this.isFalling || this.isFallen) return;
     const maxX = (TRACK_WIDTH / 2) - (LANE_WIDTH * 0.4);
     this.targetX = clamp(this.targetX + deltaX, -maxX, maxX);
   }
 
   public setTargetX(normX: number): void {
-    if (this.isFalling) return;
+    if (this.isFalling || this.isFallen) return;
     const maxX = (TRACK_WIDTH / 2) - (LANE_WIDTH * 0.4);
     this.targetX = clamp(normX * maxX, -maxX, maxX);
   }
 
   public startFalling(): void {
     this.isFalling = true;
+    this.isFallen = false;
     this.isGrounded = false;
     this.vy = -1.5;
+  }
+
+  public stopFalling(): void {
+    this.isFalling = false;
+    this.isFallen = true;
+    this.vy = 0;
   }
 
   public reset(): void {
@@ -260,6 +268,7 @@ export class Player {
     this.vy = 0;
     this.isGrounded = true;
     this.isFalling = false;
+    this.isFallen = false;
     this.isStabbing = false;
     this.stabTimer = 0;
     this.currentLane = 3;
@@ -369,11 +378,14 @@ export class Player {
     this.x = lerp(this.x, this.targetX, min(1, dt * 14));
 
     // 3. Vertical Jump & Gravity physics
-    if (!this.isGrounded || this.isFalling) {
+    if (this.isFalling) {
       this.y += this.vy * dt;
-      this.vy -= (this.isFalling ? 24 : 20) * dt;
+      this.vy -= 22 * dt;
+    } else if (!this.isGrounded && !this.isFallen) {
+      this.y += this.vy * dt;
+      this.vy -= 20 * dt;
 
-      if (!this.isFalling && this.y <= 0) {
+      if (this.y <= 0) {
         this.y = 0;
         this.vy = 0;
         this.isGrounded = true;
@@ -381,12 +393,12 @@ export class Player {
     }
 
     // 4. Gallop bobbing
-    if (this.isGrounded && isMoving && !this.isFalling) {
+    if (this.isGrounded && isMoving && !this.isFalling && !this.isFallen) {
       this.gallopTimer += dt * speed * 1.5;
     }
 
     let gallopY = 0;
-    if (this.isGrounded && isMoving && !this.isFalling && !isVR) {
+    if (this.isGrounded && isMoving && !this.isFalling && !this.isFallen && !isVR) {
       gallopY = sin(this.gallopTimer) * 0.012;
     }
 
