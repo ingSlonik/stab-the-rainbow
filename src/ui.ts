@@ -30,11 +30,16 @@ export class UIManager {
   public group: any;
   private camera: any;
 
-  // 3D UI Mesh & Texture (used for in-VR HUD and in-VR Game Over)
-  private uiMesh: any;
-  private uiCanvas: HTMLCanvasElement;
-  private uiCtx: CanvasRenderingContext2D;
-  private uiTexture: any;
+  // 3D UI Meshes: Slim HUD ribbon and VR Game Over panel
+  private hudMesh: any;
+  private hudCanvas: HTMLCanvasElement;
+  private hudCtx: CanvasRenderingContext2D;
+  private hudTexture: any;
+
+  private goMesh: any;
+  private goCanvas: HTMLCanvasElement;
+  private goCtx: CanvasRenderingContext2D;
+  private goTexture: any;
 
   // Interaction & Raycasting (for VR pointer/controller clicks)
   private raycaster: any;
@@ -85,37 +90,58 @@ export class UIManager {
   }
 
   private initCanvasMesh(): void {
-    this.uiCanvas = document.createElement('canvas');
-    this.uiCanvas.width = 1024;
-    this.uiCanvas.height = 1024;
-    this.uiCtx = this.uiCanvas.getContext('2d')!;
+    // 1. Sleek upper HUD ribbon (never occludes track or horn)
+    this.hudCanvas = document.createElement('canvas');
+    this.hudCanvas.width = 1024;
+    this.hudCanvas.height = 256;
+    this.hudCtx = this.hudCanvas.getContext('2d')!;
 
-    this.uiTexture = new THREE.CanvasTexture(this.uiCanvas);
-    this.uiTexture.minFilter = THREE.LinearFilter;
-    this.uiTexture.magFilter = THREE.LinearFilter;
+    this.hudTexture = new THREE.CanvasTexture(this.hudCanvas);
+    this.hudTexture.minFilter = THREE.LinearFilter;
 
-    const geom = new THREE.PlaneGeometry(2.4, 2.4);
-    const mat = new THREE.MeshBasicMaterial({
-      map: this.uiTexture,
+    const hudGeom = new THREE.PlaneGeometry(1.6, 0.40);
+    const hudMat = new THREE.MeshBasicMaterial({
+      map: this.hudTexture,
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      side: THREE.DoubleSide,
     });
 
-    this.uiMesh = new THREE.Mesh(geom, mat);
-    this.uiMesh.renderOrder = 99999;
-    this.uiMesh.position.set(0, 0, -2.4);
-    this.uiMesh.visible = false;
-    this.camera.add(this.uiMesh);
+    this.hudMesh = new THREE.Mesh(hudGeom, hudMat);
+    this.hudMesh.position.set(0, 0.55, -1.8);
+    this.hudMesh.rotation.x = 0.12;
+    this.hudMesh.visible = false;
+    this.camera.add(this.hudMesh);
+
+    // 2. Centered VR Game Over card
+    this.goCanvas = document.createElement('canvas');
+    this.goCanvas.width = 1024;
+    this.goCanvas.height = 1024;
+    this.goCtx = this.goCanvas.getContext('2d')!;
+
+    this.goTexture = new THREE.CanvasTexture(this.goCanvas);
+    this.goTexture.minFilter = THREE.LinearFilter;
+
+    const goGeom = new THREE.PlaneGeometry(1.6, 1.4);
+    const goMat = new THREE.MeshBasicMaterial({
+      map: this.goTexture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
+
+    this.goMesh = new THREE.Mesh(goGeom, goMat);
+    this.goMesh.position.set(0, 0.05, -1.8);
+    this.goMesh.visible = false;
+    this.camera.add(this.goMesh);
   }
 
   public updateHover(pointerNdcX: number, pointerNdcY: number): void {
-    if (!this.uiMesh.visible) return;
+    if (!this.goMesh.visible) return;
     this.mouseVec.set(pointerNdcX, pointerNdcY);
     this.raycaster.setFromCamera(this.mouseVec, this.camera);
 
-    const intersects = this.raycaster.intersectObject(this.uiMesh);
+    const intersects = this.raycaster.intersectObject(this.goMesh);
     if (intersects.length > 0 && intersects[0].uv) {
       const uv = intersects[0].uv;
       const cx = uv.x * 1024;
@@ -168,31 +194,33 @@ export class UIManager {
     onToggleFullscreen?: () => void,
     isVR: boolean = false
   ): void {
-    const ctx = this.uiCtx;
     this.buttons = [];
 
     if (state === GameState.MENU) {
       // In MENU, 3D UI mesh is completely hidden: HTML DOM Rozcestník is used!
-      this.uiMesh.visible = false;
+      this.hudMesh.visible = false;
+      this.goMesh.visible = false;
       return;
     }
 
     if (state === GameState.PLAYING) {
-      this.uiMesh.visible = true;
-      ctx.clearRect(0, 0, 1024, 1024);
-      this.drawHUD(ctx, score, laneHealth, urgentLane, time, isVR);
-      this.uiTexture.needsUpdate = true;
+      this.hudMesh.visible = true;
+      this.goMesh.visible = false;
+      this.hudCtx.clearRect(0, 0, 1024, 256);
+      this.drawHUD(this.hudCtx, score, laneHealth, urgentLane, time, isVR);
+      this.hudTexture.needsUpdate = true;
       return;
     }
 
     if (state === GameState.FALLING || state === GameState.GAMEOVER) {
+      this.hudMesh.visible = false;
       if (isVR) {
-        this.uiMesh.visible = true;
-        ctx.clearRect(0, 0, 1024, 1024);
-        this.drawGameOver(ctx, score, onRestart, onHome || onRestart, time, true);
-        this.uiTexture.needsUpdate = true;
+        this.goMesh.visible = true;
+        this.goCtx.clearRect(0, 0, 1024, 1024);
+        this.drawGameOver(this.goCtx, score, onRestart, onHome || onRestart, time, true);
+        this.goTexture.needsUpdate = true;
       } else {
-        this.uiMesh.visible = false;
+        this.goMesh.visible = false;
       }
       return;
     }
@@ -206,31 +234,31 @@ export class UIManager {
     time: number,
     isVR: boolean = false
   ): void {
-    // Upper HUD ribbon (only covers top ~15% of screen, track is 100% visible)
-    ctx.fillStyle = 'rgba(10, 8, 25, 0.78)';
-    this.roundRect(ctx, 162, 20, 700, 150, 24);
+    // Upper HUD ribbon (only covers top visor of screen, track is 100% visible)
+    ctx.fillStyle = 'rgba(10, 8, 25, 0.82)';
+    this.roundRect(ctx, 24, 12, 976, 232, 24);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Mode Banner
     ctx.textAlign = 'center';
-    ctx.font = '700 16px system-ui, sans-serif';
+    ctx.font = '700 20px system-ui, sans-serif';
     ctx.fillStyle = '#00d4ff';
     ctx.fillText(
       isVR
         ? '🥽 VR: NA TOHLE MUSÍŠ HLAVOU! • TRHNI VPŘED = BODNUTÍ 🦄'
         : '🦄 STAB THE RAINBOW • BĚŽ A ZACHRAŇ DUHU 🌈',
       512,
-      50
+      46
     );
 
     // Score
     ctx.textAlign = 'left';
-    ctx.font = '900 36px system-ui, sans-serif';
+    ctx.font = '900 40px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`SKÓRE: ${score}`, 192, 88);
+    ctx.fillText(`SKÓRE: ${score}`, 48, 104);
 
     // Urgent Alert
     if (urgentLane >= 0 && urgentLane < LANE_COUNT) {
@@ -239,15 +267,15 @@ export class UIManager {
       const blink = sin(time * 16) > 0;
 
       ctx.textAlign = 'right';
-      ctx.font = '700 22px system-ui, sans-serif';
+      ctx.font = '700 24px system-ui, sans-serif';
       ctx.fillStyle = blink ? uCol : '#ffffff';
-      ctx.fillText(`⚡ ZACHRAŇ ${uName.toUpperCase()}!`, 830, 86);
+      ctx.fillText(`⚡ ZACHRAŇ ${uName.toUpperCase()}!`, 976, 104);
     }
 
     // 7 Rainbow Lane Health Gems / Indicators
-    const barStartY = 112;
-    const barStartX = 192;
-    const totalW = 640;
+    const barStartY = 142;
+    const barStartX = 48;
+    const totalW = 928;
     const itemW = totalW / LANE_COUNT;
 
     for (let i = 0; i < LANE_COUNT; i++) {
@@ -257,26 +285,26 @@ export class UIManager {
 
       // Slot background
       ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-      this.roundRect(ctx, x + 3, barStartY, itemW - 6, 32, 8);
+      this.roundRect(ctx, x + 4, barStartY, itemW - 8, 48, 10);
       ctx.fill();
 
       // Health fill
       if (h > 0.04) {
         ctx.fillStyle = col;
-        const fillW = (itemW - 6) * h;
-        this.roundRect(ctx, x + 3, barStartY, fillW, 32, 8);
+        const fillW = (itemW - 8) * h;
+        this.roundRect(ctx, x + 4, barStartY, fillW, 48, 10);
         ctx.fill();
       } else {
         ctx.fillStyle = '#ff2a4b';
-        ctx.font = '900 16px system-ui, sans-serif';
+        ctx.font = '900 18px system-ui, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('VOID', x + itemW / 2, barStartY + 22);
+        ctx.fillText('VOID', x + itemW / 2, barStartY + 31);
       }
 
       // Border
       ctx.strokeStyle = i === urgentLane ? '#ffffff' : col;
       ctx.lineWidth = i === urgentLane ? 3 : 1.5;
-      this.roundRect(ctx, x + 3, barStartY, itemW - 6, 32, 8);
+      this.roundRect(ctx, x + 4, barStartY, itemW - 8, 48, 10);
       ctx.stroke();
     }
   }

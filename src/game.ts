@@ -273,7 +273,7 @@ export class Game {
           this.goToMenu();
         }
       });
-      this.scene.add(c);
+      this.player.cameraRig.add(c);
     };
 
     setupController(this.renderer.xr.getController(0));
@@ -358,10 +358,15 @@ export class Game {
     try {
       initAudio();
       const session = await (navigator as any).xr.requestSession('immersive-vr', {
-        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'],
+        optionalFeatures: ['local-floor', 'bounded-floor', 'layers', 'hand-tracking'],
       });
       this.vrSession = session;
       await this.renderer.xr.setSession(session);
+
+      // Reset camera transforms for pristine WebXR headset tracking
+      this.camera.position.set(0, 0, 0);
+      this.camera.rotation.set(0, 0, 0);
+      this.camera.quaternion.set(0, 0, 0, 1);
 
       const modal = document.getElementById('modal');
       if (modal) modal.style.display = 'none';
@@ -370,6 +375,8 @@ export class Game {
 
       session.addEventListener('end', () => {
         this.vrSession = null;
+        this.camera.position.set(0, 1.6, 0);
+        this.camera.rotation.set(-0.10, 0, 0);
         if (this.state === GameState.MENU) {
           const m = document.getElementById('modal');
           if (m) m.style.display = 'flex';
@@ -605,8 +612,10 @@ export class Game {
     const dt = min(0.08, this.clock.getDelta());
     const totalTime = this.clock.getElapsedTime();
 
+    const isVR = this.renderer?.xr?.isPresenting || false;
+
     // 0. VR 6DOF Head Motion & Controller Input
-    if (this.renderer.xr.isPresenting) {
+    if (isVR) {
       // Head forward thrust = STAB!
       const curHeadZ = this.camera.position.z;
       const headVelZ = (curHeadZ - this.prevHeadZ) / max(0.001, dt);
@@ -647,13 +656,13 @@ export class Game {
       }
     }
 
-    // Sky and hills follow camera position so player is always centered in the world
+    // Sky and hills follow player world lateral coordinate so player is always centered in the world
     if (this.skyMesh) {
-      this.skyMesh.position.copy(this.camera.position);
+      this.skyMesh.position.set(this.player.x, this.player.y, 0);
     }
     if (this.hillsGroup) {
-      this.hillsGroup.position.x = this.camera.position.x;
-      this.hillsGroup.position.z = this.camera.position.z;
+      this.hillsGroup.position.x = this.player.x;
+      this.hillsGroup.position.z = 0;
     }
 
     // Sync audio engine with state, airborne jumping status, and run speed
@@ -669,7 +678,7 @@ export class Game {
       const demoSpeed = 15;
       const demoAutoX = sin(totalTime * 0.8) * 2.2;
       this.player.setTargetX(demoAutoX / 3.5);
-      this.player.update(dt, demoSpeed, true);
+      this.player.update(dt, demoSpeed, true, isVR);
       this.track.update(dt, demoSpeed, totalTime, 60, true);
       this.clouds.update(dt, demoSpeed, totalTime);
 
@@ -685,7 +694,7 @@ export class Game {
         () => this.restartGame(),
         () => this.goToMenu(),
         () => this.toggleFullscreen(),
-        this.renderer?.xr?.isPresenting || false
+        isVR
       );
     } else if (this.state === GameState.PLAYING) {
       this.runTime += dt;
@@ -693,7 +702,7 @@ export class Game {
       this.speed = min(36, 18 + this.runTime * 0.28);
       this.score += floor(this.speed * dt * 2.5);
 
-      this.player.update(dt, this.speed, true);
+      this.player.update(dt, this.speed, true, isVR);
       this.track.update(dt, this.speed, totalTime, this.runTime);
       this.clouds.update(
         dt,
@@ -717,17 +726,17 @@ export class Game {
         () => this.restartGame(),
         () => this.goToMenu(),
         () => this.toggleFullscreen(),
-        this.renderer?.xr?.isPresenting || false
+        isVR
       );
     } else if (this.state === GameState.FALLING) {
       this.fallTimer += dt;
-      this.player.update(dt, this.speed * 0.4, false);
+      this.player.update(dt, this.speed * 0.4, false, isVR);
       this.track.update(dt, this.speed * 0.4, totalTime, this.runTime);
       this.clouds.update(dt, this.speed * 0.4, totalTime);
 
       if (this.fallTimer >= 1.2) {
         this.state = GameState.GAMEOVER;
-        if (!this.renderer?.xr?.isPresenting) {
+        if (!isVR) {
           const goModal = document.getElementById('go-modal');
           if (goModal) goModal.style.display = 'flex';
           const goScore = document.getElementById('go-score');
@@ -755,7 +764,7 @@ export class Game {
         () => this.restartGame(),
         () => this.goToMenu(),
         () => this.toggleFullscreen(),
-        this.renderer?.xr?.isPresenting || false
+        isVR
       );
     } else if (this.state === GameState.GAMEOVER) {
       this.ui.renderUI(
@@ -770,7 +779,7 @@ export class Game {
         () => this.restartGame(),
         () => this.goToMenu(),
         () => this.toggleFullscreen(),
-        this.renderer?.xr?.isPresenting || false
+        isVR
       );
     }
 
