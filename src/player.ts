@@ -102,13 +102,13 @@ export class Player {
     this.horn.add(this.hornTip);
 
     // Magical starlight pointer beam extending from horn tip for VR interaction (unit length 1.0)
-    const beamGeom = new THREE.CylinderGeometry(0.003, 0.007, 1.0, 6);
+    const beamGeom = new THREE.CylinderGeometry(0.008, 0.016, 1.0, 8);
     beamGeom.rotateX(-Math.PI / 2);
     beamGeom.translate(0, 0, -0.5);
     const beamMat = new THREE.MeshBasicMaterial({
-      color: 0x00d4ff,
+      color: 0x00ffff,
       transparent: true,
-      opacity: 0.75,
+      opacity: 0.85,
     });
     this.pointerBeam = new THREE.Mesh(beamGeom, beamMat);
     this.pointerBeam.visible = false;
@@ -131,7 +131,7 @@ export class Player {
       c.add(this.horn);
     }
     this.horn.position.set(0, -0.02, -0.08);
-    this.horn.rotation.set(0, 0, 0);
+    this.horn.rotation.set(-0.65, 0, 0);
     this.horn.scale.set(1.0, 1.0, 1.0);
     if (this.pointerBeam) this.pointerBeam.visible = showPointer;
   }
