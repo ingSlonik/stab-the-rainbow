@@ -6,12 +6,6 @@ import {
   GameState,
 } from './types';
 import { sin, max, min, floor, randChoice } from './math';
-import {
-  toggleAudio,
-  toggleSfx,
-  getAudioMuted,
-  getSfxMuted,
-} from './audio';
 
 const DEATH_QUOTES = [
   'Gravity: 1, Unicorn: 0',
@@ -36,13 +30,13 @@ export class UIManager {
   public group: any;
   private camera: any;
 
-  // 3D UI Mesh & Texture
+  // 3D UI Mesh & Texture (used for in-VR HUD and in-VR Game Over)
   private uiMesh: any;
   private uiCanvas: HTMLCanvasElement;
   private uiCtx: CanvasRenderingContext2D;
   private uiTexture: any;
 
-  // Interaction & Raycasting
+  // Interaction & Raycasting (for VR pointer/controller clicks)
   private raycaster: any;
   private mouseVec: any;
   private buttons: UIButton[] = [];
@@ -76,7 +70,7 @@ export class UIManager {
       this.highScore = score;
       try {
         localStorage.setItem('str_high', score.toString());
-      } catch (_) { }
+      } catch (_) {}
       return true;
     }
     return false;
@@ -84,6 +78,10 @@ export class UIManager {
 
   public getHighScore(): number {
     return this.highScore;
+  }
+
+  public getLastQuote(): string {
+    return this.lastQuote || 'Gravity always wins.';
   }
 
   private initCanvasMesh(): void {
@@ -107,19 +105,19 @@ export class UIManager {
 
     this.uiMesh = new THREE.Mesh(geom, mat);
     this.uiMesh.renderOrder = 99999;
-    // Position in front of camera view
     this.uiMesh.position.set(0, 0, -2.4);
+    this.uiMesh.visible = false;
     this.camera.add(this.uiMesh);
   }
 
   public updateHover(pointerNdcX: number, pointerNdcY: number): void {
+    if (!this.uiMesh.visible) return;
     this.mouseVec.set(pointerNdcX, pointerNdcY);
     this.raycaster.setFromCamera(this.mouseVec, this.camera);
 
     const intersects = this.raycaster.intersectObject(this.uiMesh);
     if (intersects.length > 0 && intersects[0].uv) {
       const uv = intersects[0].uv;
-      // Convert UV (0..1) to Canvas pixels (0..1024)
       const cx = uv.x * 1024;
       const cy = (1 - uv.y) * 1024;
 
@@ -171,193 +169,33 @@ export class UIManager {
     isVR: boolean = false
   ): void {
     const ctx = this.uiCtx;
-    ctx.clearRect(0, 0, 1024, 1024);
     this.buttons = [];
 
     if (state === GameState.MENU) {
-      this.drawMenu(ctx, time, hasWebXR, onStartGame, onEnterVR, onToggleFullscreen, isVR);
-    } else if (state === GameState.PLAYING) {
+      // In MENU, 3D UI mesh is completely hidden: HTML DOM Rozcestník is used!
+      this.uiMesh.visible = false;
+      return;
+    }
+
+    if (state === GameState.PLAYING) {
+      this.uiMesh.visible = true;
+      ctx.clearRect(0, 0, 1024, 1024);
       this.drawHUD(ctx, score, laneHealth, urgentLane, time, isVR);
-    } else if (state === GameState.FALLING || state === GameState.GAMEOVER) {
-      this.drawGameOver(ctx, score, onRestart, onHome || onRestart, time, isVR);
+      this.uiTexture.needsUpdate = true;
+      return;
     }
 
-    this.uiTexture.needsUpdate = true;
-  }
-
-  private drawMenu(
-    ctx: CanvasRenderingContext2D,
-    time: number,
-    hasWebXR: boolean,
-    onStartGame: () => void,
-    onEnterVR: () => void,
-    onToggleFullscreen?: () => void,
-    isVR: boolean = false
-  ): void {
-    // Backdrop panel
-    ctx.fillStyle = 'rgba(15, 10, 35, 0.88)';
-    this.roundRect(ctx, 64, 30, 896, 960, 36);
-    ctx.fill();
-
-    // Rainbow border glow
-    const grad = ctx.createLinearGradient(64, 30, 960, 990);
-    RAINBOW_HEX_STRINGS.forEach((col, i) => {
-      grad.addColorStop(i / 6, col);
-    });
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = 6;
-    ctx.stroke();
-
-    // Title
-    ctx.textAlign = 'center';
-    ctx.font = '900 58px system-ui, sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = '#00d4ff';
-    ctx.shadowBlur = 20;
-    ctx.fillText('✨ STAB THE RAINBOW ✨', 512, 110);
-    ctx.shadowBlur = 0;
-
-    // Subtitle
-    ctx.font = '500 22px system-ui, sans-serif';
-    ctx.fillStyle = '#ffd2f6';
-    ctx.fillText('🦄 Ethereal Unicorn Gallop & Cloud Piercer 🌈', 512, 150);
-
-    // VR Spectator Banner
-    ctx.fillStyle = 'rgba(0, 212, 255, 0.15)';
-    this.roundRect(ctx, 112, 172, 800, 38, 12);
-    ctx.fill();
-    ctx.strokeStyle = '#00d4ff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.font = '700 17px system-ui, sans-serif';
-    ctx.fillStyle = '#00d4ff';
-    ctx.fillText(
-      isVR
-        ? '🥽 VR REŽIM AKTIVNÍ • STISKNI SPOUŠŤ NEBO MEZERNÍK PRO START 🦄'
-        : '🥽 PRIMÁRNĚ PRO VR • DESKTOP SLOUŽÍ PRO DIVÁKY VENKU 📺',
-      512,
-      197
-    );
-
-    // High Score badge
-    ctx.fillStyle = 'rgba(255, 221, 0, 0.18)';
-    this.roundRect(ctx, 312, 222, 400, 42, 14);
-    ctx.fill();
-    ctx.strokeStyle = '#ffdd00';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.font = '700 22px system-ui, sans-serif';
-    ctx.fillStyle = '#ffdd00';
-    ctx.fillText(`🏆 HIGH SCORE: ${this.highScore}`, 512, 251);
-
-    // How to Play box
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
-    this.roundRect(ctx, 112, 276, 800, 365, 24);
-    ctx.fill();
-
-    ctx.font = '700 25px system-ui, sans-serif';
-    ctx.fillStyle = '#00d4ff';
-    ctx.fillText('📖 OVLÁDÁNÍ / HOW TO PLAY', 512, 315);
-
-    const instructions = [
-      '• ŠIPKY [←] [→] / [A] [D]: Posun o pruh vedle (1 stisk = vedlejší pruh)',
-      '• MEZERNÍK / [↑] / [W]: Skok přes propasti i k mrakům',
-      '• ŠIPKA [↓] / [ENTER] / [SHIFT] / Levý klik: Bodnutí rohem (STAB)!',
-      '• KLÁVESA [F]: Celá obrazovka (Fullscreen)',
-      '• VE VR: Otáčením míříte roh, trhnutím vpřed bodnete, páčkou/úkrokem měníte pruh!',
-      '• Mraky obnovují pruhy. Pokud šlápnete do prázdna, propadnete se!',
-    ];
-
-    ctx.textAlign = 'left';
-    ctx.font = '400 20px system-ui, sans-serif';
-    ctx.fillStyle = '#e8eeff';
-    instructions.forEach((line, idx) => {
-      ctx.fillText(line, 135, 360 + idx * 45);
-    });
-
-    // Start / Enter VR Buttons
-    const btnW = 380;
-    const btnH = 72;
-    const btnY = 660;
-
-    // Desktop Play Button
-    this.drawButton(
-      ctx,
-      'btn_play',
-      hasWebXR ? 112 : 322,
-      btnY,
-      btnW,
-      btnH,
-      '▶ PLAY (DESKTOP)',
-      '#10e052',
-      onStartGame
-    );
-
-    // VR Button
-    if (hasWebXR) {
-      this.drawButton(
-        ctx,
-        'btn_vr',
-        532,
-        btnY,
-        btnW,
-        btnH,
-        '🥽 ENTER VR',
-        '#00d4ff',
-        onEnterVR
-      );
-    }
-
-    // Audio & Fullscreen Toggles
-    const isM = getAudioMuted();
-    const isSm = getSfxMuted();
-
-    this.drawButton(
-      ctx,
-      'btn_music',
-      112,
-      755,
-      240,
-      54,
-      `🎵 MUSIC: ${isM ? 'OFF' : 'ON'}`,
-      isM ? '#777777' : '#b82bfb',
-      () => toggleAudio()
-    );
-
-    this.drawButton(
-      ctx,
-      'btn_sfx',
-      392,
-      755,
-      240,
-      54,
-      `🔊 SFX: ${isSm ? 'OFF' : 'ON'}`,
-      isSm ? '#777777' : '#ff7b00',
-      () => toggleSfx()
-    );
-
-    this.drawButton(
-      ctx,
-      'btn_fs',
-      672,
-      755,
-      240,
-      54,
-      '⛶ FULLSCREEN (F)',
-      '#00d4ff',
-      () => {
-        if (onToggleFullscreen) onToggleFullscreen();
+    if (state === GameState.FALLING || state === GameState.GAMEOVER) {
+      if (isVR) {
+        this.uiMesh.visible = true;
+        ctx.clearRect(0, 0, 1024, 1024);
+        this.drawGameOver(ctx, score, onRestart, onHome || onRestart, time, true);
+        this.uiTexture.needsUpdate = true;
+      } else {
+        this.uiMesh.visible = false;
       }
-    );
-
-    // Credits
-    ctx.textAlign = 'center';
-    ctx.font = '400 18px system-ui, sans-serif';
-    ctx.fillStyle = '#8f9db5';
-    ctx.fillText('Made with Three.js r185 ESM for js13kGames 2026 • Created by Filip Paulů', 512, 855);
-    ctx.fillText('https://stab-the-rainbow.paulu.cz/', 512, 885);
+      return;
+    }
   }
 
   private drawHUD(
@@ -368,31 +206,31 @@ export class UIManager {
     time: number,
     isVR: boolean = false
   ): void {
-    // Upper HUD ribbon
-    ctx.fillStyle = 'rgba(10, 8, 25, 0.72)';
-    this.roundRect(ctx, 162, 30, 700, 150, 24);
+    // Upper HUD ribbon (only covers top ~15% of screen, track is 100% visible)
+    ctx.fillStyle = 'rgba(10, 8, 25, 0.78)';
+    this.roundRect(ctx, 162, 20, 700, 150, 24);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Spectator view indicator
+    // Mode Banner
     ctx.textAlign = 'center';
     ctx.font = '700 16px system-ui, sans-serif';
     ctx.fillStyle = '#00d4ff';
     ctx.fillText(
       isVR
-        ? '🥽 VR IMMERSIVE MODE • THRUST TO STAB 🦄'
-        : '📺 SPECTATOR VIEW • BEST IN VR 🥽',
+        ? '🥽 VR: NA TOHLE MUSÍŠ HLAVOU! • TRHNI VPŘED = BODNUTÍ 🦄'
+        : '🦄 STAB THE RAINBOW • BĚŽ A ZACHRAŇ DUHU 🌈',
       512,
-      60
+      50
     );
 
     // Score
     ctx.textAlign = 'left';
-    ctx.font = '900 40px system-ui, sans-serif';
+    ctx.font = '900 36px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`SCORE: ${score}`, 195, 84);
+    ctx.fillText(`SKÓRE: ${score}`, 192, 88);
 
     // Urgent Alert
     if (urgentLane >= 0 && urgentLane < LANE_COUNT) {
@@ -401,15 +239,15 @@ export class UIManager {
       const blink = sin(time * 16) > 0;
 
       ctx.textAlign = 'right';
-      ctx.font = '700 24px system-ui, sans-serif';
+      ctx.font = '700 22px system-ui, sans-serif';
       ctx.fillStyle = blink ? uCol : '#ffffff';
-      ctx.fillText(`⚡ SAVE ${uName.toUpperCase()}!`, 830, 80);
+      ctx.fillText(`⚡ ZACHRAŇ ${uName.toUpperCase()}!`, 830, 86);
     }
 
     // 7 Rainbow Lane Health Gems / Indicators
-    const barStartY = 115;
-    const barStartX = 200;
-    const totalW = 624;
+    const barStartY = 112;
+    const barStartX = 192;
+    const totalW = 640;
     const itemW = totalW / LANE_COUNT;
 
     for (let i = 0; i < LANE_COUNT; i++) {
@@ -419,27 +257,26 @@ export class UIManager {
 
       // Slot background
       ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-      this.roundRect(ctx, x + 4, barStartY, itemW - 8, 32, 8);
+      this.roundRect(ctx, x + 3, barStartY, itemW - 6, 32, 8);
       ctx.fill();
 
       // Health fill
       if (h > 0.04) {
         ctx.fillStyle = col;
-        const fillW = (itemW - 8) * h;
-        this.roundRect(ctx, x + 4, barStartY, fillW, 32, 8);
+        const fillW = (itemW - 6) * h;
+        this.roundRect(ctx, x + 3, barStartY, fillW, 32, 8);
         ctx.fill();
       } else {
-        // Void warning
         ctx.fillStyle = '#ff2a4b';
-        ctx.font = '900 18px system-ui, sans-serif';
+        ctx.font = '900 16px system-ui, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('VOID', x + itemW / 2, barStartY + 23);
+        ctx.fillText('VOID', x + itemW / 2, barStartY + 22);
       }
 
       // Border
       ctx.strokeStyle = i === urgentLane ? '#ffffff' : col;
       ctx.lineWidth = i === urgentLane ? 3 : 1.5;
-      this.roundRect(ctx, x + 4, barStartY, itemW - 8, 32, 8);
+      this.roundRect(ctx, x + 3, barStartY, itemW - 6, 32, 8);
       ctx.stroke();
     }
   }
@@ -452,7 +289,7 @@ export class UIManager {
     time: number,
     isVR: boolean = false
   ): void {
-    // Dark dramatic panel
+    // Dark dramatic panel for VR
     ctx.fillStyle = 'rgba(20, 5, 15, 0.92)';
     this.roundRect(ctx, 162, 140, 700, 720, 36);
     ctx.fill();
@@ -463,7 +300,7 @@ export class UIManager {
 
     // Game Over Title
     ctx.textAlign = 'center';
-    ctx.font = '900 56px system-ui, sans-serif';
+    ctx.font = '900 54px system-ui, sans-serif';
     ctx.fillStyle = '#ff2a4b';
     ctx.shadowColor = '#ff2a4b';
     ctx.shadowBlur = 24;
@@ -491,75 +328,14 @@ export class UIManager {
       ctx.fillText(`BEST RECORD: ${this.highScore}`, 512, 445);
     }
 
-    // Try Again Button
-    this.drawButton(
-      ctx,
-      'btn_retry',
-      272,
-      515,
-      480,
-      72,
-      '🔄 TRY AGAIN',
-      '#10e052',
-      onRestart
-    );
+    // VR instructions
+    ctx.font = '700 26px system-ui, sans-serif';
+    ctx.fillStyle = '#10e052';
+    ctx.fillText('Stiskni SPOUŠŤ pro nový běh', 512, 540);
 
-    // Return to Home Button
-    this.drawButton(
-      ctx,
-      'btn_home',
-      272,
-      605,
-      480,
-      72,
-      '🏠 RETURN TO HOME',
-      '#00d4ff',
-      onHome
-    );
-
-    ctx.font = '500 20px system-ui, sans-serif';
-    ctx.fillStyle = '#8f9db5';
-    ctx.fillText(
-      isVR
-        ? 'Stiskni SPOUŠŤ pro nový běh • Úchop (Grip) pro Menu'
-        : 'Press SPACEBAR to restart • Press H or ESC for home',
-      512,
-      715
-    );
-  }
-
-  private drawButton(
-    ctx: CanvasRenderingContext2D,
-    id: string,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    text: string,
-    colorHex: string,
-    action: () => void
-  ): void {
-    const isHover = this.hoveredButtonId === id;
-
-    // Register button for raycast interaction
-    this.buttons.push({ id, x, y, w, h, text, action });
-
-    // Background
-    ctx.fillStyle = isHover ? colorHex : 'rgba(255, 255, 255, 0.12)';
-    this.roundRect(ctx, x, y, w, h, 16);
-    ctx.fill();
-
-    // Border
-    ctx.strokeStyle = colorHex;
-    ctx.lineWidth = isHover ? 4 : 2;
-    this.roundRect(ctx, x, y, w, h, 16);
-    ctx.stroke();
-
-    // Label
-    ctx.textAlign = 'center';
-    ctx.font = '800 26px system-ui, sans-serif';
-    ctx.fillStyle = isHover ? '#0b0816' : '#ffffff';
-    ctx.fillText(text, x + w / 2, y + h / 2 + 9);
+    ctx.font = '600 22px system-ui, sans-serif';
+    ctx.fillStyle = '#00d4ff';
+    ctx.fillText('Stiskni ÚCHOP (Grip) pro Hlavní Rozcestník', 512, 600);
   }
 
   private roundRect(
