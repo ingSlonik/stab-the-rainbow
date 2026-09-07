@@ -102,8 +102,8 @@ export class Game {
     this.ui = new UIManager(this.scene, this.camera);
     this.player.setMenuMode(this.sceneEl.is('vr-mode'), this.sceneEl.is('vr-mode') ? this.rightControllerEl?.object3D : null);
 
-    if (this.camera) {
-      this.camera.rotation.x = -0.24;
+    if (this.camera && !this.sceneEl.is('vr-mode')) {
+      this.camera.rotation.x = -0.18;
     }
 
     this.initAFrameWebXR();
@@ -220,6 +220,10 @@ export class Game {
     const modal = document.getElementById('modal');
     if (modal) modal.style.display = 'none';
 
+    if (this.camera) {
+      this.camera.rotation.set(0, 0, 0);
+    }
+
     // Enter 3D VR menu directly in A-Frame over the rainbow
     this.state = GameState.MENU;
     this.currentVRMode = GameMode.VR_EASY;
@@ -231,6 +235,9 @@ export class Game {
   private onExitVR(): void {
     this.currentVRMode = GameMode.DESKTOP;
     this.player.setVRMode(GameMode.DESKTOP);
+    if (this.camera) {
+      this.camera.rotation.set(-0.18, 0, 0);
+    }
     this.goToMenu();
   }
 

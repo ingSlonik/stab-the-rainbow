@@ -339,6 +339,22 @@ export class UIManager {
     }
 
     if (state === GameState.PLAYING) {
+      if (isVR) {
+        this.hudMesh.position.set(0, -0.36, -1.42);
+        this.hudMesh.rotation.set(-0.16, 0, 0);
+        if (this.trackPercentMesh) {
+          this.trackPercentMesh.position.set(0, 0.92, -4.2);
+          this.trackPercentMesh.rotation.x = -0.36;
+        }
+      } else {
+        this.hudMesh.position.set(0, -0.44, -1.55);
+        this.hudMesh.rotation.set(-0.22, 0, 0);
+        if (this.trackPercentMesh) {
+          this.trackPercentMesh.position.set(0, 0.08, -3.6);
+          this.trackPercentMesh.rotation.x = -Math.PI / 2 + 0.18;
+        }
+      }
+
       this.hudMesh.visible = true;
       if (this.trackPercentMesh) this.trackPercentMesh.visible = true;
       this.dialogMesh.visible = false;
@@ -741,7 +757,7 @@ export class UIManager {
       // Health Fill
       if (h > 0.04) {
         ctx.fillStyle = col;
-        ctx.globalAlpha = 0.45;
+        ctx.globalAlpha = 0.55;
         const fillH = 138 * h;
         this.roundRect(ctx, x + 6, 86 + 142 - fillH, laneW - 12, fillH, 10);
         ctx.fill();
@@ -755,26 +771,32 @@ export class UIManager {
         : isCritical
           ? (blink ? '#ffffff' : '#ff2a4b')
           : col;
-      ctx.lineWidth = isUrgent || isCritical ? 3.5 : 1.5;
+      ctx.lineWidth = isUrgent || isCritical ? 4.0 : 2.0;
       this.roundRect(ctx, x + 4, 86, laneW - 8, 146, 14);
       ctx.stroke();
 
       // Color Label
       ctx.fillStyle = col;
-      ctx.font = '800 16px system-ui, sans-serif';
+      ctx.font = '800 17px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(COLOR_NAMES_EN[i].toUpperCase(), x + laneW / 2, 114);
 
       // Percentage / EMPTY
+      ctx.save();
       if (h > 0.04) {
         ctx.fillStyle = '#ffffff';
-        ctx.font = '900 34px system-ui, sans-serif';
-        ctx.fillText(`${Math.round(h * 100)}%`, x + laneW / 2, 172);
+        ctx.shadowColor = '#000000';
+        ctx.shadowBlur = 8;
+        ctx.font = '900 38px system-ui, sans-serif';
+        ctx.fillText(`${Math.round(h * 100)}%`, x + laneW / 2, 174);
       } else {
         ctx.fillStyle = '#ff2a4b';
-        ctx.font = '900 22px system-ui, sans-serif';
-        ctx.fillText('EMPTY', x + laneW / 2, 168);
+        ctx.shadowColor = '#ff2a4b';
+        ctx.shadowBlur = 10;
+        ctx.font = '900 24px system-ui, sans-serif';
+        ctx.fillText('EMPTY', x + laneW / 2, 170);
       }
+      ctx.restore();
     }
   }
 
@@ -796,14 +818,14 @@ export class UIManager {
       const isCritical = h < 0.32;
 
       // Dark card on the rainbow lane
-      ctx.fillStyle = 'rgba(10, 8, 25, 0.82)';
+      ctx.fillStyle = 'rgba(10, 8, 25, 0.88)';
       this.roundRect(ctx, x + 5, 8, laneW - 10, 144, 16);
       ctx.fill();
 
       // Health fill background inside card
       if (h > 0.04) {
         ctx.fillStyle = col;
-        ctx.globalAlpha = 0.38;
+        ctx.globalAlpha = 0.50;
         const fillH = 136 * h;
         this.roundRect(ctx, x + 9, 8 + 140 - fillH, laneW - 18, fillH, 12);
         ctx.fill();
@@ -817,26 +839,32 @@ export class UIManager {
         : isCritical
           ? (blink ? '#ffffff' : '#ff2a4b')
           : col;
-      ctx.lineWidth = isUrgent || isCritical ? 4.5 : 2.0;
+      ctx.lineWidth = isUrgent || isCritical ? 5.0 : 2.5;
       this.roundRect(ctx, x + 5, 8, laneW - 10, 144, 16);
       ctx.stroke();
 
       // Color name
       ctx.fillStyle = col;
-      ctx.font = '800 20px system-ui, sans-serif';
+      ctx.font = '800 22px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(COLOR_NAMES_EN[i].toUpperCase(), x + laneW / 2, 42);
 
       // Percentage or EMPTY label
+      ctx.save();
       if (h > 0.04) {
         ctx.fillStyle = '#ffffff';
-        ctx.font = '900 48px system-ui, sans-serif';
-        ctx.fillText(`${Math.round(h * 100)}%`, x + laneW / 2, 104);
+        ctx.shadowColor = '#000000';
+        ctx.shadowBlur = 8;
+        ctx.font = '900 52px system-ui, sans-serif';
+        ctx.fillText(`${Math.round(h * 100)}%`, x + laneW / 2, 106);
       } else {
         ctx.fillStyle = '#ff2a4b';
-        ctx.font = '900 28px system-ui, sans-serif';
-        ctx.fillText('EMPTY', x + laneW / 2, 100);
+        ctx.shadowColor = '#ff2a4b';
+        ctx.shadowBlur = 12;
+        ctx.font = '900 30px system-ui, sans-serif';
+        ctx.fillText('EMPTY', x + laneW / 2, 102);
       }
+      ctx.restore();
     }
   }
 
