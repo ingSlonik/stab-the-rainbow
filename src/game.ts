@@ -106,15 +106,22 @@ export class Game {
     this.scenery = new SceneryManager(this.scene);
     this.player = new Player(this.scene, this.camera, this.rigEl, this.rightControllerEl);
     this.ui = new UIManager(this.scene, this.camera);
-    this.player.setMenuMode(this.sceneEl.is('vr-mode'), this.sceneEl.is('vr-mode') ? this.rightControllerEl?.object3D : null);
+    this.player.setMenuMode(this.isImmersiveVR(), this.isImmersiveVR() ? this.rightControllerEl?.object3D : null);
 
-    if (this.camera && !this.sceneEl.is('vr-mode')) {
+    if (this.camera && !this.isImmersiveVR()) {
       this.camera.rotation.x = -0.18;
     }
 
     this.initAFrameWebXR();
 
     this.isReady = true;
+  }
+
+  public isImmersiveVR(): boolean {
+    return !!(
+      (this.sceneEl?.xrSession && this.sceneEl.is('vr-mode')) ||
+      (this.renderer?.xr?.isPresenting)
+    );
   }
 
   private async initAFrameWebXR(): Promise<void> {
@@ -149,7 +156,7 @@ export class Game {
     this.rightControllerEl?.addEventListener('controllerconnected', () => {
       if (this.player && this.rightControllerEl?.object3D) {
         this.player.setVRController(this.rightControllerEl.object3D);
-        const isVR = this.sceneEl.is('vr-mode');
+        const isVR = this.isImmersiveVR();
         const isMenu = this.state === GameState.MENU || this.state === GameState.GAMEOVER;
         if (isVR && (isMenu || this.currentVRMode === GameMode.VR_EASY)) {
           this.player.attachHornToHand(this.rightControllerEl.object3D, isMenu);
@@ -241,6 +248,21 @@ export class Game {
   }
 
   private onEnterVR(): void {
+    // Strictly verify an active immersive WebXR session exists! Non-immersive fallback must NEVER run VR mode!
+    if (!this.isImmersiveVR()) {
+      console.warn('Blocked non-immersive VR mode attempt');
+      this.sceneEl?.exitVR();
+      const warningEl = document.getElementById('vr-warning');
+      if (warningEl) {
+        warningEl.innerHTML = '⚠️ <strong>Immersive VR headset required</strong><br>No active WebXR headset detected. Connect a VR headset or click PLAY ON DESKTOP.';
+        warningEl.style.display = 'block';
+      }
+      const modal = document.getElementById('modal');
+      if (modal) modal.style.display = 'flex';
+      this.onExitVR();
+      return;
+    }
+
     const warningEl = document.getElementById('vr-warning');
     if (warningEl) warningEl.style.display = 'none';
 
@@ -262,6 +284,7 @@ export class Game {
   private onExitVR(): void {
     this.currentVRMode = GameMode.DESKTOP;
     this.player.setVRMode(GameMode.DESKTOP);
+    this.player.setMenuMode(false);
     if (this.camera) {
       this.camera.rotation.set(-0.18, 0, 0);
     }
@@ -302,16 +325,26 @@ export class Game {
     }
   }
 
-
   public requestVRSession(): void {
     const warningEl = document.getElementById('vr-warning');
     if (warningEl) warningEl.style.display = 'none';
 
     initAudio();
-    this.state = GameState.MENU;
 
-    if (this.sceneEl.is('vr-mode')) {
+    if (this.isImmersiveVR()) {
       this.onEnterVR();
+      return;
+    }
+
+    // Strict validation: WebXR immersive-vr must be supported and a headset present
+    const hasXR = typeof navigator !== 'undefined' && 'xr' in navigator && !!(navigator as any).xr;
+    const isHeadsetConnected = !!(this.sceneEl?.checkHeadsetConnected?.() || this.sceneEl?.isMobile);
+
+    if (!hasXR || (!this.hasWebXR && !isHeadsetConnected)) {
+      if (warningEl) {
+        warningEl.innerHTML = '⚠️ <strong>Immersive VR headset required</strong><br>WebXR immersive-vr is not supported or no headset detected. Please use a VR headset (e.g. Meta Quest) or click PLAY ON DESKTOP.';
+        warningEl.style.display = 'block';
+      }
       return;
     }
 
@@ -321,17 +354,21 @@ export class Game {
         p.catch((err: any) => {
           console.warn('Enter VR error:', err);
           if (warningEl) {
-            warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>Ensure WebXR is enabled and headset is connected.';
+            warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>' + (err?.message || 'Ensure your VR headset is active.');
             warningEl.style.display = 'block';
           }
+          this.sceneEl?.exitVR();
+          this.onExitVR();
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Enter VR synchronous error:', err);
       if (warningEl) {
-        warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>' + err;
+        warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>' + (err?.message || 'Ensure your VR headset is active.');
         warningEl.style.display = 'block';
       }
+      this.sceneEl?.exitVR();
+      this.onExitVR();
     }
   }
 
@@ -345,7 +382,7 @@ export class Game {
         this.player?.setTargetX(this.pointerNdcX * 1.05);
 
         // Keep camera rock-solid on desktop so horn is statically anchored
-        if (!this.sceneEl?.is('vr-mode') && this.camera) {
+        if (!this.isImmersiveVR() && this.camera) {
           this.camera.rotation.y = 0;
           this.camera.rotation.x = -0.18;
           this.camera.rotation.z = 0;
@@ -429,9 +466,9 @@ export class Game {
         // Return to menu at any time
         this.goToMenu();
       } else if (c === 'Digit1') {
-        if (this.state === GameState.MENU) this.startGame(GameMode.VR_EASY);
+        if (this.state === GameState.MENU && this.isImmersiveVR()) this.startGame(GameMode.VR_EASY);
       } else if (c === 'Digit2') {
-        if (this.state === GameState.MENU) this.startGame(GameMode.VR_HARD);
+        if (this.state === GameState.MENU && this.isImmersiveVR()) this.startGame(GameMode.VR_HARD);
       } else if (c === 'Digit3') {
         if (this.state === GameState.MENU) this.startGame(GameMode.DESKTOP);
       }
@@ -451,7 +488,7 @@ export class Game {
   }
 
   public goToMenu(): void {
-    const isVR = this.sceneEl?.is('vr-mode');
+    const isVR = this.isImmersiveVR();
     const modal = document.getElementById('modal');
     if (modal) {
       modal.style.display = isVR ? 'none' : 'flex';
@@ -478,6 +515,12 @@ export class Game {
   }
 
   public startGame(mode: GameMode = this.currentVRMode ?? GameMode.DESKTOP): void {
+    const isVR = this.isImmersiveVR();
+    // Invariant: Non-immersive environment can NEVER run in VR mode
+    if (!isVR && mode !== GameMode.DESKTOP) {
+      mode = GameMode.DESKTOP;
+    }
+
     const warningEl = document.getElementById('vr-warning');
     if (warningEl) warningEl.style.display = 'none';
 
@@ -640,7 +683,17 @@ export class Game {
     const dt = min(0.08, timeDelta / 1000);
     const totalTime = time / 1000;
 
-    const isVR = this.sceneEl?.is('vr-mode') || false;
+    const isVR = this.isImmersiveVR();
+
+    // Invariant: VR modes (EASY/HARD) must NEVER run without active WebXR immersion
+    if (!isVR && this.currentVRMode !== GameMode.DESKTOP) {
+      this.currentVRMode = GameMode.DESKTOP;
+      this.player.setVRMode(GameMode.DESKTOP);
+      this.player.setMenuMode(false);
+      if (this.camera) {
+        this.camera.rotation.set(-0.18, 0, 0);
+      }
+    }
 
     // VR Controls
     if (isVR) {
