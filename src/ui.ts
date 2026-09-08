@@ -8,6 +8,7 @@ import {
 } from './types';
 import { sin, max, min, floor } from './math';
 import { getRandomDeathQuip } from './quips';
+import { toggleAudio, toggleSfx, getAudioMuted, getSfxMuted } from './audio';
 
 export interface UIButton {
   id: string;
@@ -1104,6 +1105,54 @@ export class UIManager {
     ctx.font = '600 17px system-ui, sans-serif';
     ctx.fillStyle = '#9cb3d0';
     ctx.fillText('Jump: Controller A / X or Thumbstick Up • Pause: Esc', 512, 778);
+
+    // Separator line before Audio Bar
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(140, 735);
+    ctx.lineTo(884, 735);
+    ctx.stroke();
+
+    // 3D Audio Buttons (Side-by-side in bottom bar)
+    const isMusicMuted = getAudioMuted();
+    const isSfxMuted = getSfxMuted();
+
+    this.drawButton(
+      ctx,
+      'btn-music-3d',
+      110,
+      755,
+      380,
+      85,
+      isMusicMuted ? '🎵 MUSIC: OFF' : '🎵 MUSIC: ON',
+      'Click to toggle music soundtrack',
+      isMusicMuted ? '#8899aa' : '#00d4ff',
+      () => {
+        toggleAudio();
+        const b = document.getElementById('btn-music');
+        if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
+        this.dialogTexture.needsUpdate = true;
+      }
+    );
+
+    this.drawButton(
+      ctx,
+      'btn-sfx-3d',
+      534,
+      755,
+      380,
+      85,
+      isSfxMuted ? '🔊 SFX: OFF' : '🔊 SFX: ON',
+      'Click to toggle sound effects',
+      isSfxMuted ? '#8899aa' : '#10e052',
+      () => {
+        toggleSfx();
+        const b = document.getElementById('btn-sfx');
+        if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
+        this.dialogTexture.needsUpdate = true;
+      }
+    );
   }
 
   private drawGameOver(
@@ -1202,6 +1251,56 @@ export class UIManager {
         () => onToggleMode()
       );
     }
+
+    // Separator line before Audio Bar
+    const audioY = isVR ? 688 : 586;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(160, audioY);
+    ctx.lineTo(864, audioY);
+    ctx.stroke();
+
+    // 3D Audio Buttons (Side-by-side in bottom bar)
+    const isMusicMuted = getAudioMuted();
+    const isSfxMuted = getSfxMuted();
+    const btnAudioY = isVR ? 706 : 606;
+
+    this.drawButton(
+      ctx,
+      'btn-music-3d',
+      140,
+      btnAudioY,
+      355,
+      85,
+      isMusicMuted ? '🎵 MUSIC: OFF' : '🎵 MUSIC: ON',
+      'Toggle music',
+      isMusicMuted ? '#8899aa' : '#00d4ff',
+      () => {
+        toggleAudio();
+        const b = document.getElementById('btn-music');
+        if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
+        this.dialogTexture.needsUpdate = true;
+      }
+    );
+
+    this.drawButton(
+      ctx,
+      'btn-sfx-3d',
+      529,
+      btnAudioY,
+      355,
+      85,
+      isSfxMuted ? '🔊 SFX: OFF' : '🔊 SFX: ON',
+      'Toggle sound effects',
+      isSfxMuted ? '#8899aa' : '#10e052',
+      () => {
+        toggleSfx();
+        const b = document.getElementById('btn-sfx');
+        if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
+        this.dialogTexture.needsUpdate = true;
+      }
+    );
 
     try {
       (window as any)._gof = ctx.getImageData(0, 0, 1, 1);
