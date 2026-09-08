@@ -1,4 +1,4 @@
-import { LANE_COUNT, LANE_WIDTH, TRACK_WIDTH, GameMode } from './types';
+import { LANE_COUNT, LANE_WIDTH, TRACK_WIDTH, GameMode, RAINBOW_COLORS } from './types';
 import { sin, cos, max, min, clamp, lerp } from './math';
 import { playJumpSound } from './audio';
 
@@ -12,6 +12,9 @@ export class Player {
   public hornTip: any;
   public vrMode: GameMode = GameMode.DESKTOP;
   public vrController: any = null;
+
+  public groundMarker: any;
+  private groundMarkerMat: any;
 
   public currentLane = 3;
   public x = 0;
@@ -59,9 +62,76 @@ export class Player {
 
     this.hornTipWorldPos = new THREE.Vector3();
     this.initHorn();
+    this.initGroundMarker(scene);
 
     // Default desktop mount on camera
     this.camera.add(this.horn);
+  }
+
+  private initGroundMarker(scene: any): void {
+    this.groundMarker = new THREE.Group();
+
+    // 1. Outer glowing starlight ring
+    const ringGeom = new THREE.RingGeometry(0.16, 0.20, 32);
+    ringGeom.rotateX(-Math.PI / 2 + 0.016);
+    this.groundMarkerMat = new THREE.MeshBasicMaterial({
+      color: 0x10e052,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const ringMesh = new THREE.Mesh(ringGeom, this.groundMarkerMat);
+    this.groundMarker.add(ringMesh);
+
+    // 2. Inner disc with subtle starlight fill
+    const innerGeom = new THREE.CircleGeometry(0.15, 32);
+    innerGeom.rotateX(-Math.PI / 2 + 0.016);
+    const innerMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.22,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const innerMesh = new THREE.Mesh(innerGeom, innerMat);
+    this.groundMarker.add(innerMesh);
+
+    // 3. Forward-pointing magical chevron / arrow indicating lane alignment
+    const arrowGeom = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+      -0.08, 0.001, -0.04,
+       0.00, 0.001, -0.12,
+       0.08, 0.001, -0.04,
+    ]);
+    arrowGeom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    arrowGeom.rotateX(0.016);
+    const arrowMat = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.90,
+      linewidth: 2,
+    });
+    const arrowLine = new THREE.Line(arrowGeom, arrowMat);
+    this.groundMarker.add(arrowLine);
+
+    // 4. Lateral boundary brackets (+/- LANE_WIDTH / 2) showing precise lane occupancy
+    const bracketGeom = new THREE.BufferGeometry();
+    const halfW = LANE_WIDTH * 0.48; // ~0.19m
+    const bracketVerts = new Float32Array([
+      -halfW, 0.001, -0.08,
+      -halfW, 0.001,  0.08,
+       halfW, 0.001, -0.08,
+       halfW, 0.001,  0.08,
+    ]);
+    bracketGeom.setAttribute('position', new THREE.BufferAttribute(bracketVerts, 3));
+    bracketGeom.rotateX(0.016);
+    const bracketLines = new THREE.LineSegments(bracketGeom, arrowMat);
+    this.groundMarker.add(bracketLines);
+
+    this.groundMarker.renderOrder = 20;
+    this.groundMarker.visible = true;
+    scene.add(this.groundMarker);
   }
 
   private initHorn(): void {
@@ -291,7 +361,14 @@ export class Player {
     if (this.pointerBeam) this.pointerBeam.visible = false;
   }
 
-  public update(dt: number, speed: number, isMoving: boolean, isVR: boolean = false): void {
+  public update(
+    dt: number,
+    speed: number,
+    isMoving: boolean,
+    isVR: boolean = false,
+    isPlaying: boolean = true,
+    isLaneSolid: boolean = true
+  ): void {
     // 0. Horn thrust animation on stab
     let thrustOffset = 0;
     if (this.stabTimer > 0) {
@@ -346,9 +423,9 @@ export class Player {
         this.isCalibrated = true;
       }
 
-      // Lateral head position / physical side-steps steer across lanes (matching real room scale)
+      // Lateral head position / physical side-steps steer across lanes (amplified for comfortable room scale)
       const headLeanX = this.camera.position.x - this.calibratedHeadX;
-      const targetNormX = clamp(headLeanX * 1.05, -1.0, 1.0);
+      const targetNormX = clamp(headLeanX * 3.0, -1.0, 1.0);
       this.setTargetX(targetNormX);
 
       // Hard mode: Head forward thrust ("headbutt") or nod triggers STAB, physical vertical leap triggers JUMP
@@ -405,15 +482,44 @@ export class Player {
     // 5. Update root position & orientation
     const isDesktop = this.vrMode === GameMode.DESKTOP;
     const baseH = isDesktop ? 2.05 : 0.85;
-    this.root.position.x = this.x;
-    this.root.position.y = baseH + this.y + gallopY;
 
-    if (isVR) {
-      // In VR, the physical headset dictates orientation. Horizon remains level!
+    if (isVR && this.camera) {
+      // In VR: align rig so camera world X and groundMarker X are perfectly in unison directly beneath the headset
+      const headOffset = this.camera.position.x - this.calibratedHeadX;
+      this.root.position.x = this.x - headOffset;
+      this.root.position.y = baseH + this.y + gallopY;
       this.root.rotation.set(0, 0, 0);
     } else {
-      // Fall straight down without disorienting tumbling
+      this.root.position.x = this.x;
+      this.root.position.y = baseH + this.y + gallopY;
       this.root.rotation.set(0, 0, 0);
+    }
+
+    // 6. Update Ground Position Marker
+    if (this.groundMarker) {
+      if (!isPlaying || this.isFalling || this.isFallen) {
+        this.groundMarker.visible = false;
+      } else {
+        this.groundMarker.visible = true;
+        const markerZ = -1.40;
+        const actualZ = markerZ - 49;
+        const trackY = 0.60 - sin((-actualZ) * 0.02) * 1.5;
+        // Optically elevated to hover cleanly above the rainbow
+        const hoverY = trackY + 0.09;
+        this.groundMarker.position.set(this.x, hoverY, markerZ);
+
+        // Color matches current lane, or flashing red if lane is void (0%)
+        const col = isLaneSolid ? RAINBOW_COLORS[this.currentLane] : 0xff2a4b;
+        if (this.groundMarkerMat) {
+          this.groundMarkerMat.color.setHex(col);
+          const jumpOpacity = this.isGrounded ? 0.88 : Math.max(0.40, 0.88 - this.y * 0.08);
+          this.groundMarkerMat.opacity = jumpOpacity;
+        }
+
+        // Landing target scale mod on jump
+        const jumpScale = this.isGrounded ? 1.0 : (1.0 + Math.min(0.35, this.y * 0.08));
+        this.groundMarker.scale.set(jumpScale, 1.0, jumpScale);
+      }
     }
   }
 }
