@@ -86,6 +86,8 @@ export class TrackManager {
       pos.setY(i, y);
     }
     geom.computeVertexNormals();
+    geom.computeBoundingBox();
+    geom.computeBoundingSphere();
 
     for (let i = 0; i < LANE_COUNT; i++) {
       const col = RAINBOW_COLORS[i];
@@ -99,6 +101,7 @@ export class TrackManager {
       });
 
       const mesh = new THREE.Mesh(geom, mat);
+      mesh.renderOrder = 10;
       const laneX = (i - 3) * LANE_WIDTH;
       mesh.position.set(laneX, 0, 0);
 
@@ -124,11 +127,18 @@ export class TrackManager {
 
   public replenishLane(colorIdx: number): void {
     if (colorIdx >= 0 && colorIdx < LANE_COUNT) {
-      this.laneHealth[colorIdx] = 1.0;
+      this.laneHealth[colorIdx] = min(1.0, this.laneHealth[colorIdx] + 0.35);
       this.laneFlash[colorIdx] = 1.0;
       if (this.currentUrgentLane === colorIdx) {
         this.pickNextUrgentLane();
       }
+    }
+  }
+
+  public drainLane(colorIdx: number, amount = 0.15): void {
+    if (colorIdx >= 0 && colorIdx < LANE_COUNT) {
+      this.laneHealth[colorIdx] = max(0, this.laneHealth[colorIdx] - amount);
+      this.laneFlash[colorIdx] = -1.0;
     }
   }
 
@@ -173,10 +183,10 @@ export class TrackManager {
       this.pickNextUrgentLane();
     }
 
-    // Early game grace scaling: decay starts 3x slower and ramps up over 50s
-    const ramp = min(1.0, 0.32 + (runTime / 50) * 0.68);
-    const baseDecay = (0.016 + speed * 0.0008) * ramp;
-    const urgentMult = 1.4 + 1.4 * ramp;
+    // Active decay: steady and visible progress
+    const ramp = min(1.0, 0.45 + (runTime / 35) * 0.55);
+    const baseDecay = (0.022 + speed * 0.0009) * ramp;
+    const urgentMult = 1.6 + 1.2 * ramp;
 
     for (let i = 0; i < LANE_COUNT; i++) {
       // In menu mode, when a lane completely dissolves, revive it after a brief moment with a flash

@@ -28,6 +28,7 @@ export class CloudManager {
   private starPosArr: Float32Array;
   private readonly STAR_COUNT = 150;
 
+  public onMissedCloud?: (colorIdx: number) => void;
   private spawnTimer = 0;
 
   constructor(scene: any) {
@@ -307,6 +308,9 @@ export class CloudManager {
 
       // Passed behind player without being stabbed
       if (c.z > 5) {
+        if (!c.stabbed && !isMenu && this.onMissedCloud) {
+          this.onMissedCloud(c.colorIdx);
+        }
         this.group.remove(c.mesh);
         this.clouds.splice(i, 1);
       }

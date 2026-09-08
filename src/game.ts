@@ -98,6 +98,12 @@ export class Game {
 
     this.track = new TrackManager(this.scene);
     this.clouds = new CloudManager(this.scene);
+    this.clouds.onMissedCloud = (colorIdx: number) => {
+      if (this.state === GameState.PLAYING) {
+        this.track.drainLane(colorIdx, 0.15);
+        this.combo = 1;
+      }
+    };
     this.scenery = new SceneryManager(this.scene);
     this.player = new Player(this.scene, this.camera, this.rigEl, this.rightControllerEl);
     this.ui = new UIManager(this.scene, this.camera);
