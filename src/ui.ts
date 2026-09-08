@@ -49,6 +49,7 @@ export class UIManager {
   private board3DGroup: any;
   private charMaterials: Record<string, any> = {};
   private labelMaterials: Record<string, any> = {};
+  private statusMaterials: any[] = [];
   private scoreDigitMeshes: any[] = [];
   private bestDigitMeshes: any[] = [];
   private comboLabelMesh: any;
@@ -100,9 +101,7 @@ export class UIManager {
   public pointerX = -100;
   public pointerY = -100;
 
-  private highScoreDesktop = 0;
-  private highScoreEasy = 0;
-  private highScoreHard = 0;
+  private highScores = [0, 0, 0];
   private lastQuote = '';
 
   // Dynamic funny quips for Hard mode
@@ -125,28 +124,20 @@ export class UIManager {
     this.initFloatingPopups(scene);
   }
 
-  private getScoreKey(mode: GameMode): [string, 'highScoreHard' | 'highScoreEasy' | 'highScoreDesktop'] {
-    if (mode === GameMode.VR_HARD) return ['str_h_hard', 'highScoreHard'];
-    if (mode === GameMode.VR_EASY) return ['str_h_easy', 'highScoreEasy'];
-    return ['str_h_desktop', 'highScoreDesktop'];
-  }
-
   private loadHighScores(): void {
-    const get = (k: string) => {
+    const keys = ['str_h_desktop', 'str_h_easy', 'str_h_hard'];
+    this.highScores = keys.map(k => {
       try { return parseInt(localStorage.getItem(k) || '0', 10) || 0; } catch (_) { return 0; }
-    };
-    this.highScoreDesktop = get('str_h_desktop');
-    this.highScoreEasy = get('str_h_easy');
-    this.highScoreHard = get('str_h_hard');
+    });
   }
 
   public saveHighScore(score: number, mode: GameMode): boolean {
-    const [key, prop] = this.getScoreKey(mode);
-    if (score > this[prop]) {
-      this[prop] = score;
+    const prev = this.highScores[mode] || 0;
+    if (score > prev) {
+      this.highScores[mode] = score;
       this.dialogDirty = true;
       try {
-        localStorage.setItem(key, score.toString());
+        localStorage.setItem(['str_h_desktop', 'str_h_easy', 'str_h_hard'][mode], score.toString());
       } catch (_) { }
       return true;
     }
@@ -154,7 +145,7 @@ export class UIManager {
   }
 
   public getHighScore(mode: GameMode): number {
-    return this[this.getScoreKey(mode)[1]];
+    return this.highScores[mode] || 0;
   }
 
   public getLastQuote(): string {
@@ -236,11 +227,6 @@ export class UIManager {
       ['VR EASY', 46, '#00d4ff', 340, 72],
       ['VR HARD', 46, '#ffdd00', 340, 72],
       ['DESKTOP', 46, '#a0b8d8', 340, 72],
-      // 4. Status Badges
-      ['● OK', 30, '#10e052', 180, 48],
-      ['▲ DRAIN', 30, '#ffdd00', 180, 48],
-      ['⚠ ALERT', 30, '#ff2a4b', 180, 48],
-      ['✖ GONE', 30, '#888888', 180, 48],
       ['EMPTY', 46, '#ff2a4b', 240, 72, '#ff2a4b'],
       ['100%', 64, '#ffffff', 220, 76, '#000000'],
       ['-5%', 64, '#ffffff', 180, 76, '#000000'],
@@ -248,6 +234,18 @@ export class UIManager {
 
     for (const [text, sz, col, w, h, glow] of fixedLabels) {
       this.labelMaterials[text] = this.createTextMaterial(text, uiFont(sz), col, w, h, glow);
+    }
+
+    // 3. Status Badges (indexed 0: OK, 1: DRAIN, 2: ALERT, 3: GONE)
+    const statusBadges: [string, number, string, number, number][] = [
+      ['● OK', 30, '#10e052', 180, 48],
+      ['▲ DRAIN', 30, '#ffdd00', 180, 48],
+      ['⚠ ALERT', 30, '#ff2a4b', 180, 48],
+      ['✖ GONE', 30, '#888888', 180, 48],
+    ];
+    for (let i = 0; i < statusBadges.length; i++) {
+      const [text, sz, col, w, h] = statusBadges[i];
+      this.statusMaterials[i] = this.createTextMaterial(text, uiFont(sz), col, w, h);
     }
 
     // 3. Lane Color Names
@@ -377,10 +375,10 @@ export class UIManager {
       emptyMesh.visible = false;
 
       // Status Text Mesh (● OK, ▲ DRAIN, ⚠ ALERT, ✖ GONE)
-      const statusTextMesh = createQuad(0.28, 0.070, this.labelMaterials['● OK'], 0, -0.11, 0.02, 104, colGroup);
+      const statusTextMesh = createQuad(0.28, 0.070, this.statusMaterials[0], 0, -0.11, 0.025, 104, colGroup);
 
       // Status Pill Mesh (glowing underline)
-      const statusPillMesh = createQuad(0.24, 0.020, createMat(0x10e052), 0, -0.17, 0.02, 104, colGroup);
+      const statusPillMesh = createQuad(0.24, 0.020, createMat(0x10e052), 0, -0.17, 0.025, 104, colGroup);
 
       this.laneColumns.push({
         colGroup,
@@ -454,6 +452,17 @@ export class UIManager {
     }
   }
 
+  private setDigits(meshes: any[], str: string): void {
+    const len = meshes.length;
+    for (let k = 0; k < len; k++) {
+      const m = meshes[k];
+      if (m) {
+        const ch = str[k] || ' ';
+        m.material = this.charMaterials[ch] || this.charMaterials[' '];
+      }
+    }
+  }
+
   private update3DBoard(
     score: number,
     combo: number,
@@ -464,15 +473,9 @@ export class UIManager {
   ): void {
     if (!this.board3DGroup) return;
 
-    const updateDigits = (meshes: any[], str: string) => {
-      for (let d = 0; d < meshes.length; d++) {
-        if (meshes[d]) meshes[d].material = this.charMaterials[str[d] || ' '] || this.charMaterials[' '];
-      }
-    };
-
     // 1. Live Score Digits
     const sStr = Math.floor(score).toLocaleString('en-US').padStart(8, ' ');
-    updateDigits(this.scoreDigitMeshes, sStr);
+    this.setDigits(this.scoreDigitMeshes, sStr);
 
     // 2. Heartbeat Indicator
     if (this.heartbeatMesh) {
@@ -486,7 +489,7 @@ export class UIManager {
     if (this.comboLabelMesh) this.comboLabelMesh.visible = isCombo;
     if (this.bestLabelMesh) this.bestLabelMesh.visible = !isCombo;
     const comboStr = isCombo ? `x${combo}` : Math.floor(this.getHighScore(vrMode)).toLocaleString('en-US');
-    updateDigits(this.bestDigitMeshes, comboStr.padStart(6, ' '));
+    this.setDigits(this.bestDigitMeshes, comboStr.padStart(6, ' '));
 
     // 4. Mode Label
     const isHard = vrMode === GameMode.VR_HARD;
@@ -498,16 +501,16 @@ export class UIManager {
 
     // 5. 7 Rainbow Lane Columns
     const blink = Math.sin(time * 18) > 0;
-    for (let i = 0; i < LANE_COUNT; i++) {
-      const col = this.laneColumns[i];
+    for (let laneIdx = 0; laneIdx < LANE_COUNT; laneIdx++) {
+      const col = this.laneColumns[laneIdx];
       if (!col) continue;
-      const h = laneHealth[i] ?? 1.0;
+      const h = laneHealth[laneIdx] ?? 1.0;
       const isCritical = h < 0.32;
 
       // Dynamic border color: alerts red if critical, otherwise lane color
       const borderCol = isCritical
         ? (blink ? 0xffffff : 0xff2a4b)
-        : RAINBOW_COLORS[i];
+        : RAINBOW_COLORS[laneIdx];
       col.borderMesh.material.color.setHex(borderCol);
 
       // Gauge fill: visible as long as health > 0%
@@ -518,19 +521,18 @@ export class UIManager {
       if (h > 0.0) {
         if (col.emptyMesh) col.emptyMesh.visible = false;
         const pctStr = `${Math.round(h * 100)}%`.padStart(4, ' ');
-        for (let d = 0; d < 4; d++) col.percentDigitMeshes[d].visible = true;
-        updateDigits(col.percentDigitMeshes, pctStr);
+        for (let pIdx = 0; pIdx < 4; pIdx++) col.percentDigitMeshes[pIdx].visible = true;
+        this.setDigits(col.percentDigitMeshes, pctStr);
       } else {
         if (col.emptyMesh) col.emptyMesh.visible = true;
-        for (let d = 0; d < 4; d++) col.percentDigitMeshes[d].visible = false;
+        for (let pIdx = 0; pIdx < 4; pIdx++) col.percentDigitMeshes[pIdx].visible = false;
       }
 
-      // Status Badge and Status Pill
-      const [stKey, pillColor] = h > 0.70 ? ['● OK', 0x10e052] :
-        h > 0.32 ? ['▲ DRAIN', 0xffdd00] :
-        h > 0.0 ? ['⚠ ALERT', 0xff2a4b] : ['✖ GONE', 0x888888];
-      if (this.labelMaterials[stKey]) {
-        col.statusTextMesh.material = this.labelMaterials[stKey];
+      // Status Badge and Status Pill (indexed 0: OK, 1: DRAIN, 2: ALERT, 3: GONE)
+      const statusIdx = h > 0.70 ? 0 : (h > 0.32 ? 1 : (h > 0.0 ? 2 : 3));
+      const pillColor = h > 0.70 ? 0x10e052 : (h > 0.32 ? 0xffdd00 : (h > 0.0 ? 0xff2a4b : 0x888888));
+      if (this.statusMaterials[statusIdx]) {
+        col.statusTextMesh.material = this.statusMaterials[statusIdx];
       }
       col.statusPillMesh.material.color.setHex(pillColor);
     }
@@ -983,7 +985,7 @@ export class UIManager {
     ctx.font = uiFont(21, 700);
     ctx.fillStyle = '#ffffff';
     ctx.fillText(
-      `HIGH SCORES:   EASY: ${this.highScoreEasy}   •   HARD: ${this.highScoreHard}`,
+      `HIGH SCORES:   EASY: ${this.getHighScore(GameMode.VR_EASY)}   •   HARD: ${this.getHighScore(GameMode.VR_HARD)}`,
       512,
       258
     );
@@ -1051,7 +1053,7 @@ export class UIManager {
     const isEasy = vrMode === GameMode.VR_EASY;
     const modeName = isHard ? 'VR HARD' : (isEasy ? 'VR EASY' : 'DESKTOP');
     const otherModeName = isHard ? 'VR EASY' : 'VR HARD';
-    const highScore = this.getHighScore(vrMode);
+    const highScore = this.getHighScore(vrMode) || 0;
     const isNewHigh = score >= highScore && score > 0;
 
     // Dark elegant panel
