@@ -125,58 +125,37 @@ export class UIManager {
     this.initFloatingPopups(scene);
   }
 
+  private getScoreKey(mode: GameMode): [string, 'highScoreHard' | 'highScoreEasy' | 'highScoreDesktop'] {
+    if (mode === GameMode.VR_HARD) return ['str_h_hard', 'highScoreHard'];
+    if (mode === GameMode.VR_EASY) return ['str_h_easy', 'highScoreEasy'];
+    return ['str_h_desktop', 'highScoreDesktop'];
+  }
+
   private loadHighScores(): void {
     try {
       this.highScoreDesktop = parseInt(localStorage.getItem('str_h_desktop') || '0', 10) || 0;
-      this.highScoreEasy =
-        parseInt(localStorage.getItem('str_h_easy') || '0', 10) || 0;
+      this.highScoreEasy = parseInt(localStorage.getItem('str_h_easy') || '0', 10) || 0;
       this.highScoreHard = parseInt(localStorage.getItem('str_h_hard') || '0', 10) || 0;
     } catch (_) {
-      this.highScoreDesktop = 0;
-      this.highScoreEasy = 0;
-      this.highScoreHard = 0;
+      this.highScoreDesktop = this.highScoreEasy = this.highScoreHard = 0;
     }
   }
 
   public saveHighScore(score: number, mode: GameMode): boolean {
-    const isHard = mode === GameMode.VR_HARD;
-    const isEasy = mode === GameMode.VR_EASY;
-
-    if (isHard) {
-      if (score > this.highScoreHard) {
-        this.highScoreHard = score;
-        this.dialogDirty = true;
-        try {
-          localStorage.setItem('str_h_hard', score.toString());
-        } catch (_) { }
-        return true;
-      }
-    } else if (isEasy) {
-      if (score > this.highScoreEasy) {
-        this.highScoreEasy = score;
-        this.dialogDirty = true;
-        try {
-          localStorage.setItem('str_h_easy', score.toString());
-        } catch (_) { }
-        return true;
-      }
-    } else {
-      if (score > this.highScoreDesktop) {
-        this.highScoreDesktop = score;
-        this.dialogDirty = true;
-        try {
-          localStorage.setItem('str_h_desktop', score.toString());
-        } catch (_) { }
-        return true;
-      }
+    const [key, prop] = this.getScoreKey(mode);
+    if (score > this[prop]) {
+      this[prop] = score;
+      this.dialogDirty = true;
+      try {
+        localStorage.setItem(key, score.toString());
+      } catch (_) { }
+      return true;
     }
     return false;
   }
 
   public getHighScore(mode: GameMode): number {
-    if (mode === GameMode.VR_HARD) return this.highScoreHard;
-    if (mode === GameMode.VR_EASY) return this.highScoreEasy;
-    return this.highScoreDesktop;
+    return this[this.getScoreKey(mode)[1]];
   }
 
   public getLastQuote(): string {
@@ -261,25 +240,25 @@ export class UIManager {
     }
 
     // 2. Fixed UI Labels (enlarged for crisp readability and prominent header)
-    const fixedLabels: [string, string, number, string, number, number, string?][] = [
-      ['SCORE:', 'SCORE:', 48, '#ffffff', 280, 72, '#00d4ff'],
-      ['BEST:', 'BEST:', 44, '#ffd24d', 240, 72],
-      ['COMBO', 'COMBO', 48, '#ffdd00', 240, 72, '#ffdd00'],
-      ['VR EASY', 'VR EASY', 46, '#00d4ff', 340, 72],
-      ['VR HARD', 'VR HARD', 46, '#ffdd00', 340, 72],
-      ['DESKTOP', 'DESKTOP', 46, '#a0b8d8', 340, 72],
+    const fixedLabels: [string, number, string, number, number, string?][] = [
+      ['SCORE:', 48, '#ffffff', 280, 72, '#00d4ff'],
+      ['BEST:', 44, '#ffd24d', 240, 72],
+      ['COMBO', 48, '#ffdd00', 240, 72, '#ffdd00'],
+      ['VR EASY', 46, '#00d4ff', 340, 72],
+      ['VR HARD', 46, '#ffdd00', 340, 72],
+      ['DESKTOP', 46, '#a0b8d8', 340, 72],
       // 4. Status Badges
-      ['● OK', '● OK', 30, '#10e052', 180, 48],
-      ['▲ DRAIN', '▲ DRAIN', 30, '#ffdd00', 180, 48],
-      ['⚠ ALERT', '⚠ ALERT', 30, '#ff2a4b', 180, 48],
-      ['✖ GONE', '✖ GONE', 30, '#888888', 180, 48],
-      ['EMPTY', 'EMPTY', 46, '#ff2a4b', 240, 72, '#ff2a4b'],
-      ['100%', '100%', 64, '#ffffff', 220, 76, '#000000'],
-      ['-5%', '-5%', 64, '#ffffff', 180, 76, '#000000'],
+      ['● OK', 30, '#10e052', 180, 48],
+      ['▲ DRAIN', 30, '#ffdd00', 180, 48],
+      ['⚠ ALERT', 30, '#ff2a4b', 180, 48],
+      ['✖ GONE', 30, '#888888', 180, 48],
+      ['EMPTY', 46, '#ff2a4b', 240, 72, '#ff2a4b'],
+      ['100%', 64, '#ffffff', 220, 76, '#000000'],
+      ['-5%', 64, '#ffffff', 180, 76, '#000000'],
     ];
 
-    for (const [key, text, sz, col, w, h, glow] of fixedLabels) {
-      this.labelMaterials[key] = this.createTextMaterial(text, uiFont(sz), col, w, h, glow);
+    for (const [text, sz, col, w, h, glow] of fixedLabels) {
+      this.labelMaterials[text] = this.createTextMaterial(text, uiFont(sz), col, w, h, glow);
     }
 
     // 3. Lane Color Names
@@ -323,11 +302,16 @@ export class UIManager {
     createQuad(0.32, 0.11, this.labelMaterials['SCORE:'], -1.18, 0.36, 0.02, 104, this.board3DGroup);
 
     // Score Digits (8 digit quads, enlarged for crisp visibility)
-    this.scoreDigitMeshes = [];
-    for (let d = 0; d < 8; d++) {
-      const dMesh = createQuad(0.065, 0.11, this.charMaterials[' '], -0.97 + d * 0.068, 0.36, 0.02, 104, this.board3DGroup);
-      this.scoreDigitMeshes.push(dMesh);
-    }
+    const makeDigits = (count: number, startX: number) => {
+      const arr = [];
+      for (let d = 0; d < count; d++) {
+        arr.push(createQuad(0.065, 0.11, this.charMaterials[' '], startX + d * 0.068, 0.36, 0.02, 104, this.board3DGroup));
+      }
+      return arr;
+    };
+
+    // Score Digits (8 digit quads, enlarged for crisp visibility)
+    this.scoreDigitMeshes = makeDigits(8, -0.97);
 
     // Heartbeat Pulse Mesh (instant visual feedback of 90/120Hz live frame loop)
     const hbGeom = new THREE.CircleGeometry(0.022, 16);
@@ -341,11 +325,7 @@ export class UIManager {
     this.comboLabelMesh = createQuad(0.28, 0.11, this.labelMaterials['COMBO'], -0.19, 0.36, 0.02, 104, this.board3DGroup);
     this.bestLabelMesh = createQuad(0.28, 0.11, this.labelMaterials['BEST:'], -0.19, 0.36, 0.02, 104, this.board3DGroup);
 
-    this.bestDigitMeshes = [];
-    for (let d = 0; d < 6; d++) {
-      const dMesh = createQuad(0.065, 0.11, this.charMaterials[' '], 0.01 + d * 0.068, 0.36, 0.02, 104, this.board3DGroup);
-      this.bestDigitMeshes.push(dMesh);
-    }
+    this.bestDigitMeshes = makeDigits(6, 0.01);
 
     // Right: Mode Label (prominently enlarged game mode indicator)
     this.modeLabelMesh = createQuad(0.46, 0.11, this.labelMaterials['DESKTOP'], 1.11, 0.36, 0.02, 104, this.board3DGroup);
@@ -499,16 +479,15 @@ export class UIManager {
   ): void {
     if (!this.board3DGroup) return;
 
-    // 1. Live Score Digits
-    const sStr = Math.floor(score)
-      .toLocaleString('en-US')
-      .padStart(8, ' ');
-    for (let d = 0; d < 8; d++) {
-      const ch = sStr[d] || ' ';
-      if (this.scoreDigitMeshes[d]) {
-        this.scoreDigitMeshes[d].material = this.charMaterials[ch] || this.charMaterials[' '];
+    const updateDigits = (meshes: any[], str: string) => {
+      for (let d = 0; d < meshes.length; d++) {
+        if (meshes[d]) meshes[d].material = this.charMaterials[str[d] || ' '] || this.charMaterials[' '];
       }
-    }
+    };
+
+    // 1. Live Score Digits
+    const sStr = Math.floor(score).toLocaleString('en-US').padStart(8, ' ');
+    updateDigits(this.scoreDigitMeshes, sStr);
 
     // 2. Heartbeat Indicator
     if (this.heartbeatMesh) {
@@ -518,30 +497,11 @@ export class UIManager {
     }
 
     // 3. Combo vs Best Score
-    const highScore = this.getHighScore(vrMode);
-    if (combo > 1) {
-      if (this.comboLabelMesh) this.comboLabelMesh.visible = true;
-      if (this.bestLabelMesh) this.bestLabelMesh.visible = false;
-      const cStr = `x${combo}`.padStart(6, ' ');
-      for (let d = 0; d < 6; d++) {
-        const ch = cStr[d] || ' ';
-        if (this.bestDigitMeshes[d]) {
-          this.bestDigitMeshes[d].material = this.charMaterials[ch] || this.charMaterials[' '];
-        }
-      }
-    } else {
-      if (this.comboLabelMesh) this.comboLabelMesh.visible = false;
-      if (this.bestLabelMesh) this.bestLabelMesh.visible = true;
-      const bStr = Math.floor(highScore)
-        .toLocaleString('en-US')
-        .padStart(6, ' ');
-      for (let d = 0; d < 6; d++) {
-        const ch = bStr[d] || ' ';
-        if (this.bestDigitMeshes[d]) {
-          this.bestDigitMeshes[d].material = this.charMaterials[ch] || this.charMaterials[' '];
-        }
-      }
-    }
+    const isCombo = combo > 1;
+    if (this.comboLabelMesh) this.comboLabelMesh.visible = isCombo;
+    if (this.bestLabelMesh) this.bestLabelMesh.visible = !isCombo;
+    const comboStr = isCombo ? `x${combo}` : Math.floor(this.getHighScore(vrMode)).toLocaleString('en-US');
+    updateDigits(this.bestDigitMeshes, comboStr.padStart(6, ' '));
 
     // 4. Mode Label
     const isHard = vrMode === GameMode.VR_HARD;
@@ -572,18 +532,12 @@ export class UIManager {
       // Percent digits vs EMPTY: EMPTY only at 0%
       if (h > 0.0) {
         if (col.emptyMesh) col.emptyMesh.visible = false;
-        const pct = Math.round(h * 100);
-        const pctStr = `${pct}%`.padStart(4, ' ');
-        for (let d = 0; d < 4; d++) {
-          const ch = pctStr[d] || ' ';
-          col.percentDigitMeshes[d].visible = true;
-          col.percentDigitMeshes[d].material = this.charMaterials[ch] || this.charMaterials[' '];
-        }
+        const pctStr = `${Math.round(h * 100)}%`.padStart(4, ' ');
+        for (let d = 0; d < 4; d++) col.percentDigitMeshes[d].visible = true;
+        updateDigits(col.percentDigitMeshes, pctStr);
       } else {
         if (col.emptyMesh) col.emptyMesh.visible = true;
-        for (let d = 0; d < 4; d++) {
-          col.percentDigitMeshes[d].visible = false;
-        }
+        for (let d = 0; d < 4; d++) col.percentDigitMeshes[d].visible = false;
       }
 
       // Status Badge and Status Pill
