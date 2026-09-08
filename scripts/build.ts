@@ -109,7 +109,14 @@ async function build() {
       unsafe_methods: true,
       pure_getters: true,
       drop_console: true,
-      booleans_as_integers: true,
+      // CRITICAL - DO NOT UNCOMMENT / NEVER ENABLE:
+      // booleans_as_integers MUST remain disabled!
+      // Three.js / WebGL internally relies on strict boolean identity checks
+      // (e.g. `object.visible === true`, `material.transparent === true`,
+      // `texture.needsUpdate === true`, `depthTest === true`).
+      // Converting booleans to integers (true -> 1) breaks strict equality (1 !== true),
+      // causing Three.js to treat meshes as invisible and materials as corrupt.
+      // booleans_as_integers: false,
       collapse_vars: true,
       reduce_vars: true,
       evaluate: true,
