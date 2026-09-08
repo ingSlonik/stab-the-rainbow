@@ -63,6 +63,15 @@ export class UIManager {
   private dialogTexture: any;
   private reticle3DMesh: any;
 
+  // Dialog Canvas dirty tracking (prevents expensive 1024x1024 redraws every frame)
+  private dialogDirty = true;
+  private lastDialogState: GameState | null = null;
+  private lastDialogAudioMuted: boolean = false;
+  private lastDialogSfxMuted: boolean = false;
+  private lastDialogScore: number = -1;
+  private lastDialogIsVR: boolean = false;
+  private lastDialogVRMode: GameMode = GameMode.DESKTOP;
+  private tempLocalVec: any;
 
   // Interaction & Raycasting (for VR pointer/controller clicks)
   private raycaster: any;
@@ -88,6 +97,7 @@ export class UIManager {
 
     this.raycaster = new THREE.Raycaster();
     this.mouseVec = new THREE.Vector2(0, 0);
+    this.tempLocalVec = new THREE.Vector3();
 
     this.loadHighScores();
     this.initStaticMaterials();
@@ -116,6 +126,7 @@ export class UIManager {
     if (isHard) {
       if (score > this.highScoreHard) {
         this.highScoreHard = score;
+        this.dialogDirty = true;
         try {
           localStorage.setItem('str_h_hard', score.toString());
         } catch (_) { }
@@ -124,6 +135,7 @@ export class UIManager {
     } else if (isEasy) {
       if (score > this.highScoreEasy) {
         this.highScoreEasy = score;
+        this.dialogDirty = true;
         try {
           localStorage.setItem('str_h_easy', score.toString());
         } catch (_) { }
@@ -132,6 +144,7 @@ export class UIManager {
     } else {
       if (score > this.highScoreDesktop) {
         this.highScoreDesktop = score;
+        this.dialogDirty = true;
         try {
           localStorage.setItem('str_h_desktop', score.toString());
         } catch (_) { }
@@ -781,9 +794,32 @@ export class UIManager {
 
   }
 
+  private setHoveredButton(id: string | null): void {
+    if (this.hoveredButtonId !== id) {
+      this.hoveredButtonId = id;
+      this.dialogDirty = true;
+    }
+  }
+
+  private updateReticle3D(hit: boolean, point?: any): void {
+    if (!this.reticle3DMesh) return;
+    if (hit && point) {
+      this.dialogMesh.worldToLocal(this.tempLocalVec.copy(point));
+      this.reticle3DMesh.position.set(this.tempLocalVec.x, this.tempLocalVec.y, 0.02);
+      this.reticle3DMesh.rotation.set(0, 0, 0);
+      const isHover = !!this.hoveredButtonId;
+      this.reticle3DMesh.scale.set(isHover ? 1.3 : 1.0, isHover ? 1.3 : 1.0, 1.0);
+      this.reticle3DMesh.material.color.setHex(isHover ? 0xffdd00 : 0x00ffff);
+      this.reticle3DMesh.visible = true;
+    } else {
+      this.reticle3DMesh.visible = false;
+      this.reticle3DMesh.position.set(0, -999, 0);
+    }
+  }
+
   public updateHoverRay(origin: any, direction: any): { hit: boolean; point?: any } {
     if (!this.dialogMesh || !this.dialogMesh.visible) {
-      this.hoveredButtonId = null;
+      this.setHoveredButton(null);
       this.pointerX = -100;
       this.pointerY = -100;
       if (this.reticle3DMesh) this.reticle3DMesh.visible = false;
@@ -793,27 +829,13 @@ export class UIManager {
     this.raycaster.set(origin, direction);
     const intersects = this.raycaster.intersectObject(this.dialogMesh);
     const res = this.processIntersects(intersects);
-    if (this.reticle3DMesh) {
-      if (res.hit && res.point) {
-        const local = new THREE.Vector3();
-        this.dialogMesh.worldToLocal(local.copy(res.point));
-        this.reticle3DMesh.position.set(local.x, local.y, 0.02);
-        this.reticle3DMesh.rotation.set(0, 0, 0);
-        const isHover = !!this.hoveredButtonId;
-        this.reticle3DMesh.scale.set(isHover ? 1.3 : 1.0, isHover ? 1.3 : 1.0, 1.0);
-        this.reticle3DMesh.material.color.setHex(isHover ? 0xffdd00 : 0x00ffff);
-        this.reticle3DMesh.visible = true;
-      } else {
-        this.reticle3DMesh.visible = false;
-        this.reticle3DMesh.position.set(0, -999, 0);
-      }
-    }
+    this.updateReticle3D(res.hit, res.point);
     return res;
   }
 
   public updateHoverNdc(pointerNdcX: number, pointerNdcY: number): { hit: boolean; point?: any } {
     if (!this.dialogMesh || !this.dialogMesh.visible) {
-      this.hoveredButtonId = null;
+      this.setHoveredButton(null);
       this.pointerX = -100;
       this.pointerY = -100;
       if (this.reticle3DMesh) {
@@ -827,21 +849,7 @@ export class UIManager {
     this.raycaster.setFromCamera(this.mouseVec, this.camera);
     const intersects = this.raycaster.intersectObject(this.dialogMesh);
     const res = this.processIntersects(intersects);
-    if (this.reticle3DMesh) {
-      if (res.hit && res.point) {
-        const local = new THREE.Vector3();
-        this.dialogMesh.worldToLocal(local.copy(res.point));
-        this.reticle3DMesh.position.set(local.x, local.y, 0.02);
-        this.reticle3DMesh.rotation.set(0, 0, 0);
-        const isHover = !!this.hoveredButtonId;
-        this.reticle3DMesh.scale.set(isHover ? 1.3 : 1.0, isHover ? 1.3 : 1.0, 1.0);
-        this.reticle3DMesh.material.color.setHex(isHover ? 0xffdd00 : 0x00ffff);
-        this.reticle3DMesh.visible = true;
-      } else {
-        this.reticle3DMesh.visible = false;
-        this.reticle3DMesh.position.set(0, -999, 0);
-      }
-    }
+    this.updateReticle3D(res.hit, res.point);
     return res;
   }
 
@@ -879,10 +887,10 @@ export class UIManager {
         }
       }
 
-      this.hoveredButtonId = found;
+      this.setHoveredButton(found);
       return { hit: true, point: hit.point };
     } else {
-      this.hoveredButtonId = null;
+      this.setHoveredButton(null);
       this.pointerX = -100;
       this.pointerY = -100;
       return { hit: false };
@@ -922,6 +930,7 @@ export class UIManager {
 
   public setGameOverDeathQuote(): void {
     this.lastQuote = getRandomDeathQuip();
+    this.dialogDirty = true;
   }
 
   public renderUI(
@@ -938,8 +947,6 @@ export class UIManager {
     isVR: boolean = false,
     vrMode: GameMode = GameMode.DESKTOP
   ): void {
-    this.buttons = [];
-
     if (this.quipTimer > 0) {
       this.quipTimer -= dt;
       if (this.quipTimer <= 0) {
@@ -953,15 +960,32 @@ export class UIManager {
     // 2. Update 3D Floating Popups (100% / -5%)
     this.updateFloatingPopups(dt);
 
+    const audioMuted = getAudioMuted();
+    const sfxMuted = getSfxMuted();
+    if (
+      state !== this.lastDialogState ||
+      audioMuted !== this.lastDialogAudioMuted ||
+      sfxMuted !== this.lastDialogSfxMuted ||
+      isVR !== this.lastDialogIsVR ||
+      vrMode !== this.lastDialogVRMode
+    ) {
+      this.dialogDirty = true;
+      this.lastDialogState = state;
+      this.lastDialogAudioMuted = audioMuted;
+      this.lastDialogSfxMuted = sfxMuted;
+      this.lastDialogIsVR = isVR;
+      this.lastDialogVRMode = vrMode;
+    }
 
     if (state === GameState.MENU) {
       this.dialogMesh.visible = true;
       this.setMenuPosition(isVR);
-      this.dialogCtx.clearRect(0, 0, 1024, 1024);
-      this.drawMenu(this.dialogCtx, onStartGame, time, isVR, vrMode);
-      this.dialogTexture.needsUpdate = true;
-      if (this.dialogMesh.material && this.dialogMesh.material.map) {
-        this.dialogMesh.material.map.needsUpdate = true;
+      if (this.dialogDirty) {
+        this.buttons = [];
+        this.dialogCtx.clearRect(0, 0, 1024, 1024);
+        this.drawMenu(this.dialogCtx, onStartGame, isVR, vrMode);
+        this.dialogTexture.needsUpdate = true;
+        this.dialogDirty = false;
       }
       return;
     }
@@ -988,11 +1012,16 @@ export class UIManager {
 
     if (state === GameState.GAMEOVER) {
       this.dialogMesh.visible = true;
-      this.dialogCtx.clearRect(0, 0, 1024, 1024);
-      this.drawGameOver(this.dialogCtx, score, onRestart, onHome, onToggleMode, time, isVR, vrMode);
-      this.dialogTexture.needsUpdate = true;
-      if (this.dialogMesh.material && this.dialogMesh.material.map) {
-        this.dialogMesh.material.map.needsUpdate = true;
+      if (score !== this.lastDialogScore) {
+        this.lastDialogScore = score;
+        this.dialogDirty = true;
+      }
+      if (this.dialogDirty) {
+        this.buttons = [];
+        this.dialogCtx.clearRect(0, 0, 1024, 1024);
+        this.drawGameOver(this.dialogCtx, score, onRestart, onHome, onToggleMode, isVR, vrMode);
+        this.dialogTexture.needsUpdate = true;
+        this.dialogDirty = false;
       }
       return;
     }
@@ -1087,7 +1116,6 @@ export class UIManager {
   private drawMenu(
     ctx: CanvasRenderingContext2D,
     onStartGame: (mode: GameMode) => void,
-    time: number,
     isVR: boolean,
     currentMode: GameMode
   ): void {
@@ -1201,7 +1229,7 @@ export class UIManager {
         toggleAudio();
         const b = document.getElementById('btn-music');
         if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
-        this.dialogTexture.needsUpdate = true;
+        this.dialogDirty = true;
       }
     );
 
@@ -1219,7 +1247,7 @@ export class UIManager {
         toggleSfx();
         const b = document.getElementById('btn-sfx');
         if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
-        this.dialogTexture.needsUpdate = true;
+        this.dialogDirty = true;
       }
     );
   }
@@ -1230,7 +1258,6 @@ export class UIManager {
     onRestart: () => void,
     onHome: () => void,
     onToggleMode: () => void,
-    time: number,
     isVR: boolean,
     vrMode: GameMode
   ): void {
@@ -1349,7 +1376,7 @@ export class UIManager {
         toggleAudio();
         const b = document.getElementById('btn-music');
         if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
-        this.dialogTexture.needsUpdate = true;
+        this.dialogDirty = true;
       }
     );
 
@@ -1367,13 +1394,9 @@ export class UIManager {
         toggleSfx();
         const b = document.getElementById('btn-sfx');
         if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
-        this.dialogTexture.needsUpdate = true;
+        this.dialogDirty = true;
       }
     );
-
-    try {
-      (window as any)._gof = ctx.getImageData(0, 0, 1, 1);
-    } catch (_) {}
   }
 
 
