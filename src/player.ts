@@ -72,7 +72,7 @@ export class Player {
     this.groundMarker = new THREE.Group();
     this.groundMarker.rotation.x = -0.03;
 
-    // 1. Outer glowing starlight ring (renderOrder 60, depthTest false so never covered by track)
+    // 1. Outer glowing starlight ring (renderOrder 60)
     const ringGeom = new THREE.RingGeometry(0.20, 0.25, 32);
     ringGeom.rotateX(-Math.PI / 2);
     this.groundMarkerMat = new THREE.MeshBasicMaterial({
@@ -80,7 +80,7 @@ export class Player {
       transparent: true,
       opacity: 0.95,
       side: THREE.DoubleSide,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
     });
     const ringMesh = new THREE.Mesh(ringGeom, this.groundMarkerMat);
@@ -95,7 +95,7 @@ export class Player {
       transparent: true,
       opacity: 0.85,
       side: THREE.DoubleSide,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
     });
     const innerMesh = new THREE.Mesh(innerGeom, innerMat);
@@ -121,7 +121,7 @@ export class Player {
       color: 0xffffff,
       transparent: true,
       opacity: 0.95,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
       linewidth: 3,
     });
@@ -164,18 +164,24 @@ export class Player {
       metalness: 0.15,
       transparent: true,
       opacity: 0.88,
+      depthTest: true,
+      depthWrite: true,
     });
 
     const hornMesh = new THREE.Mesh(coneGeom, this.hornMat);
+    hornMesh.renderOrder = 70;
     this.horn.add(hornMesh);
 
     // Glowing tip at the apex
     const tipGeom = new THREE.SphereGeometry(0.024, 12, 12);
     const tipMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
+      depthTest: true,
+      depthWrite: true,
     });
     this.hornTip = new THREE.Mesh(tipGeom, tipMat);
     this.hornTip.position.set(0, 0, -coneLength);
+    this.hornTip.renderOrder = 71;
     this.horn.add(this.hornTip);
 
     // Magical starlight pointer beam extending from horn tip for VR interaction (unit length 1.0)
@@ -188,6 +194,7 @@ export class Player {
       opacity: 0.85,
     });
     this.pointerBeam = new THREE.Mesh(beamGeom, beamMat);
+    this.pointerBeam.renderOrder = 72;
     this.pointerBeam.visible = false;
     this.hornTip.add(this.pointerBeam);
 
