@@ -622,12 +622,12 @@ export class Game {
           this.track.replenishLane(c.colorIdx);
           this.cloudsStabbed++;
           playStabSound(c.colorIdx);
-          this.scoreFloat += 150 * this.combo;
+          this.scoreFloat += 100 * this.combo;
           this.score = floor(this.scoreFloat);
           this.combo = min(8, this.combo + 1);
 
-          // Visual popup (+100%) in 3D world in lane color
-          this.ui.spawnWorldPopup('+100%', c.colorIdx);
+          // Visual popup (100%) in 3D world in lane color
+          this.ui.spawnWorldPopup('100%', c.colorIdx);
 
           // Hard mode humorous quips on cloud stabbing
           if (isHard) {

@@ -146,8 +146,8 @@ export class TrackManager {
     }
 
     // Active decay: clear, noticeable progress, uniform across all lanes
-    const ramp = min(1.0, 0.55 + (runTime / 20) * 0.45);
-    const baseDecay = (0.032 + speed * 0.001) * ramp;
+    const ramp = min(1.0, 0.50 + (runTime / 24) * 0.50);
+    const baseDecay = (0.024 + speed * 0.00075) * ramp;
 
     for (let i = 0; i < LANE_COUNT; i++) {
       // In menu mode, cycle health smoothly so attract screen stays dynamic forever

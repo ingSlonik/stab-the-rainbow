@@ -48,7 +48,7 @@ export class UIManager {
     gaugeMesh: any;
   }> = [];
 
-  // Floating 3D Popups (+100% on pierce, -5% on miss)
+  // Floating 3D Popups (100% on pierce, -5% on miss)
   private floatingPopups: Array<{
     mesh: any;
     life: number;
@@ -323,8 +323,8 @@ export class UIManager {
       54,
       '#ff2a4b'
     );
-    this.labelMaterials['+100%'] = this.createTextMaterial(
-      '+100%',
+    this.labelMaterials['100%'] = this.createTextMaterial(
+      '100%',
       '900 52px system-ui, sans-serif',
       '#ffffff',
       190,
@@ -561,7 +561,7 @@ export class UIManager {
     }
   }
 
-  public spawnWorldPopup(text: '+100%' | '-5%', colorIdx: number): void {
+  public spawnWorldPopup(text: '100%' | '-5%', colorIdx: number): void {
     const baseMat = this.labelMaterials[text];
     if (!baseMat) return;
     let p = this.floatingPopups.find(item => !item.active);
@@ -578,7 +578,7 @@ export class UIManager {
     // Position further forward in front of player, directly above the corresponding color lane
     const laneX = (colorIdx - 3) * LANE_WIDTH;
     const forwardZ = -2.8;
-    const spawnY = text === '+100%' ? 1.45 : 1.25;
+    const spawnY = text === '100%' ? 1.45 : 1.25;
     p.mesh.position.set(laneX, spawnY, forwardZ);
     p.mesh.scale.set(0.70, 0.70, 0.70);
     p.mesh.visible = true;
@@ -950,7 +950,7 @@ export class UIManager {
     // 1. Update 100% Native 3D HUD Board (zero dynamic canvas uploads, 90/120Hz native WebGL)
     this.update3DBoard(score, combo, laneHealth, time, dt, vrMode);
 
-    // 2. Update 3D Floating Popups (+100% / -5%)
+    // 2. Update 3D Floating Popups (100% / -5%)
     this.updateFloatingPopups(dt);
 
 

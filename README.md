@@ -54,6 +54,23 @@ The celestial highway consists of **7 distinct parallel color tracks**:
 - **The Void:** When energy hits **0%**, the lane completely dissolves. If you are grounded and standing on that lane, you enter a hilarious tumbling freefall through space!
 - **Leaping:** While airborne during a jump, void lanes cannot drag you down. Time your jumps precisely to leap across missing color bands!
 
+### 🏆 Scoring & Combo System
+The score consists of two components: passive gallop speed and active cloud stabbing with an escalating combo multiplier.
+
+- **Passive Distance Score:** Every frame while galloping, points accumulate continuously proportional to current speed:
+  $$\Delta \text{score} = \text{speed} \times \Delta t \times 3.5$$
+  As speed accelerates from $18 \to 36\text{ units/s}$, passive scoring ramps up from $\approx 63 \to 126\text{ points/sec}$.
+- **Base Cloud Stab (100 Points):** Piercing a cloud with your cranial horn awards:
+  $$\text{Points} = 100 \times \text{combo}$$
+- **Combo Multiplier (Up to 8×):**
+  - Starts at $1\times$ ($100\text{ pts}$).
+  - Each successfully pierced cloud increments the combo multiplier by $+1$, reaching up to $8\times$ ($800\text{ pts}$ per cloud).
+  - A glowing `100%` popup appears directly over the lane in its respective rainbow hue, signifying that the lane has been fully restored to 100% integrity.
+- **Combo Reset & Miss Penalty:** If an oncoming cloud drifts past unpierced:
+  - Combo resets back to $1\times$.
+  - That color lane suffers a $-5\%$ health penalty (spawning a red `'-5%'` alert popup).
+- **Persistent High Scores:** Saved in `localStorage` separately for Desktop, VR Easy, and VR Hard modes.
+
 ---
 
 ## 🎵 Generative Ezo-Ambient Soundscape (Web Audio API)
