@@ -29,27 +29,28 @@ export const UNICORN_DEATH_QUIPS = [
   'Watch your step!',
 ];
 
-let lastSpokenTime = 0;
-
-export function speakQuip(text: string, force = false): void {
-  const now = Date.now();
-  if (!force && now - lastSpokenTime < 3200) {
-    return;
-  }
-  lastSpokenTime = now;
-
-  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.pitch = 1.35;
-      utterance.rate = 1.10;
-      utterance.volume = 0.9;
-      window.speechSynthesis.speak(utterance);
-    } catch (_) {}
-  }
-}
+// Commented out for 13KB bundle size optimization:
+// let lastSpokenTime = 0;
+//
+// export function speakQuip(text: string, force = false): void {
+//   const now = Date.now();
+//   if (!force && now - lastSpokenTime < 3200) {
+//     return;
+//   }
+//   lastSpokenTime = now;
+//
+//   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+//     try {
+//       window.speechSynthesis.cancel();
+//       const utterance = new SpeechSynthesisUtterance(text);
+//       utterance.lang = 'en-US';
+//       utterance.pitch = 1.35;
+//       utterance.rate = 1.10;
+//       utterance.volume = 0.9;
+//       window.speechSynthesis.speak(utterance);
+//     } catch (_) {}
+//   }
+// }
 
 export function getRandomStartQuip(): string {
   return randChoice(UNICORN_START_QUIPS);

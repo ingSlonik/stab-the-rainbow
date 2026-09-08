@@ -18,7 +18,8 @@ import {
   getSfxMuted,
 } from './audio';
 import {
-  speakQuip,
+  // Commented out for 13KB bundle size optimization:
+  // speakQuip,
   getRandomStartQuip,
   getRandomStabQuip,
   getRandomComboQuip,
@@ -562,7 +563,8 @@ export class Game {
     if (isHard) {
       const startQuip = getRandomStartQuip();
       this.ui?.setQuip(startQuip);
-      speakQuip(startQuip, true);
+      // Commented out for 13KB bundle size optimization:
+      // speakQuip(startQuip, true);
     }
   }
 
@@ -623,7 +625,8 @@ export class Game {
               : (Math.random() < 0.4 ? getRandomStabQuip() : null);
             if (q) {
               this.ui.setQuip(q);
-              speakQuip(q);
+              // Commented out for 13KB bundle size optimization:
+              // speakQuip(q);
             }
           }
           break;
@@ -648,7 +651,8 @@ export class Game {
         this.ui.setGameOverDeathQuote();
         const isHard = this.currentVRMode === GameMode.VR_HARD;
         if (isHard) {
-          speakQuip(this.ui.getLastQuote(), true);
+          // Commented out for 13KB bundle size optimization:
+          // speakQuip(this.ui.getLastQuote(), true);
         }
         this.ui.saveHighScore(this.score, this.currentVRMode);
       }
