@@ -27,7 +27,7 @@ async function build() {
     bundle: true,
     write: false,
     format: 'iife',
-    target: 'es2020',
+    target: 'es2022',
     treeShaking: true,
     legalComments: 'none',
     minify: true,
@@ -39,7 +39,7 @@ async function build() {
   // 2. Minify JavaScript with Terser
   console.log('\n⚡ Step 2: Minifying JavaScript with Terser...');
   const terserResult = await minifyJs(bundledJs, {
-    ecma: 2020,
+    ecma: 2022,
     compress: {
       passes: 15,
       unsafe: true,
@@ -96,7 +96,7 @@ async function build() {
     }
   );
 
-  await jsPacker.optimize(2);
+  await jsPacker.optimize(3);
   const { firstLine, secondLine } = jsPacker.makeDecoder();
   const roadrolledJs = firstLine + secondLine;
   console.log(`   Roadroller JS size: ${(roadrolledJs.length / 1024).toFixed(2)} KB (${roadrolledJs.length} bytes)`);
@@ -121,6 +121,9 @@ async function build() {
     collapseWhitespace: true,
     removeComments: true,
     removeAttributeQuotes: true,
+    collapseBooleanAttributes: true,
+    removeRedundantAttributes: true,
+    removeEmptyAttributes: true,
   });
 
   const htmlDistPath = path.join(distDir, 'index.html');
