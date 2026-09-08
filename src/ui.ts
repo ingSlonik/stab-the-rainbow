@@ -184,23 +184,25 @@ export class UIManager {
     // 2. Rainbow track health percentages: written directly on the rainbow track in front of the player!
     this.trackPercentCanvas = document.createElement('canvas');
     this.trackPercentCanvas.width = 1024;
-    this.trackPercentCanvas.height = 160;
+    this.trackPercentCanvas.height = 256;
     this.trackPercentCtx = this.trackPercentCanvas.getContext('2d')!;
 
     this.trackPercentTexture = new THREE.CanvasTexture(this.trackPercentCanvas);
     this.trackPercentTexture.minFilter = THREE.LinearFilter;
 
-    const trackGeom = new THREE.PlaneGeometry(7.7, 1.45);
+    const trackGeom = new THREE.PlaneGeometry(6.65, 1.45);
     const trackMat = new THREE.MeshBasicMaterial({
       map: this.trackPercentTexture,
       transparent: true,
       side: THREE.DoubleSide,
+      depthTest: true,
       depthWrite: false,
     });
 
     this.trackPercentMesh = new THREE.Mesh(trackGeom, trackMat);
-    this.trackPercentMesh.position.set(0, 0.08, -5.2);
-    this.trackPercentMesh.rotation.x = -Math.PI / 2 + 0.35;
+    this.trackPercentMesh.position.set(0, 0.20, -4.8);
+    this.trackPercentMesh.rotation.set(-Math.PI / 2 + 0.40, 0, 0);
+    this.trackPercentMesh.renderOrder = 100;
     this.trackPercentMesh.visible = true;
     this.group.add(this.trackPercentMesh);
 
@@ -414,9 +416,19 @@ export class UIManager {
     // Always keep track percentages updated and visible on the rainbow road
     if (this.trackPercentMesh) {
       this.trackPercentMesh.visible = true;
-      this.trackPercentMesh.position.set(0, 0.08, -5.2);
-      this.trackPercentMesh.rotation.x = -Math.PI / 2 + 0.35;
-      this.drawTrackPercentages(this.trackPercentCtx, laneHealth, urgentLane, time);
+      this.trackPercentMesh.position.set(0, 0.20, -4.8);
+      this.trackPercentMesh.rotation.set(-Math.PI / 2 + 0.40, 0, 0);
+      this.drawTrackPercentages(
+        this.trackPercentCtx,
+        laneHealth,
+        urgentLane,
+        time,
+        score,
+        combo,
+        this.getHighScore(vrMode),
+        isVR,
+        vrMode
+      );
       this.trackPercentTexture.needsUpdate = true;
     }
 
@@ -433,27 +445,14 @@ export class UIManager {
     }
 
     if (state === GameState.PLAYING) {
-      if (isVR) {
-        // Floating 3D arcade scoreboard banner right above the rainbow track in front of player
-        this.hudMesh.position.set(0, 2.45, -3.2);
-        this.hudMesh.rotation.set(0.12, 0, 0);
-        this.hudMesh.scale.set(1.35, 1.35, 1.35);
-      } else {
-        // Lower view on desktop screen
-        this.hudMesh.position.set(0, 0.72, -2.5);
-        this.hudMesh.rotation.set(-0.16, 0, 0);
-        this.hudMesh.scale.set(1.0, 1.0, 1.0);
-      }
-
-      this.hudMesh.visible = true;
+      this.hudMesh.visible = false;
+      this.hudMesh.position.set(0, -999, 0);
       this.dialogMesh.visible = false;
       this.dialogMesh.position.set(0, -999, 0);
       if (this.reticle3DMesh) {
         this.reticle3DMesh.visible = false;
         this.reticle3DMesh.position.set(0, -999, 0);
       }
-      this.drawHUD(this.hudCtx, score, combo, laneHealth, urgentLane, time, vrMode);
-      this.hudTexture.needsUpdate = true;
       return;
     }
 
@@ -902,65 +901,139 @@ export class UIManager {
     ctx: CanvasRenderingContext2D,
     laneHealth: number[],
     urgentLane: number,
-    time: number
+    time: number,
+    score: number = 0,
+    combo: number = 1,
+    highScore: number = 0,
+    isVR: boolean = false,
+    vrMode: VRMode | GameMode = GameMode.DESKTOP
   ): void {
-    ctx.clearRect(0, 0, 1024, 160);
+    ctx.clearRect(0, 0, 1024, 256);
 
-    const laneW = 1024 / LANE_COUNT;
+    // 1. TOP HEADER: Score, Combo / Best Score, Mode
+    ctx.fillStyle = 'rgba(8, 6, 22, 0.90)';
+    this.roundRect(ctx, 8, 6, 1008, 52, 14);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 212, 255, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.textBaseline = 'middle';
+
+    // Left: Live Score
+    ctx.textAlign = 'left';
+    ctx.font = '900 28px system-ui, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#00d4ff';
+    ctx.shadowBlur = 10;
+    ctx.fillText(`SCORE: ${score.toLocaleString()}`, 28, 32);
+    ctx.shadowBlur = 0;
+
+    // Center: Combo or Best Score
+    ctx.textAlign = 'center';
+    if (combo > 1) {
+      ctx.font = '900 28px system-ui, sans-serif';
+      ctx.fillStyle = '#ffdd00';
+      ctx.shadowColor = '#ffdd00';
+      ctx.shadowBlur = 12;
+      ctx.fillText(`🔥 COMBO x${combo}! 🔥`, 512, 32);
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.font = '800 21px system-ui, sans-serif';
+      ctx.fillStyle = '#ffd24d';
+      ctx.fillText(`BEST: ${highScore.toLocaleString()}`, 512, 32);
+    }
+
+    // Right: Mode
+    const isHard = vrMode === (VRMode.UNICORN_HARD as any) || (vrMode as any) === GameMode.VR_HARD;
+    const isEasy = vrMode === (VRMode.RIDER_EASY as any) || (vrMode as any) === GameMode.VR_EASY;
+    const modeLabel = isHard ? 'VR HARD' : (isEasy ? 'VR EASY' : 'DESKTOP');
+    ctx.textAlign = 'right';
+    ctx.font = '800 21px system-ui, sans-serif';
+    ctx.fillStyle = '#a0b8d8';
+    ctx.fillText(modeLabel, 996, 32);
+    ctx.restore();
+
+    // 2. BOTTOM CARDS: 7 Rainbow Lane Columns
+    const colW = 1008 / LANE_COUNT;
+    const startX = 8;
+    const cardY = 66;
+    const cardH = 184;
 
     for (let i = 0; i < LANE_COUNT; i++) {
       const h = laneHealth[i] ?? 1.0;
-      const x = i * laneW;
+      const x = startX + i * colW + 3;
+      const w = colW - 6;
       const col = RAINBOW_HEX_STRINGS[i];
       const isUrgent = i === urgentLane;
       const isCritical = h < 0.32;
 
-      // Dark card on the rainbow lane
-      ctx.fillStyle = 'rgba(10, 8, 25, 0.88)';
-      this.roundRect(ctx, x + 5, 8, laneW - 10, 144, 16);
+      // Dark card container
+      ctx.fillStyle = 'rgba(12, 9, 28, 0.88)';
+      this.roundRect(ctx, x, cardY, w, cardH, 12);
       ctx.fill();
 
-      // Health fill background inside card
+      // Dynamic health fill from bottom of card
       if (h > 0.04) {
         ctx.fillStyle = col;
-        ctx.globalAlpha = 0.50;
-        const fillH = 136 * h;
-        this.roundRect(ctx, x + 9, 8 + 140 - fillH, laneW - 18, fillH, 12);
+        ctx.globalAlpha = 0.52;
+        const fillH = (cardH - 8) * h;
+        this.roundRect(ctx, x + 3, cardY + cardH - 4 - fillH, w - 6, fillH, 9);
         ctx.fill();
         ctx.globalAlpha = 1.0;
       }
 
-      // Border: flash white if urgent or critical
+      // Border with urgent/critical pulse
       const blink = sin(time * 18) > 0;
       ctx.strokeStyle = isUrgent
         ? (blink ? '#ffffff' : col)
         : isCritical
           ? (blink ? '#ffffff' : '#ff2a4b')
           : col;
-      ctx.lineWidth = isUrgent || isCritical ? 5.0 : 2.5;
-      this.roundRect(ctx, x + 5, 8, laneW - 10, 144, 16);
+      ctx.lineWidth = isUrgent || isCritical ? 4.5 : 2.0;
+      this.roundRect(ctx, x, cardY, w, cardH, 12);
       ctx.stroke();
 
-      // Color name
+      // Lane Color Name
       ctx.fillStyle = col;
-      ctx.font = '800 22px system-ui, sans-serif';
+      ctx.font = '800 17px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(COLOR_NAMES_EN[i].toUpperCase(), x + laneW / 2, 42);
+      ctx.fillText(COLOR_NAMES_EN[i].toUpperCase(), x + w / 2, cardY + 28);
 
-      // Percentage or EMPTY label
+      // Percentage or EMPTY
       ctx.save();
       if (h > 0.04) {
         ctx.fillStyle = '#ffffff';
         ctx.shadowColor = '#000000';
         ctx.shadowBlur = 8;
-        ctx.font = '900 52px system-ui, sans-serif';
-        ctx.fillText(`${Math.round(h * 100)}%`, x + laneW / 2, 106);
+        ctx.font = '900 44px system-ui, sans-serif';
+        ctx.fillText(`${Math.round(h * 100)}%`, x + w / 2, cardY + 92);
       } else {
         ctx.fillStyle = '#ff2a4b';
         ctx.shadowColor = '#ff2a4b';
-        ctx.shadowBlur = 12;
-        ctx.font = '900 30px system-ui, sans-serif';
-        ctx.fillText('EMPTY', x + laneW / 2, 102);
+        ctx.shadowBlur = 10;
+        ctx.font = '900 25px system-ui, sans-serif';
+        ctx.fillText('EMPTY', x + w / 2, cardY + 90);
+      }
+      ctx.restore();
+
+      // Status Indicator
+      ctx.save();
+      ctx.font = '800 14px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      if (h > 0.70) {
+        ctx.fillStyle = '#10e052';
+        ctx.fillText('● OK', x + w / 2, cardY + 148);
+      } else if (h > 0.32) {
+        ctx.fillStyle = '#ffdd00';
+        ctx.fillText('▲ DRAIN', x + w / 2, cardY + 148);
+      } else if (h > 0.04) {
+        ctx.fillStyle = '#ff2a4b';
+        ctx.fillText('⚠ ALERT', x + w / 2, cardY + 148);
+      } else {
+        ctx.fillStyle = '#888888';
+        ctx.fillText('✖ GONE', x + w / 2, cardY + 148);
       }
       ctx.restore();
     }
