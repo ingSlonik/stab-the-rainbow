@@ -179,39 +179,91 @@ export function setAudioState(state: GameState, isGrounded: boolean, speedMultip
 function playHoof(time: number, isLeft: boolean, intensity: number): void {
   if (!audioCtx || !musicGain || isMuted) return;
 
-  const g = audioCtx.createGain();
+  const hoofGain = audioCtx.createGain();
   const pan = audioCtx.createStereoPanner();
-  pan.pan.setValueAtTime(isLeft ? -0.14 : 0.14, time);
+  // Clear stereo separation between left and right hooves
+  pan.pan.setValueAtTime(isLeft ? -0.28 : 0.28, time);
 
-  // Pitch sweep: fast hollow resonance
-  const osc = audioCtx.createOscillator();
-  osc.type = 'triangle';
-  const startF = isLeft ? 260 : 310;
-  const endF = isLeft ? 75 : 95;
-  osc.frequency.setValueAtTime(startF, time);
-  osc.frequency.exponentialRampToValueAtTime(endF, time + 0.038);
+  // 1. Resonant hollow cavity knock ("clop/klap" - characteristic acoustic body)
+  const knockOsc = audioCtx.createOscillator();
+  const knockFilter = audioCtx.createBiquadFilter();
+  const knockGain = audioCtx.createGain();
 
-  // Click transient on crystal
-  const click = audioCtx.createOscillator();
-  click.type = 'square';
-  click.frequency.setValueAtTime(isLeft ? 980 : 1200, time);
+  knockOsc.type = 'triangle';
+  const startF = isLeft ? 500 : 640;
+  const endF = isLeft ? 140 : 180;
+  knockOsc.frequency.setValueAtTime(startF, time);
+  knockOsc.frequency.exponentialRampToValueAtTime(endF, time + 0.04);
+
+  // Bandpass filter produces the distinctive wooden / keratin "tok-tok" hollow knock
+  knockFilter.type = 'bandpass';
+  knockFilter.frequency.setValueAtTime(isLeft ? 520 : 700, time);
+  knockFilter.Q.setValueAtTime(4.0, time);
+
+  knockGain.gain.setValueAtTime(0.75 * intensity, time);
+  knockGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.046);
+
+  knockOsc.connect(knockFilter);
+  knockFilter.connect(knockGain);
+  knockGain.connect(hoofGain);
+
+  // 2. Crisp crystal / horseshoe contact transient ("clip/cvak" - cuts through the mix)
+  const clickOsc = audioCtx.createOscillator();
   const clickGain = audioCtx.createGain();
-  clickGain.gain.setValueAtTime(0.08 * intensity, time);
+  clickOsc.type = 'square';
+  clickOsc.frequency.setValueAtTime(isLeft ? 1700 : 2200, time);
+  clickOsc.frequency.exponentialRampToValueAtTime(isLeft ? 650 : 850, time + 0.015);
+
+  clickGain.gain.setValueAtTime(0.28 * intensity, time);
   clickGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.018);
 
-  g.gain.setValueAtTime(0.38 * intensity, time);
-  g.gain.exponentialRampToValueAtTime(0.0001, time + 0.045);
+  clickOsc.connect(clickGain);
+  clickGain.connect(hoofGain);
 
-  osc.connect(g);
-  click.connect(clickGain);
-  clickGain.connect(g);
-  g.connect(pan);
+  // 3. Low-end punch / thud (weight of the hoof landing on the rainbow track)
+  const thudOsc = audioCtx.createOscillator();
+  const thudGain = audioCtx.createGain();
+  thudOsc.type = 'sine';
+  thudOsc.frequency.setValueAtTime(170, time);
+  thudOsc.frequency.exponentialRampToValueAtTime(55, time + 0.038);
+
+  thudGain.gain.setValueAtTime(0.52 * intensity, time);
+  thudGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.042);
+
+  thudOsc.connect(thudGain);
+  thudGain.connect(hoofGain);
+
+  // 4. Crisp surface friction noise transient using reusable noiseBuffer
+  if (noiseBuffer) {
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const noiseFilter = audioCtx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.setValueAtTime(isLeft ? 2400 : 3100, time);
+    noiseFilter.Q.setValueAtTime(2.2, time);
+
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.20 * intensity, time);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.02);
+
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(hoofGain);
+
+    noise.start(time);
+    noise.stop(time + 0.024);
+  }
+
+  hoofGain.gain.setValueAtTime(0.9, time);
+  hoofGain.connect(pan);
   pan.connect(musicGain);
 
-  osc.start(time);
-  osc.stop(time + 0.05);
-  click.start(time);
-  click.stop(time + 0.025);
+  knockOsc.start(time);
+  knockOsc.stop(time + 0.05);
+  clickOsc.start(time);
+  clickOsc.stop(time + 0.025);
+  thudOsc.start(time);
+  thudOsc.stop(time + 0.05);
 }
 
 // 2. Punchy Sub Kick (Underpinning heavy lead hoof)
@@ -458,24 +510,26 @@ function scheduleStep(step: number, time: number): void {
   // A. Hoofbeats & Gallop Beat
   // Classic 16th gallop pattern: [1, 0, 1, 1,  1, 0, 1, 1, ...]
   // -----------------------------------------------------------
-  const isHoofStep = [0, 2, 3, 4, 6, 7, 8, 10, 11, 12, 14, 15].includes(stepInBar);
+  const HOOF_STEPS = [0, 2, 3, 4, 6, 7, 8, 10, 11, 12, 14, 15];
+  const hoofHitIdx = HOOF_STEPS.indexOf(stepInBar);
 
-  if ((isPlaying || isMenu) && isHoofStep) {
-    const isLeftHoof = (stepInBar === 0 || stepInBar === 3 || stepInBar === 6 || stepInBar === 10 || stepInBar === 14);
+  if ((isPlaying || isMenu) && hoofHitIdx !== -1) {
+    // Alternates Left ("Clop") and Right ("Clip") hooves consistently on every consecutive strike
+    const isLeftHoof = hoofHitIdx % 2 === 0;
     // In air (jumping), hooves are silenced for dramatic lift!
     const hoofVol = isPlaying
-      ? (curIsGrounded ? (stepInBar % 4 === 0 ? 1.0 : 0.72) : 0.08)
-      : 0.28;
+      ? (curIsGrounded ? (stepInBar % 4 === 0 ? 1.05 : 0.85) : 0.08)
+      : 0.58;
     playHoof(time, isLeftHoof, hoofVol);
 
     if (isPlaying) {
       // Sub kick on beat 1 & 3
       if (stepInBar === 0 || stepInBar === 8) {
-        playKick(time, curIsGrounded ? 1.0 : 0.4);
+        playKick(time, curIsGrounded ? 0.95 : 0.4);
       }
       // Snare / Clap on beat 2 & 4
       if (stepInBar === 4 || stepInBar === 12) {
-        playSnare(time, 1.0);
+        playSnare(time, 0.95);
       }
     }
   }
