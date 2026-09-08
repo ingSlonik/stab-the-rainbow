@@ -183,11 +183,11 @@ export class UIManager {
   public setMenuPosition(isVR: boolean = false): void {
     if (!this.dialogMesh) return;
     if (isVR) {
-      this.dialogMesh.position.set(0, 1.65, -2.8);
-      this.dialogMesh.rotation.x = -0.05;
+      this.dialogMesh.position.set(0, 2.15, -2.8);
+      this.dialogMesh.rotation.x = -0.03;
     } else {
-      this.dialogMesh.position.set(0, 1.75, -3.2);
-      this.dialogMesh.rotation.x = -0.08;
+      this.dialogMesh.position.set(0, 2.25, -3.2);
+      this.dialogMesh.rotation.x = -0.04;
     }
   }
 
@@ -233,58 +233,58 @@ export class UIManager {
     for (const ch of chars) {
       this.charMaterials[ch] = this.createTextMaterial(
         ch,
-        '900 62px system-ui, sans-serif',
+        '900 110px system-ui, sans-serif',
         '#ffffff',
-        64,
-        80,
+        112,
+        140,
         '#000000'
       );
     }
 
-    // 2. Fixed UI Labels
+    // 2. Fixed UI Labels (enlarged for crisp readability and prominent header)
     this.labelMaterials['SCORE:'] = this.createTextMaterial(
       'SCORE:',
-      '900 32px system-ui, sans-serif',
+      '900 48px system-ui, sans-serif',
       '#ffffff',
-      192,
-      48,
+      280,
+      72,
       '#00d4ff'
     );
     this.labelMaterials['BEST:'] = this.createTextMaterial(
       'BEST:',
-      '800 28px system-ui, sans-serif',
+      '900 44px system-ui, sans-serif',
       '#ffd24d',
-      160,
-      48
+      240,
+      72
     );
     this.labelMaterials['COMBO'] = this.createTextMaterial(
       'COMBO',
-      '900 30px system-ui, sans-serif',
+      '900 48px system-ui, sans-serif',
       '#ffdd00',
-      160,
-      48,
+      240,
+      72,
       '#ffdd00'
     );
     this.labelMaterials['VR EASY'] = this.createTextMaterial(
       'VR EASY',
-      '800 24px system-ui, sans-serif',
+      '900 46px system-ui, sans-serif',
       '#00d4ff',
-      180,
-      44
+      340,
+      72
     );
     this.labelMaterials['VR HARD'] = this.createTextMaterial(
       'VR HARD',
-      '800 24px system-ui, sans-serif',
+      '900 46px system-ui, sans-serif',
       '#ffdd00',
-      180,
-      44
+      340,
+      72
     );
     this.labelMaterials['DESKTOP'] = this.createTextMaterial(
       'DESKTOP',
-      '800 24px system-ui, sans-serif',
+      '900 46px system-ui, sans-serif',
       '#a0b8d8',
-      180,
-      44
+      340,
+      72
     );
 
     // 3. Lane Color Names
@@ -292,76 +292,77 @@ export class UIManager {
       const name = COLOR_NAMES_EN[i].toUpperCase();
       this.labelMaterials[name] = this.createTextMaterial(
         name,
-        '900 26px system-ui, sans-serif',
+        '900 36px system-ui, sans-serif',
         RAINBOW_HEX_STRINGS[i],
-        160,
-        44
+        220,
+        56
       );
     }
 
     // 4. Status Badges
     this.labelMaterials['● OK'] = this.createTextMaterial(
       '● OK',
-      '800 22px system-ui, sans-serif',
+      '900 30px system-ui, sans-serif',
       '#10e052',
-      140,
-      40
+      180,
+      48
     );
     this.labelMaterials['▲ DRAIN'] = this.createTextMaterial(
       '▲ DRAIN',
-      '800 22px system-ui, sans-serif',
+      '900 30px system-ui, sans-serif',
       '#ffdd00',
-      140,
-      40
+      180,
+      48
     );
     this.labelMaterials['⚠ ALERT'] = this.createTextMaterial(
       '⚠ ALERT',
-      '800 22px system-ui, sans-serif',
+      '900 30px system-ui, sans-serif',
       '#ff2a4b',
-      140,
-      40
+      180,
+      48
     );
     this.labelMaterials['✖ GONE'] = this.createTextMaterial(
       '✖ GONE',
-      '800 22px system-ui, sans-serif',
+      '900 30px system-ui, sans-serif',
       '#888888',
-      140,
-      40
+      180,
+      48
     );
     this.labelMaterials['EMPTY'] = this.createTextMaterial(
       'EMPTY',
-      '900 32px system-ui, sans-serif',
+      '900 46px system-ui, sans-serif',
       '#ff2a4b',
-      160,
-      54,
+      240,
+      72,
       '#ff2a4b'
     );
     this.labelMaterials['100%'] = this.createTextMaterial(
       '100%',
-      '900 52px system-ui, sans-serif',
+      '900 64px system-ui, sans-serif',
       '#ffffff',
-      190,
-      64,
+      220,
+      76,
       '#000000'
     );
     this.labelMaterials['-5%'] = this.createTextMaterial(
       '-5%',
-      '900 52px system-ui, sans-serif',
+      '900 64px system-ui, sans-serif',
       '#ffffff',
-      150,
-      64,
+      180,
+      76,
       '#000000'
     );
   }
 
   private init3DBoard(): void {
     this.board3DGroup = new THREE.Group();
-    this.board3DGroup.position.set(0, 0.72, -3.8);
-    this.board3DGroup.rotation.set(-Math.PI / 2 + 0.40, 0, 0);
+    // Positioned closer to player with optimized sightline tilt
+    this.board3DGroup.position.set(0, 0.74, -2.7);
+    this.board3DGroup.rotation.set(-Math.PI / 2 + 0.46, 0, 0);
     this.group.add(this.board3DGroup);
 
-    // 1. Dark Main Backplate (scaled for ~2.96m width)
-    const bgGeom = new THREE.PlaneGeometry(2.96, 0.78);
+    // 1. Dark Main Backplate (tightened to 2.80m width, exactly matching the 2.80m rainbow track with minimal side padding)
+    const bgGeom = new THREE.PlaneGeometry(2.80, 0.82);
     const bgMat = new THREE.MeshBasicMaterial({
       color: 0x080616,
       transparent: true,
@@ -369,7 +370,7 @@ export class UIManager {
       depthWrite: false,
     });
     const bgMesh = new THREE.Mesh(bgGeom, bgMat);
-    bgMesh.position.set(0, 0.08, 0);
+    bgMesh.position.set(0, 0.09, 0);
     bgMesh.renderOrder = 100;
     this.board3DGroup.add(bgMesh);
 
@@ -379,12 +380,12 @@ export class UIManager {
       frameEdges,
       new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.4 })
     );
-    frameLine.position.set(0, 0.08, 0.005);
+    frameLine.position.set(0, 0.09, 0.005);
     frameLine.renderOrder = 101;
     this.board3DGroup.add(frameLine);
 
     // Separator line between header and lane columns
-    const sepGeom = new THREE.PlaneGeometry(2.92, 0.01);
+    const sepGeom = new THREE.PlaneGeometry(2.78, 0.012);
     const sepMat = new THREE.MeshBasicMaterial({
       color: 0x00d4ff,
       transparent: true,
@@ -392,67 +393,67 @@ export class UIManager {
       depthWrite: false,
     });
     const sepMesh = new THREE.Mesh(sepGeom, sepMat);
-    sepMesh.position.set(0, 0.25, 0.01);
+    sepMesh.position.set(0, 0.24, 0.01);
     sepMesh.renderOrder = 102;
     this.board3DGroup.add(sepMesh);
 
-    // 2. Top Header Bar
+    // 2. Top Header Bar (prominently enlarged fonts for score, multiplier/combo, and game mode)
     // Left: "SCORE:" Label
-    const scoreLabelGeom = new THREE.PlaneGeometry(0.28, 0.08);
+    const scoreLabelGeom = new THREE.PlaneGeometry(0.32, 0.11);
     const scoreLabelMesh = new THREE.Mesh(scoreLabelGeom, this.labelMaterials['SCORE:']);
-    scoreLabelMesh.position.set(-1.18, 0.33, 0.02);
+    scoreLabelMesh.position.set(-1.18, 0.36, 0.02);
     scoreLabelMesh.renderOrder = 104;
     this.board3DGroup.add(scoreLabelMesh);
 
-    // Score Digits (8 digit quads to support scores up to 99,999,999 with commas)
+    // Score Digits (8 digit quads, enlarged for crisp visibility)
     this.scoreDigitMeshes = [];
     for (let d = 0; d < 8; d++) {
-      const dGeom = new THREE.PlaneGeometry(0.055, 0.08);
+      const dGeom = new THREE.PlaneGeometry(0.065, 0.11);
       const dMesh = new THREE.Mesh(dGeom, this.charMaterials[' ']);
-      dMesh.position.set(-0.98 + d * 0.058, 0.33, 0.02);
+      dMesh.position.set(-0.97 + d * 0.068, 0.36, 0.02);
       dMesh.renderOrder = 104;
       this.board3DGroup.add(dMesh);
       this.scoreDigitMeshes.push(dMesh);
     }
 
     // Heartbeat Pulse Mesh (instant visual feedback of 90/120Hz live frame loop)
-    const hbGeom = new THREE.CircleGeometry(0.018, 16);
+    const hbGeom = new THREE.CircleGeometry(0.022, 16);
     const hbMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, side: THREE.DoubleSide, depthWrite: false });
     this.heartbeatMesh = new THREE.Mesh(hbGeom, hbMat);
-    this.heartbeatMesh.position.set(-0.46, 0.33, 0.02);
+    this.heartbeatMesh.position.set(-0.41, 0.36, 0.02);
     this.heartbeatMesh.renderOrder = 104;
     this.board3DGroup.add(this.heartbeatMesh);
 
-    // Center: COMBO or BEST Label & Digits
-    const centerLabelGeom = new THREE.PlaneGeometry(0.24, 0.08);
+    // Center: COMBO or BEST Label & Digits (significantly enlarged multiplier)
+    const centerLabelGeom = new THREE.PlaneGeometry(0.28, 0.11);
     this.comboLabelMesh = new THREE.Mesh(centerLabelGeom, this.labelMaterials['COMBO']);
-    this.comboLabelMesh.position.set(-0.10, 0.33, 0.02);
+    this.comboLabelMesh.position.set(-0.19, 0.36, 0.02);
     this.comboLabelMesh.renderOrder = 104;
     this.board3DGroup.add(this.comboLabelMesh);
 
     this.bestLabelMesh = new THREE.Mesh(centerLabelGeom, this.labelMaterials['BEST:']);
-    this.bestLabelMesh.position.set(-0.10, 0.33, 0.02);
+    this.bestLabelMesh.position.set(-0.19, 0.36, 0.02);
     this.bestLabelMesh.renderOrder = 104;
     this.board3DGroup.add(this.bestLabelMesh);
 
     this.bestDigitMeshes = [];
     for (let d = 0; d < 6; d++) {
-      const dGeom = new THREE.PlaneGeometry(0.055, 0.08);
+      const dGeom = new THREE.PlaneGeometry(0.065, 0.11);
       const dMesh = new THREE.Mesh(dGeom, this.charMaterials[' ']);
-      dMesh.position.set(0.08 + d * 0.058, 0.33, 0.02);
+      dMesh.position.set(0.01 + d * 0.068, 0.36, 0.02);
       dMesh.renderOrder = 104;
       this.board3DGroup.add(dMesh);
       this.bestDigitMeshes.push(dMesh);
     }
 
-    // Right: Mode Label
-    const modeGeom = new THREE.PlaneGeometry(0.28, 0.08);
+    // Right: Mode Label (prominently enlarged game mode indicator)
+    const modeGeom = new THREE.PlaneGeometry(0.46, 0.11);
     this.modeLabelMesh = new THREE.Mesh(modeGeom, this.labelMaterials['DESKTOP']);
-    this.modeLabelMesh.position.set(1.18, 0.33, 0.02);
+    this.modeLabelMesh.position.set(1.11, 0.36, 0.02);
     this.modeLabelMesh.renderOrder = 104;
     this.board3DGroup.add(this.modeLabelMesh);
 
-    // 3. Bottom: 7 Rainbow Lane Columns (spaced exactly at 0.40m matching the rainbow)
+    // 3. Bottom: 7 Rainbow Lane Columns (spaced at 0.40m matching the rainbow, with snug card widths)
     this.laneColumns = [];
     for (let i = 0; i < LANE_COUNT; i++) {
       const cx = LANE_WIDTH * (i - 3);
@@ -461,7 +462,7 @@ export class UIManager {
       this.board3DGroup.add(colGroup);
 
       // Card Background Plane
-      const cardGeom = new THREE.PlaneGeometry(0.37, 0.50);
+      const cardGeom = new THREE.PlaneGeometry(0.38, 0.50);
       const cardMat = new THREE.MeshBasicMaterial({
         color: 0x0c091c,
         transparent: true,
@@ -484,7 +485,7 @@ export class UIManager {
       colGroup.add(borderMesh);
 
       // 3D Gauge Fill inside card (pivoted at bottom, scales with lane health)
-      const gaugeGeom = new THREE.PlaneGeometry(0.35, 0.48);
+      const gaugeGeom = new THREE.PlaneGeometry(0.36, 0.48);
       gaugeGeom.translate(0, 0.24, 0); // pivot at bottom
       const gaugeMat = new THREE.MeshBasicMaterial({
         color: RAINBOW_COLORS[i],
@@ -498,7 +499,7 @@ export class UIManager {
       colGroup.add(gaugeMesh);
 
       // Color Name Quad
-      const nameGeom = new THREE.PlaneGeometry(0.32, 0.075);
+      const nameGeom = new THREE.PlaneGeometry(0.34, 0.082);
       const colorLabelMesh = new THREE.Mesh(
         nameGeom,
         this.labelMaterials[COLOR_NAMES_EN[i].toUpperCase()]
@@ -509,9 +510,9 @@ export class UIManager {
 
       // 4 Percentage Digit Quads (e.g. '1', '0', '0', '%' or ' ', '8', '5', '%')
       const percentDigitMeshes: any[] = [];
-      const pw = 0.062;
+      const pw = 0.066;
       for (let d = 0; d < 4; d++) {
-        const pGeom = new THREE.PlaneGeometry(pw, 0.09);
+        const pGeom = new THREE.PlaneGeometry(pw, 0.096);
         const pMesh = new THREE.Mesh(pGeom, this.charMaterials[' ']);
         pMesh.position.set(-1.5 * pw + d * pw, 0.05, 0.025);
         pMesh.renderOrder = 104;
@@ -520,7 +521,7 @@ export class UIManager {
       }
 
       // EMPTY label (displayed when lane health is <= 0.04)
-      const emptyGeom = new THREE.PlaneGeometry(0.28, 0.085);
+      const emptyGeom = new THREE.PlaneGeometry(0.30, 0.092);
       const emptyMesh = new THREE.Mesh(emptyGeom, this.labelMaterials['EMPTY']);
       emptyMesh.position.set(0, 0.05, 0.025);
       emptyMesh.renderOrder = 104;
@@ -528,14 +529,14 @@ export class UIManager {
       colGroup.add(emptyMesh);
 
       // Status Text Mesh (● OK, ▲ DRAIN, ⚠ ALERT, ✖ GONE)
-      const stGeom = new THREE.PlaneGeometry(0.26, 0.065);
+      const stGeom = new THREE.PlaneGeometry(0.28, 0.070);
       const statusTextMesh = new THREE.Mesh(stGeom, this.labelMaterials['● OK']);
       statusTextMesh.position.set(0, -0.11, 0.02);
       statusTextMesh.renderOrder = 104;
       colGroup.add(statusTextMesh);
 
       // Status Pill Mesh (glowing underline)
-      const pillGeom = new THREE.PlaneGeometry(0.22, 0.018);
+      const pillGeom = new THREE.PlaneGeometry(0.24, 0.020);
       const pillMat = new THREE.MeshBasicMaterial({ color: 0x10e052, depthWrite: false });
       const statusPillMesh = new THREE.Mesh(pillGeom, pillMat);
       statusPillMesh.position.set(0, -0.17, 0.02);
@@ -590,7 +591,7 @@ export class UIManager {
 
     // Position further forward in front of player, directly above the corresponding color lane
     const laneX = (colorIdx - 3) * LANE_WIDTH;
-    const forwardZ = -2.8;
+    const forwardZ = -2.65;
     const spawnY = text === '100%' ? 1.45 : 1.25;
     p.mesh.position.set(laneX, spawnY, forwardZ);
     p.mesh.scale.set(0.70, 0.70, 0.70);
@@ -772,8 +773,8 @@ export class UIManager {
     });
 
     this.dialogMesh = new THREE.Mesh(dialogGeom, dialogMat);
-    this.dialogMesh.position.set(0, 1.65, -2.8);
-    this.dialogMesh.rotation.x = -0.05;
+    this.dialogMesh.position.set(0, 2.15, -2.8);
+    this.dialogMesh.rotation.x = -0.03;
     this.dialogMesh.renderOrder = 2000;
     this.dialogMesh.visible = true;
     this.group.add(this.dialogMesh);
