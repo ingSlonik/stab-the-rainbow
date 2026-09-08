@@ -52,8 +52,37 @@ async function build() {
     fs.mkdirSync(distDir, { recursive: true });
   }
 
-  // 1. Bundle TypeScript to JavaScript with esbuild
+  const rawCss = fs.readFileSync('src/style.css', 'utf8');
+  const indexHtmlRaw = fs.readFileSync('index.html', 'utf8');
+
+  // 1a. Unminified bundle for debugging (Step 0: pure bundle before any minification)
   console.log('\n📦 Step 1: Bundling TypeScript with esbuild...');
+  const unminifiedBundle = await esbuild.build({
+    entryPoints: ['src/game.ts'],
+    bundle: true,
+    write: false,
+    format: 'iife',
+    target: 'es2022',
+    treeShaking: true,
+    legalComments: 'none',
+    minify: false,
+  });
+  const unminifiedJs = unminifiedBundle.outputFiles[0].text;
+
+  // Stage 1 HTML: original index.html with raw CSS and unminified bundled JS
+  const stage1Html = indexHtmlRaw
+    .replace(
+      /<link\b[^>]*\brel=["']stylesheet["'][^>]*\/?>|<link\b[^>]*\bhref=["'][^"']*style\.css["'][^>]*\/?>/i,
+      `<style>${rawCss}</style>`
+    )
+    .replace(
+      /<script\b[^>]*\bsrc=["'][^"']*game\.ts["'][^>]*>\s*<\/script>/i,
+      `<script>${unminifiedJs}</script>`
+    );
+  fs.writeFileSync(path.join(distDir, 'index_1_bundle.html'), stage1Html, 'utf8');
+  console.log(`   Stage 1: dist/index_1_bundle.html (unminified bundle, pre-minification, ${(stage1Html.length / 1024).toFixed(2)} KB)`);
+
+  // 1b. Fast whitespace-stripped bundle for Terser input
   const bundleResult = await esbuild.build({
     entryPoints: ['src/game.ts'],
     bundle: true,
@@ -107,7 +136,6 @@ async function build() {
 
   // 3. Minify CSS with CSSO
   console.log('\n🎨 Step 3: Minifying CSS with CSSO...');
-  const rawCss = fs.readFileSync('src/style.css', 'utf8');
   const cssoResult = csso.minify(rawCss, {
     restructure: true,
     comments: false,
@@ -117,23 +145,24 @@ async function build() {
 
   // 4. Process and minify full HTML (inlining CSS & JS)
   console.log('\n📄 Step 4: Processing full index.html with inlined CSS & JS...');
-  const indexHtmlRaw = fs.readFileSync('index.html', 'utf8');
 
-  // Replace external CSS stylesheet link with inlined minified CSS
-  const htmlWithCss = indexHtmlRaw.replace(
-    /<link\b[^>]*\brel=["']stylesheet["'][^>]*\/?>|<link\b[^>]*\bhref=["'][^"']*style\.css["'][^>]*\/?>/i,
-    `<style>${minifiedCss}</style>`
-  );
+  // Stage 2 HTML: Terser-minified JS + CSSO-minified CSS (pre-html-minifier)
+  const fullHtmlRaw = indexHtmlRaw
+    .replace(
+      /<link\b[^>]*\brel=["']stylesheet["'][^>]*\/?>|<link\b[^>]*\bhref=["'][^"']*style\.css["'][^>]*\/?>/i,
+      `<style>${minifiedCss}</style>`
+    )
+    .replace(
+      /<script\b[^>]*\bsrc=["'][^"']*game\.ts["'][^>]*>\s*<\/script>/i,
+      `<script>${minifiedJs}</script>`
+    );
 
-  // Replace module script with minified JS
-  const fullHtmlRaw = htmlWithCss.replace(
-    /<script\b[^>]*\bsrc=["'][^"']*game\.ts["'][^>]*>\s*<\/script>/i,
-    `<script>${minifiedJs}</script>`
-  );
-
-  // Also write uncompressed version for easy debugging
+  fs.writeFileSync(path.join(distDir, 'index_2_terser.html'), fullHtmlRaw, 'utf8');
   fs.writeFileSync(path.join(distDir, 'index_debug.html'), fullHtmlRaw, 'utf8');
+  console.log(`   Stage 2: dist/index_2_terser.html (Terser + CSSO minified, ${(fullHtmlRaw.length / 1024).toFixed(2)} KB)`);
+  console.log(`   Stage 2 alias: dist/index_debug.html`);
 
+  // Stage 3 HTML: After html-minifier-terser (pre-Roadroller)
   const minifiedFullHtml = await minifyHtml(fullHtmlRaw, {
     collapseWhitespace: true,
     removeComments: true,
@@ -142,7 +171,8 @@ async function build() {
     removeRedundantAttributes: true,
     removeEmptyAttributes: true,
   });
-  console.log(`   Full HTML size: ${(fullHtmlRaw.length / 1024).toFixed(2)} KB -> ${(minifiedFullHtml.length / 1024).toFixed(2)} KB (${minifiedFullHtml.length} bytes)`);
+  fs.writeFileSync(path.join(distDir, 'index_3_html_min.html'), minifiedFullHtml, 'utf8');
+  console.log(`   Stage 3: dist/index_3_html_min.html (full HTML minified, ${(minifiedFullHtml.length / 1024).toFixed(2)} KB)`);
 
   // 5. Crush entire HTML with Roadroller
   console.log('\n🛞 Step 5: Crushing full HTML with Roadroller...');
@@ -165,11 +195,12 @@ async function build() {
   const roadrolledJs = firstLine + secondLine;
   console.log(`   Roadroller decoder size: ${(roadrolledJs.length / 1024).toFixed(2)} KB (${roadrolledJs.length} bytes)`);
 
+  // Stage 4 HTML: Final production Roadroller crushed build
   const finalHtml = `<script>${roadrolledJs}</script>`;
   const htmlDistPath = path.join(distDir, 'index.html');
   fs.writeFileSync(htmlDistPath, finalHtml, 'utf8');
   const htmlSize = fs.statSync(htmlDistPath).size;
-  console.log(`   dist/index.html size: ${(htmlSize / 1024).toFixed(2)} KB (${htmlSize} bytes)`);
+  console.log(`   Stage 4 (Final): dist/index.html (${(htmlSize / 1024).toFixed(2)} KB, ${htmlSize} bytes)`);
 
   // 6. Compress with ECT for maximum ZIP compression
   console.log('\n🗜️ Step 6: Compressing archive with ECT (max compression)...');
