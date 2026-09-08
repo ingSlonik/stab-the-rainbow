@@ -959,7 +959,6 @@ export class UIManager {
       this.setMenuPosition(isVR);
       this.dialogCtx.clearRect(0, 0, 1024, 1024);
       this.drawMenu(this.dialogCtx, onStartGame, time, isVR, vrMode);
-      this.drawPointerReticle(this.dialogCtx);
       this.dialogTexture.needsUpdate = true;
       if (this.dialogMesh.material && this.dialogMesh.material.map) {
         this.dialogMesh.material.map.needsUpdate = true;
@@ -991,39 +990,11 @@ export class UIManager {
       this.dialogMesh.visible = true;
       this.dialogCtx.clearRect(0, 0, 1024, 1024);
       this.drawGameOver(this.dialogCtx, score, onRestart, onHome, onToggleMode, time, isVR, vrMode);
-      this.drawPointerReticle(this.dialogCtx);
       this.dialogTexture.needsUpdate = true;
       if (this.dialogMesh.material && this.dialogMesh.material.map) {
         this.dialogMesh.material.map.needsUpdate = true;
       }
       return;
-    }
-  }
-
-  private drawPointerReticle(ctx: CanvasRenderingContext2D): void {
-    if (this.pointerX >= 0 && this.pointerY >= 0) {
-      const isHovering = !!this.hoveredButtonId;
-      const ringRadius = isHovering ? 24 : 15;
-      const dotRadius = isHovering ? 8 : 5;
-
-      ctx.save();
-      // Outer glowing pulse ring
-      ctx.beginPath();
-      ctx.arc(this.pointerX, this.pointerY, ringRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = isHovering ? '#ffffff' : '#00d4ff';
-      ctx.lineWidth = isHovering ? 4.5 : 2.5;
-      ctx.shadowColor = isHovering ? '#00d4ff' : '#ffffff';
-      ctx.shadowBlur = 18;
-      ctx.stroke();
-
-      // Inner solid dot
-      ctx.beginPath();
-      ctx.arc(this.pointerX, this.pointerY, dotRadius, 0, Math.PI * 2);
-      ctx.fillStyle = isHovering ? '#ffdd00' : '#ffffff';
-      ctx.shadowColor = '#ffdd00';
-      ctx.shadowBlur = 12;
-      ctx.fill();
-      ctx.restore();
     }
   }
 
