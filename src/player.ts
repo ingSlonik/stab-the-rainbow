@@ -70,66 +70,79 @@ export class Player {
 
   private initGroundMarker(scene: any): void {
     this.groundMarker = new THREE.Group();
+    this.groundMarker.rotation.x = -0.03;
 
-    // 1. Outer glowing starlight ring
-    const ringGeom = new THREE.RingGeometry(0.16, 0.20, 32);
-    ringGeom.rotateX(-Math.PI / 2 + 0.016);
+    // 1. Outer glowing starlight ring (renderOrder 60, depthTest false so never covered by track)
+    const ringGeom = new THREE.RingGeometry(0.20, 0.25, 32);
+    ringGeom.rotateX(-Math.PI / 2);
     this.groundMarkerMat = new THREE.MeshBasicMaterial({
       color: 0x10e052,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.95,
       side: THREE.DoubleSide,
+      depthTest: false,
       depthWrite: false,
     });
     const ringMesh = new THREE.Mesh(ringGeom, this.groundMarkerMat);
+    ringMesh.renderOrder = 60;
     this.groundMarker.add(ringMesh);
 
-    // 2. Inner disc with subtle starlight fill
-    const innerGeom = new THREE.CircleGeometry(0.15, 32);
-    innerGeom.rotateX(-Math.PI / 2 + 0.016);
+    // 2. Inner concentric ring
+    const innerGeom = new THREE.RingGeometry(0.08, 0.12, 32);
+    innerGeom.rotateX(-Math.PI / 2);
     const innerMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: 0.22,
+      opacity: 0.85,
       side: THREE.DoubleSide,
+      depthTest: false,
       depthWrite: false,
     });
     const innerMesh = new THREE.Mesh(innerGeom, innerMat);
+    innerMesh.renderOrder = 60;
     this.groundMarker.add(innerMesh);
 
-    // 3. Forward-pointing magical chevron / arrow indicating lane alignment
+    // 3. Central disc fill
+    const discGeom = new THREE.CircleGeometry(0.06, 24);
+    discGeom.rotateX(-Math.PI / 2);
+    const discMesh = new THREE.Mesh(discGeom, this.groundMarkerMat);
+    discMesh.renderOrder = 60;
+    this.groundMarker.add(discMesh);
+
+    // 4. Forward-pointing magical chevron / arrow indicating lane direction
     const arrowGeom = new THREE.BufferGeometry();
     const vertices = new Float32Array([
-      -0.08, 0.001, -0.04,
-       0.00, 0.001, -0.12,
-       0.08, 0.001, -0.04,
+      -0.09, 0.002, -0.04,
+       0.00, 0.002, -0.16,
+       0.09, 0.002, -0.04,
     ]);
     arrowGeom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-    arrowGeom.rotateX(0.016);
     const arrowMat = new THREE.LineBasicMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: 0.90,
-      linewidth: 2,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+      linewidth: 3,
     });
     const arrowLine = new THREE.Line(arrowGeom, arrowMat);
+    arrowLine.renderOrder = 61;
     this.groundMarker.add(arrowLine);
 
-    // 4. Lateral boundary brackets (+/- LANE_WIDTH / 2) showing precise lane occupancy
+    // 5. Lateral boundary brackets (+/- LANE_WIDTH / 2) showing precise lane occupancy
     const bracketGeom = new THREE.BufferGeometry();
-    const halfW = LANE_WIDTH * 0.48; // ~0.19m
+    const halfW = LANE_WIDTH * 0.49; // ~0.196m
     const bracketVerts = new Float32Array([
-      -halfW, 0.001, -0.08,
-      -halfW, 0.001,  0.08,
-       halfW, 0.001, -0.08,
-       halfW, 0.001,  0.08,
+      -halfW, 0.002, -0.12,
+      -halfW, 0.002,  0.12,
+       halfW, 0.002, -0.12,
+       halfW, 0.002,  0.12,
     ]);
     bracketGeom.setAttribute('position', new THREE.BufferAttribute(bracketVerts, 3));
-    bracketGeom.rotateX(0.016);
     const bracketLines = new THREE.LineSegments(bracketGeom, arrowMat);
+    bracketLines.renderOrder = 61;
     this.groundMarker.add(bracketLines);
 
-    this.groundMarker.renderOrder = 20;
     this.groundMarker.visible = true;
     scene.add(this.groundMarker);
   }
@@ -301,9 +314,37 @@ export class Player {
 
   public getHornTipPosition(): any {
     if (this.hornTip) {
+      if (this.root) {
+        this.root.updateMatrixWorld(true);
+      } else if (this.camera?.parent) {
+        this.camera.parent.updateMatrixWorld(true);
+      }
+      if (this.camera) {
+        this.camera.updateMatrixWorld(true);
+      }
+      if (this.horn) {
+        this.horn.updateMatrixWorld(true);
+      }
+      this.hornTip.updateMatrixWorld(true);
       this.hornTip.getWorldPosition(this.hornTipWorldPos);
     }
     return this.hornTipWorldPos;
+  }
+
+  public getPlayerWorldX(): number {
+    if (this.vrMode === GameMode.VR_HARD) {
+      return this.getHornTipPosition().x;
+    } else if (this.vrMode === GameMode.VR_EASY) {
+      if (this.camera) {
+        if (this.camera.parent) this.camera.parent.updateMatrixWorld(true);
+        this.camera.updateMatrixWorld(true);
+        const headPos = new THREE.Vector3();
+        this.camera.getWorldPosition(headPos);
+        return headPos.x;
+      }
+      return this.getHornTipPosition().x;
+    }
+    return this.x;
   }
 
   public shiftLane(direction: number): void {
@@ -451,8 +492,13 @@ export class Player {
       }
     }
 
-    // 2. Lateral smooth gliding towards target lane
-    this.x = lerp(this.x, this.targetX, min(1, dt * 14));
+    // 2. Lateral positioning
+    if (isVR) {
+      this.x = this.getPlayerWorldX();
+    } else {
+      this.x = lerp(this.x, this.targetX, min(1, dt * 14));
+    }
+    this.currentLane = clamp(Math.round(this.x / LANE_WIDTH + 3), 0, LANE_COUNT - 1);
 
     // 3. Vertical Jump & Gravity physics
     if (this.isFalling) {
@@ -483,10 +529,9 @@ export class Player {
     const isDesktop = this.vrMode === GameMode.DESKTOP;
     const baseH = isDesktop ? 2.05 : 0.85;
 
-    if (isVR && this.camera) {
-      // In VR: align rig so camera world X and groundMarker X are perfectly in unison directly beneath the headset
-      const headOffset = this.camera.position.x - this.calibratedHeadX;
-      this.root.position.x = this.x - headOffset;
+    if (isVR) {
+      // In VR: camera rig stays centered at x=0 so physical room-scale movement maps directly to the track
+      this.root.position.x = 0;
       this.root.position.y = baseH + this.y + gallopY;
       this.root.rotation.set(0, 0, 0);
     } else {
@@ -502,10 +547,9 @@ export class Player {
       } else {
         this.groundMarker.visible = true;
         const markerZ = -1.40;
-        const actualZ = markerZ - 49;
-        const trackY = 0.60 - sin((-actualZ) * 0.02) * 1.5;
-        // Optically elevated to hover cleanly above the rainbow
-        const hoverY = trackY + 0.09;
+        const trackY = 0.60 - sin((-markerZ) * 0.02) * 1.5;
+        // Optically elevated to hover cleanly 3cm above the rainbow surface
+        const hoverY = trackY + 0.03;
         this.groundMarker.position.set(this.x, hoverY, markerZ);
 
         // Color matches current lane, or flashing red if lane is void (0%)

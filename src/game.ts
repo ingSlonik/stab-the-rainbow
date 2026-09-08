@@ -650,7 +650,7 @@ export class Game {
   private checkTrackFall(): void {
     if (!this.player || !this.track) return;
     if (this.player.isGrounded && !this.player.isFalling) {
-      const effectiveX = this.player.x;
+      const effectiveX = this.player.getPlayerWorldX();
       const laneIdx = this.track.getLaneIndexFromX(effectiveX);
       this.player.currentLane = laneIdx;
 
@@ -835,7 +835,11 @@ export class Game {
       this.scoreFloat += this.speed * dt * 3.5;
       this.score = floor(this.scoreFloat);
 
-      const isSolid = this.track.isLaneSolid(this.player.currentLane);
+      const effectiveX = this.player.getPlayerWorldX();
+      const currentLane = this.track.getLaneIndexFromX(effectiveX);
+      this.player.currentLane = currentLane;
+      const isSolid = this.track.isLaneSolid(currentLane);
+
       this.player.update(dt, this.speed, true, isVR, true, isSolid);
       this.track.update(dt, this.speed, totalTime, this.runTime);
       this.clouds.update(dt, this.speed, totalTime, false);
@@ -859,7 +863,7 @@ export class Game {
       if (this.fallTimer >= 1.05) {
         this.player.stopFalling();
         this.state = GameState.GAMEOVER;
-        this.ui.setGameOverPosition(this.player.x, this.player.root.position.y, isVR);
+        this.ui.setGameOverPosition(this.player.getPlayerWorldX(), this.player.root.position.y, isVR);
         this.player.setMenuMode(isVR, isVR ? this.rightControllerEl?.object3D : null);
       }
     } else if (this.state === GameState.GAMEOVER) {
