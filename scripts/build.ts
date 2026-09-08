@@ -101,18 +101,27 @@ async function build() {
   const roadrolledJs = firstLine + secondLine;
   console.log(`   Roadroller JS size: ${(roadrolledJs.length / 1024).toFixed(2)} KB (${roadrolledJs.length} bytes)`);
 
-  // 5. Construct Final Single HTML File
-  console.log('\n📄 Step 5: Generating final dist/index.html...');
+  // 5. Process index.html into dist/index.html
+  console.log('\n📄 Step 5: Processing index.html into dist/index.html...');
   const indexHtmlRaw = fs.readFileSync('index.html', 'utf8');
-  const bodyMatch = indexHtmlRaw.match(/<body>([\s\S]*?)<\/body>/i);
-  const domHtml = bodyMatch ? bodyMatch[1].trim() : '';
-  const minifiedDomHtml = await minifyHtml(domHtml, {
+
+  // Replace external CSS stylesheet link with inlined minified CSS
+  const htmlWithCss = indexHtmlRaw.replace(
+    /<link\b[^>]*\brel=["']stylesheet["'][^>]*\/?>|<link\b[^>]*\bhref=["'][^"']*style\.css["'][^>]*\/?>/i,
+    `<style>${minifiedCss}</style>`
+  );
+
+  // Replace module script with roadrolled JS
+  const roadrolledHtmlRaw = htmlWithCss.replace(
+    /<script\b[^>]*\bsrc=["'][^"']*game\.ts["'][^>]*>\s*<\/script>/i,
+    `<script>${roadrolledJs}</script>`
+  );
+
+  const finalHtml = await minifyHtml(roadrolledHtmlRaw, {
     collapseWhitespace: true,
     removeComments: true,
     removeAttributeQuotes: true,
   });
-  const aframeScript = `<script src="https://play.js13kgames.com/2026/webxr/aframe.js"></script><script>if(!window.AFRAME)document.write('<script src="./aframe.js"><\\/script>')</script>`;
-  const finalHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style>${aframeScript}<script>${roadrolledJs}</script></head><body>${minifiedDomHtml}</body></html>`;
 
   const htmlDistPath = path.join(distDir, 'index.html');
   fs.writeFileSync(htmlDistPath, finalHtml, 'utf8');
@@ -120,8 +129,11 @@ async function build() {
   console.log(`   dist/index.html size: ${(htmlSize / 1024).toFixed(2)} KB (${htmlSize} bytes)`);
 
   // Also write uncompressed version for easy debugging
-  const uncompressedHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Stab the Rainbow</title><style>${minifiedCss}</style>${aframeScript}<script>${minifiedJs}</script></head><body>${domHtml}</body></html>`;
-  fs.writeFileSync(path.join(distDir, 'index_debug.html'), uncompressedHtml, 'utf8');
+  const debugHtmlRaw = htmlWithCss.replace(
+    /<script\b[^>]*\bsrc=["'][^"']*game\.ts["'][^>]*>\s*<\/script>/i,
+    `<script>${minifiedJs}</script>`
+  );
+  fs.writeFileSync(path.join(distDir, 'index_debug.html'), debugHtmlRaw, 'utf8');
 
   // 6. Compress with ECT for maximum ZIP compression
   console.log('\n🗜️ Step 6: Compressing archive with ECT (max compression)...');
