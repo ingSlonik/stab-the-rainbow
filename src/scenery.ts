@@ -63,6 +63,8 @@ export class SceneryManager {
     // Shared low-poly cone geometry with base at Y = 0
     const hillGeom = new THREE.ConeGeometry(1, 1, 7);
     hillGeom.translate(0, 0.5, 0);
+    hillGeom.computeBoundingBox();
+    hillGeom.computeBoundingSphere();
 
     // 3 Atmospheric hill materials for near, mid, and far layers
     const mats = [
@@ -71,14 +73,16 @@ export class SceneryManager {
       new THREE.MeshLambertMaterial({ color: 0x140e2a, flatShading: true }),
     ];
 
-    // Layers: [count, extraMin, extraMax, rMin, rMax, hMin, hMax, baseY, speed, matIdx]
+    // Layers: [count, extraMin, extraMax, rMin, rMax, hMin, hMax, origBaseY, speed, matIdx]
     const layers = [
       [10, 2, 8, 4, 8, 6, 12, -4, 1.0, 0],
       [8, 6, 16, 8, 16, 10, 18, -6, 0.65, 1],
       [6, 16, 36, 18, 32, 18, 32, -8, 0.35, 2],
     ];
 
-    for (const [count, extraMin, extraMax, rMin, rMax, hMin, hMax, baseY, speed, mat] of layers) {
+    const deepBaseY = -40;
+
+    for (const [count, extraMin, extraMax, rMin, rMax, hMin, hMax, origBaseY, speed, mat] of layers) {
       for (let i = 0; i < count; i++) {
         const side = i % 2 === 0 ? 1 : -1;
         const r = randRange(rMin, rMax);
@@ -87,9 +91,15 @@ export class SceneryManager {
         const z = randRange(-140, 20);
         const h = randRange(hMin, hMax);
 
+        // Extend pyramid from lower base using trojčlenka (rule of three)
+        // to keep the exact same slope and visible appearance above origBaseY
+        const peakY = origBaseY + h;
+        const totalH = peakY - deepBaseY;
+        const totalR = r * (totalH / h);
+
         const mesh = new THREE.Mesh(hillGeom, mats[mat]);
-        mesh.position.set(x, baseY, z);
-        mesh.scale.set(r, h, r * 1.25);
+        mesh.position.set(x, deepBaseY, z);
+        mesh.scale.set(totalR, totalH, totalR * 1.25);
         mesh.rotation.y = randRange(0, Math.PI * 2);
 
         this.group.add(mesh);
