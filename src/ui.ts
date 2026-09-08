@@ -781,12 +781,12 @@ export class UIManager {
         }
       }
 
-      // If pointing anywhere on the menu dialog card, intelligently snap to closest difficulty
+      // If pointing on the difficulty cards area, intelligently snap to closest difficulty
       if (!found && this.dialogMesh && this.dialogMesh.visible) {
         if (cx >= 80 && cx <= 944) {
-          if (cy >= 180 && cy < 500) {
+          if (cy >= 260 && cy < 450) {
             found = 'btn-easy';
-          } else if (cy >= 500 && cy <= 820) {
+          } else if (cy >= 450 && cy < 620) {
             found = 'btn-hard';
           }
         }
@@ -810,10 +810,10 @@ export class UIManager {
         return true;
       }
     }
-    // High-confidence fallback if laser hits anywhere on the 3D board:
-    if (this.pointerX >= 60 && this.pointerX <= 964) {
-      const targetId = this.pointerY < 500 ? 'btn-easy' : 'btn-hard';
-      const btn = this.buttons.find((b) => b.id === targetId) || this.buttons[0];
+    // High-confidence fallback if laser hits within the difficulty selection zone:
+    if (this.pointerX >= 60 && this.pointerX <= 964 && this.pointerY >= 260 && this.pointerY < 620) {
+      const targetId = this.pointerY < 450 ? 'btn-easy' : 'btn-hard';
+      const btn = this.buttons.find((b) => b.id === targetId);
       if (btn) {
         btn.action();
         return true;
@@ -1075,11 +1075,11 @@ export class UIManager {
       ctx,
       'btn-easy',
       100,
-      300,
+      285,
       824,
-      175,
+      140,
       'UNICORN RIDER (EASY)',
-      'Horn in hand • Controller steers • Ram / Trigger pops • Buttons jump',
+      'Horn in hand • Controller / Ray aims • Trigger stabs • Grip jumps',
       '#00d4ff',
       () => onStartGame(GameMode.VR_EASY)
     );
@@ -1088,23 +1088,32 @@ export class UIManager {
       ctx,
       'btn-hard',
       100,
-      505,
+      440,
       824,
-      175,
+      140,
       'YOU ARE THE UNICORN! (HARD)',
-      'Horn on head • Lean to steer • Ram to pop • Buttons jump',
+      'Horn on head • Ram / Headbutt stabs • Physical leap / Grip jumps',
       '#ffdd00',
       () => onStartGame(GameMode.VR_HARD)
     );
 
-    // Instructions
-    ctx.font = '700 20px system-ui, sans-serif';
-    ctx.fillStyle = '#e0ecff';
-    ctx.fillText('🎯 Point ray & pull Trigger, OR press A (Easy) / B (Hard)', 512, 735);
+    // Controls Instructions (Clear, stylish and aligned)
+    ctx.textAlign = 'center';
+    ctx.font = '800 20px system-ui, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('🌈 STEER: Take real side-steps across the 2m rainbow! (Desktop: Mouse)', 512, 615);
 
-    ctx.font = '600 17px system-ui, sans-serif';
+    ctx.font = '700 17px system-ui, sans-serif';
+    ctx.fillStyle = '#00d4ff';
+    ctx.fillText('🥽 VR CONTROLLER: Trigger = Stab  •  Grip = Jump  •  A / B = Return to Home', 512, 648);
+
+    ctx.font = '600 15.5px system-ui, sans-serif';
+    ctx.fillStyle = '#10e052';
+    ctx.fillText('💻 DESKTOP: Mouse Move to Steer  •  Left-Click: Stab  •  Right-Click / Wheel: Jump', 512, 678);
+
+    ctx.font = '600 15px system-ui, sans-serif';
     ctx.fillStyle = '#9cb3d0';
-    ctx.fillText('Jump: Controller A / X or Thumbstick Up • Pause: Esc', 512, 778);
+    ctx.fillText('🎯 Aim pointer beam & pull Trigger to select difficulty', 512, 708);
 
     // Separator line before Audio Bar
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
@@ -1215,9 +1224,9 @@ export class UIManager {
       ctx,
       'btn-retry',
       140,
-      390,
+      370,
       744,
-      100,
+      88,
       `PLAY AGAIN (${modeName})`,
       '',
       '#10e052',
@@ -1228,10 +1237,10 @@ export class UIManager {
       ctx,
       'btn-home',
       140,
-      515,
+      472,
       744,
-      100,
-      'MAIN MENU',
+      88,
+      'MAIN MENU (A / B)',
       '',
       '#00d4ff',
       () => onHome()
@@ -1242,9 +1251,9 @@ export class UIManager {
         ctx,
         'btn-toggle',
         140,
-        640,
+        574,
         744,
-        100,
+        88,
         'SWITCH TO ' + otherModeName,
         '',
         '#ffdd00',

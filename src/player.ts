@@ -335,8 +335,8 @@ export class Player {
       }
     }
 
-    // 1. Body motion controls in Hard Mode (You ARE the unicorn!)
-    if (isVR && this.vrMode === GameMode.VR_HARD && this.camera) {
+    // 1. Body motion controls in VR (Physical side-steps steer across the rainbow in both Easy and Hard)
+    if (isVR && (this.vrMode === GameMode.VR_HARD || this.vrMode === GameMode.VR_EASY) && this.camera) {
       if (!this.isCalibrated) {
         this.calibratedHeadX = this.camera.position.x;
         this.calibratedHeadY = this.camera.position.y ?? 0;
@@ -346,30 +346,31 @@ export class Player {
         this.isCalibrated = true;
       }
 
-      // Lateral head lean steers across lanes
+      // Lateral head position / physical side-steps steer across lanes (matching real room scale)
       const headLeanX = this.camera.position.x - this.calibratedHeadX;
       const targetNormX = clamp(headLeanX * 3.2, -1.0, 1.0);
       this.setTargetX(targetNormX);
 
-      // Head forward thrust ("headbutt") or nod triggers STAB
-      const curHeadZ = this.camera.position.z;
-      const headVelZ = (curHeadZ - this.prevHeadZ) / max(0.001, dt);
-      this.prevHeadZ = curHeadZ;
+      // Hard mode: Head forward thrust ("headbutt") or nod triggers STAB, physical vertical leap triggers JUMP
+      if (this.vrMode === GameMode.VR_HARD) {
+        const curHeadZ = this.camera.position.z;
+        const headVelZ = (curHeadZ - this.prevHeadZ) / max(0.001, dt);
+        this.prevHeadZ = curHeadZ;
 
-      const curHeadPitch = this.camera.rotation.x;
-      const pitchVel = (curHeadPitch - this.prevHeadPitch) / max(0.001, dt);
-      this.prevHeadPitch = curHeadPitch;
+        const curHeadPitch = this.camera.rotation.x;
+        const pitchVel = (curHeadPitch - this.prevHeadPitch) / max(0.001, dt);
+        this.prevHeadPitch = curHeadPitch;
 
-      if ((headVelZ < -0.26 || pitchVel < -1.3) && !this.isFalling && !this.isStabbing) {
-        this.stab();
-      }
+        if ((headVelZ < -0.26 || pitchVel < -1.3) && !this.isFalling && !this.isStabbing) {
+          this.stab();
+        }
 
-      // Upward head jerk / physical jump triggers JUMP
-      const curHeadY = this.camera.position.y;
-      const headVelY = (curHeadY - this.prevHeadY) / max(0.001, dt);
-      this.prevHeadY = curHeadY;
-      if (headVelY > 0.70 && !this.isFalling && this.isGrounded) {
-        this.jump();
+        const curHeadY = this.camera.position.y;
+        const headVelY = (curHeadY - this.prevHeadY) / max(0.001, dt);
+        this.prevHeadY = curHeadY;
+        if (headVelY > 0.70 && !this.isFalling && this.isGrounded) {
+          this.jump();
+        }
       }
     }
 

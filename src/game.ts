@@ -146,8 +146,9 @@ export class Game {
       el.addEventListener('xbuttondown', () => this.onAButtonDown());
       el.addEventListener('bbuttondown', () => this.onBButtonDown());
       el.addEventListener('ybuttondown', () => this.onBButtonDown());
-      el.addEventListener('thumbstickmoved', (e: any) => this.onThumbstick(e.detail));
-      el.addEventListener('axismove', (e: any) => this.onAxisMove(e.detail));
+      // Commented out per spec: Thumbstick movement disabled, only physical stepping and button stab/jump allowed
+      // el.addEventListener('thumbstickmoved', (e: any) => this.onThumbstick(e.detail));
+      // el.addEventListener('axismove', (e: any) => this.onAxisMove(e.detail));
     };
 
     bindController(this.leftControllerEl, true);
@@ -166,28 +167,20 @@ export class Game {
   }
 
   private onAButtonDown(): void {
-    if (this.state === GameState.MENU) {
-      const mode = this.ui?.hoveredButtonId === 'btn-hard' ? GameMode.VR_HARD : GameMode.VR_EASY;
-      this.startGame(mode);
-    } else if (this.state === GameState.GAMEOVER) {
-      this.restartGame();
-    } else if (this.state === GameState.PLAYING) {
-      this.player.jump();
+    // A button ALWAYS and ONLY returns to main menu
+    if (this.state !== GameState.MENU) {
+      this.goToMenu();
     }
   }
 
   private onBButtonDown(): void {
-    if (this.state === GameState.MENU) {
-      const mode = this.ui?.hoveredButtonId === 'btn-easy' ? GameMode.VR_EASY : GameMode.VR_HARD;
-      this.startGame(mode);
-    } else if (this.state === GameState.GAMEOVER) {
+    // B button ALWAYS and ONLY returns to main menu
+    if (this.state !== GameState.MENU) {
       this.goToMenu();
-    } else if (this.state === GameState.PLAYING) {
-      this.player.jump();
     }
   }
 
-  private onTriggerDown(isLeft: boolean = false): void {
+  private onTriggerDown(_isLeft: boolean = false): void {
     if (this.state === GameState.MENU) {
       if (!this.ui.triggerClick()) {
         const mode = this.ui?.hoveredButtonId === 'btn-hard' ? GameMode.VR_HARD : GameMode.VR_EASY;
@@ -198,32 +191,27 @@ export class Game {
         this.restartGame();
       }
     } else if (this.state === GameState.PLAYING) {
-      const isHard = this.currentVRMode === GameMode.VR_HARD;
-      if (isHard) {
-        this.player.jump();
-      } else {
-        if (isLeft) {
-          this.player.jump();
-        } else {
-          this.player.stab();
-        }
-      }
+      // Trigger ALWAYS stabs in both Easy and Hard modes (Grip is for jumping)
+      this.player.stab();
     }
   }
 
-  private onGripDown(isLeft: boolean = false): void {
+  private onGripDown(_isLeft: boolean = false): void {
     if (this.state === GameState.MENU) {
       return;
     } else if (this.state === GameState.GAMEOVER) {
       this.goToMenu();
     } else if (this.state === GameState.PLAYING) {
-      this.player.jump();
+      // Grip = Jump (skok)
+      this.player?.jump();
     }
   }
 
-  private onThumbstick(detail: any): void {
-    if (!detail) return;
-    const { x, y } = detail;
+  private onThumbstick(_detail: any): void {
+    // Commented out per spec: Thumbstick movement disabled
+    /*
+    if (!_detail) return;
+    const { x, y } = _detail;
     if (Math.abs(x) > 0.55 && !this.thumbstickDebounce && this.state === GameState.PLAYING) {
       this.player.shiftLane(x > 0 ? 1 : -1);
       this.thumbstickDebounce = true;
@@ -232,11 +220,14 @@ export class Game {
     if (y < -0.65 && this.state === GameState.PLAYING) {
       this.player.jump();
     }
+    */
   }
 
-  private onAxisMove(detail: any): void {
-    if (!detail || !detail.axis) return;
-    const [x, y] = detail.axis;
+  private onAxisMove(_detail: any): void {
+    // Commented out per spec: Axis thumbstick movement disabled
+    /*
+    if (!_detail || !_detail.axis) return;
+    const [x, y] = _detail.axis;
     if (Math.abs(x) > 0.55 && !this.thumbstickDebounce && this.state === GameState.PLAYING) {
       this.player.shiftLane(x > 0 ? 1 : -1);
       this.thumbstickDebounce = true;
@@ -245,6 +236,7 @@ export class Game {
     if (y < -0.65 && this.state === GameState.PLAYING) {
       this.player.jump();
     }
+    */
   }
 
   private onEnterVR(): void {
@@ -446,8 +438,10 @@ export class Game {
       this.keysDown[e.code] = true;
       initAudio();
       const c = e.code;
-      const isPlay = this.state === GameState.PLAYING;
 
+      // Commented out per spec: Desktop controls are strictly MOUSE ONLY (Steer: Mouse, Stab: Left-click, Jump: Right-click/Wheel)
+      /*
+      const isPlay = this.state === GameState.PLAYING;
       if (c === 'ArrowLeft' || c === 'KeyA') {
         e.preventDefault();
         if (isPlay) this.player?.shiftLane(-1);
@@ -470,7 +464,17 @@ export class Game {
             else this.startGame(this.currentVRMode || GameMode.DESKTOP);
           }
         }
-      } else if (c === 'KeyF') {
+      } else if (c === 'Digit1') {
+        if (this.state === GameState.MENU && this.isImmersiveVR()) this.startGame(GameMode.VR_EASY);
+      } else if (c === 'Digit2') {
+        if (this.state === GameState.MENU && this.isImmersiveVR()) this.startGame(GameMode.VR_HARD);
+      } else if (c === 'Digit3') {
+        if (this.state === GameState.MENU) this.startGame(GameMode.DESKTOP);
+      }
+      */
+
+      // System shortcuts preserved
+      if (c === 'KeyF') {
         e.preventDefault();
         this.toggleFullscreen();
       } else if (c === 'KeyM') {
@@ -486,12 +490,6 @@ export class Game {
       } else if (c === 'KeyH' || c === 'Escape') {
         // Return to menu at any time
         this.goToMenu();
-      } else if (c === 'Digit1') {
-        if (this.state === GameState.MENU && this.isImmersiveVR()) this.startGame(GameMode.VR_EASY);
-      } else if (c === 'Digit2') {
-        if (this.state === GameState.MENU && this.isImmersiveVR()) this.startGame(GameMode.VR_HARD);
-      } else if (c === 'Digit3') {
-        if (this.state === GameState.MENU) this.startGame(GameMode.DESKTOP);
       }
     });
 
@@ -721,71 +719,80 @@ export class Game {
       const isEasy = this.currentVRMode === GameMode.VR_EASY;
       const isHard = this.currentVRMode === GameMode.VR_HARD;
 
-      // 1. Easy mode: VR Controller steering with hand or thumbstick
+      // 1. Easy mode: Lateral steering is handled via physical side-stepping (same as Hard mode in Player.update)
+      /*
       if (isEasy && this.player.vrController) {
         const handX = this.player.vrController.position.x;
         if (Math.abs(handX) > 0.18) {
           this.player.moveLateral(handX * dt * 3.5);
         }
       }
+      */
 
-      // 2. Controller trigger, A/B buttons, and thumbstick support via Gamepad API
+      // 2. Controller trigger (stab), grip (jump), and A/B buttons (home) via Gamepad API
       const session = this.sceneEl.xrSession;
       if (session && session.inputSources) {
         for (const source of session.inputSources) {
           if (source.gamepad) {
-            // Trigger check with per-controller state
+            // Trigger check (Button 0) -> Stab (pích)
             if (source.gamepad.buttons && source.gamepad.buttons[0]) {
               const triggerBtn = source.gamepad.buttons[0];
               const isTrigger = triggerBtn.pressed || triggerBtn.value > 0.5;
-              const handKey = source.handedness || 'right';
+              const handKey = (source.handedness || 'right') + '_trig';
               if (isTrigger && !this.triggerPressedMap[handKey]) {
                 this.triggerPressedMap[handKey] = true;
-                this.onTriggerDown(handKey === 'left');
+                this.onTriggerDown(source.handedness === 'left');
               } else if (!isTrigger && this.triggerPressedMap[handKey]) {
                 this.triggerPressedMap[handKey] = false;
               }
             }
 
-            // A & B Buttons (and X & Y) -> Jump during play, or select difficulty in menu
+            // Squeeze / Grip button (Button 1) -> Jump (skok)
+            if (source.gamepad.buttons && source.gamepad.buttons[1]) {
+              const gripBtn = source.gamepad.buttons[1];
+              const isGrip = gripBtn.pressed || gripBtn.value > 0.5;
+              const handKey = (source.handedness || 'right') + '_grip';
+              if (isGrip && !this.triggerPressedMap[handKey]) {
+                this.triggerPressedMap[handKey] = true;
+                this.onGripDown(source.handedness === 'left');
+              } else if (!isGrip && this.triggerPressedMap[handKey]) {
+                this.triggerPressedMap[handKey] = false;
+              }
+            }
+
+            // A & B Buttons (and X & Y) -> Return to Home (exit game) during play, or select in menu
             if (source.gamepad.buttons) {
               const btnA = source.gamepad.buttons[4];
               const btnB = source.gamepad.buttons[5];
-              const isAPressed = !!(btnA && btnA.pressed === true);
-              const isBPressed = !!(btnB && btnB.pressed === true);
+              const isAPressed = btnA && (btnA.pressed || btnA.value > 0.5);
+              const isBPressed = btnB && (btnB.pressed || btnB.value > 0.5);
 
               if ((isAPressed || isBPressed) && !this.menuButtonDebounce) {
                 this.menuButtonDebounce = true;
-                if (this.state === GameState.PLAYING) {
-                  this.player.jump();
-                } else if (this.state === GameState.MENU) {
-                  if (isAPressed) this.onAButtonDown();
-                  else if (isBPressed) this.onBButtonDown();
-                } else if (this.state === GameState.GAMEOVER) {
-                  if (isAPressed) this.restartGame();
-                  else this.goToMenu();
+                if (this.state !== GameState.MENU) {
+                  // A and B buttons ALWAYS and ONLY return to Main Menu
+                  this.goToMenu();
                 }
                 setTimeout(() => (this.menuButtonDebounce = false), 250);
               }
             }
 
-            // Thumbstick check
+            // Thumbstick check: Commented out per spec (only physical stepping, Trigger stab, Grip jump, and A/B home)
+            /*
             if (source.gamepad.axes) {
               const axes = source.gamepad.axes;
               const stickX = axes.length >= 3 ? axes[2] : (axes.length >= 1 ? axes[0] : 0);
-              if (Math.abs(stickX) > 0.55) {
-                if (!this.thumbstickDebounce && this.state === GameState.PLAYING) {
-                  this.player.shiftLane(stickX > 0 ? 1 : -1);
-                  this.thumbstickDebounce = true;
-                  setTimeout(() => (this.thumbstickDebounce = false), 220);
-                }
-              }
-
               const stickY = axes.length >= 4 ? axes[3] : (axes.length >= 2 ? axes[1] : 0);
+              if (Math.abs(stickX) > 0.55 && !this.thumbstickDebounce && this.state === GameState.PLAYING) {
+                this.player.shiftLane(stickX > 0 ? 1 : -1);
+                this.thumbstickDebounce = true;
+                setTimeout(() => (this.thumbstickDebounce = false), 220);
+              }
               if (stickY < -0.65 && this.state === GameState.PLAYING) {
                 this.player.jump();
               }
             }
+            */
           }
         }
       }
