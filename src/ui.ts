@@ -900,7 +900,8 @@ export class UIManager {
       isMusicMuted ? '#8899aa' : '#00d4ff',
       () => {
         toggleAudio();
-        const b = document.getElementById('btn-music');
+        // bm = #btn-music (sync HTML button text)
+        const b = document.getElementById('bm');
         if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
         this.dialogDirty = true;
       }
@@ -918,7 +919,8 @@ export class UIManager {
       isSfxMuted ? '#8899aa' : '#10e052',
       () => {
         toggleSfx();
-        const b = document.getElementById('btn-sfx');
+        // bs = #btn-sfx (sync HTML button text)
+        const b = document.getElementById('bs');
         if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
         this.dialogDirty = true;
       }
