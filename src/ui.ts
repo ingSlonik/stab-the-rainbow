@@ -1190,19 +1190,15 @@ export class UIManager {
     ctx.textAlign = 'center';
     ctx.font = '800 20px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('🌈 STEER: Take real side-steps across the 2m rainbow! (Desktop: Mouse)', 512, 615);
+    ctx.fillText('🌈 STEER: Take real side-steps across the 2m rainbow!', 512, 625);
 
     ctx.font = '700 17px system-ui, sans-serif';
     ctx.fillStyle = '#00d4ff';
-    ctx.fillText('🥽 VR CONTROLLER: Trigger = Stab  •  Grip = Jump  •  A / B = Return to Home', 512, 648);
-
-    ctx.font = '600 15.5px system-ui, sans-serif';
-    ctx.fillStyle = '#10e052';
-    ctx.fillText('💻 DESKTOP: Mouse Move to Steer  •  Left-Click: Stab  •  Right-Click / Wheel: Jump', 512, 678);
+    ctx.fillText('🥽 VR CONTROLLER: Trigger = Stab  •  Grip = Jump  •  A / B = Return to Home', 512, 660);
 
     ctx.font = '600 15px system-ui, sans-serif';
     ctx.fillStyle = '#9cb3d0';
-    ctx.fillText('🎯 Aim pointer beam & pull Trigger to select difficulty', 512, 708);
+    ctx.fillText('🎯 Aim pointer beam & pull Trigger to select difficulty', 512, 695);
 
     // Separator line before Audio Bar
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
