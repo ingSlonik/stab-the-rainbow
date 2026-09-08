@@ -23,7 +23,7 @@ export class SceneryManager {
 
   private initSun(): void {
     // 1. Radiant central solar sphere
-    const sunGeom = new THREE.SphereGeometry(9, 14, 10);
+    const sunGeom = new THREE.SphereGeometry(9, 14, 22);
     const sunMat = new THREE.MeshBasicMaterial({
       color: 0xfffae0,
       fog: false,
