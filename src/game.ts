@@ -139,14 +139,10 @@ export class Game {
 
     const bindController = (el: any, isLeft: boolean) => {
       if (!el) return;
-      el.addEventListener('triggerdown', () => this.onTriggerDown(isLeft));
-      el.addEventListener('selectstart', () => this.onTriggerDown(isLeft));
-      el.addEventListener('gripdown', () => this.onGripDown(isLeft));
-      el.addEventListener('squeezestart', () => this.onGripDown(isLeft));
-      el.addEventListener('abuttondown', () => this.onAButtonDown());
-      el.addEventListener('xbuttondown', () => this.onAButtonDown());
-      el.addEventListener('bbuttondown', () => this.onBButtonDown());
-      el.addEventListener('ybuttondown', () => this.onBButtonDown());
+      const on = (events: string[], fn: () => void) => events.forEach((e) => el.addEventListener(e, fn));
+      on(['triggerdown', 'selectstart'], () => this.onTriggerDown(isLeft));
+      on(['gripdown', 'squeezestart'], () => this.onGripDown(isLeft));
+      on(['abuttondown', 'xbuttondown', 'bbuttondown', 'ybuttondown'], () => this.onAButtonDown());
       // Commented out per spec: Thumbstick movement disabled, only physical stepping and button stab/jump allowed
       // el.addEventListener('thumbstickmoved', (e: any) => this.onThumbstick(e.detail));
       // el.addEventListener('axismove', (e: any) => this.onAxisMove(e.detail));
@@ -176,9 +172,7 @@ export class Game {
 
   private onBButtonDown(): void {
     // B button ALWAYS and ONLY returns to main menu
-    if (this.state !== GameState.MENU) {
-      this.goToMenu();
-    }
+    this.onAButtonDown();
   }
 
   private onTriggerDown(_isLeft: boolean = false): void {
@@ -362,27 +356,23 @@ export class Game {
       return;
     }
 
-    try {
-      const p = this.sceneEl.enterVR();
-      if (p && typeof p.catch === 'function') {
-        p.catch((err: any) => {
-          console.warn('Enter VR error:', err);
-          if (warningEl) {
-            warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>' + (err?.message || 'Ensure your VR headset is active.');
-            warningEl.style.display = 'block';
-          }
-          this.sceneEl?.exitVR();
-          this.onExitVR();
-        });
-      }
-    } catch (err: any) {
-      console.warn('Enter VR synchronous error:', err);
+    const failVR = (msg: string, err: any) => {
+      console.warn(msg, err);
       if (warningEl) {
         warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>' + (err?.message || 'Ensure your VR headset is active.');
         warningEl.style.display = 'block';
       }
       this.sceneEl?.exitVR();
       this.onExitVR();
+    };
+
+    try {
+      const p = this.sceneEl.enterVR();
+      if (p && typeof p.catch === 'function') {
+        p.catch((err: any) => failVR('Enter VR error:', err));
+      }
+    } catch (err: any) {
+      failVR('Enter VR synchronous error:', err);
     }
   }
 
@@ -675,26 +665,17 @@ export class Game {
       return true;
     }
 
-    if (this.rightControllerEl && this.rightControllerEl.object3D) {
-      this.rightControllerEl.object3D.updateMatrixWorld(true);
-      this.rightControllerEl.object3D.getWorldPosition(outOrigin);
-      const quat = new THREE.Quaternion();
-      this.rightControllerEl.object3D.getWorldQuaternion(quat);
-      const offsetQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -0.65);
-      quat.multiply(offsetQ);
-      outDir.set(0, 0, -1).applyQuaternion(quat).normalize();
-      return true;
-    }
-
-    if (this.leftControllerEl && this.leftControllerEl.object3D) {
-      this.leftControllerEl.object3D.updateMatrixWorld(true);
-      this.leftControllerEl.object3D.getWorldPosition(outOrigin);
-      const quat = new THREE.Quaternion();
-      this.leftControllerEl.object3D.getWorldQuaternion(quat);
-      const offsetQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -0.65);
-      quat.multiply(offsetQ);
-      outDir.set(0, 0, -1).applyQuaternion(quat).normalize();
-      return true;
+    for (const ctrl of [this.rightControllerEl, this.leftControllerEl]) {
+      if (ctrl && ctrl.object3D) {
+        ctrl.object3D.updateMatrixWorld(true);
+        ctrl.object3D.getWorldPosition(outOrigin);
+        const quat = new THREE.Quaternion();
+        ctrl.object3D.getWorldQuaternion(quat);
+        const offsetQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -0.65);
+        quat.multiply(offsetQ);
+        outDir.set(0, 0, -1).applyQuaternion(quat).normalize();
+        return true;
+      }
     }
 
     return false;
@@ -737,36 +718,32 @@ export class Game {
       if (session && session.inputSources) {
         for (const source of session.inputSources) {
           if (source.gamepad) {
-            // Trigger check (Button 0) -> Stab (pích)
-            if (source.gamepad.buttons && source.gamepad.buttons[0]) {
-              const triggerBtn = source.gamepad.buttons[0];
-              const isTrigger = triggerBtn.pressed || triggerBtn.value > 0.5;
-              const handKey = (source.handedness || 'right') + '_trig';
-              if (isTrigger && !this.triggerPressedMap[handKey]) {
-                this.triggerPressedMap[handKey] = true;
-                this.onTriggerDown(source.handedness === 'left');
-              } else if (!isTrigger && this.triggerPressedMap[handKey]) {
-                this.triggerPressedMap[handKey] = false;
+            const btns = source.gamepad.buttons;
+            const hand = source.handedness || 'right';
+            const isLeft = hand === 'left';
+            const checkBtn = (idx: number, suffix: string, fn: () => void) => {
+              const b = btns?.[idx];
+              if (!b) return;
+              const isPressed = b.pressed || b.value > 0.5;
+              const key = hand + suffix;
+              if (isPressed && !this.triggerPressedMap[key]) {
+                this.triggerPressedMap[key] = true;
+                fn();
+              } else if (!isPressed && this.triggerPressedMap[key]) {
+                this.triggerPressedMap[key] = false;
               }
-            }
+            };
+
+            // Trigger check (Button 0) -> Stab (pích)
+            checkBtn(0, '_trig', () => this.onTriggerDown(isLeft));
 
             // Squeeze / Grip button (Button 1) -> Jump (skok)
-            if (source.gamepad.buttons && source.gamepad.buttons[1]) {
-              const gripBtn = source.gamepad.buttons[1];
-              const isGrip = gripBtn.pressed || gripBtn.value > 0.5;
-              const handKey = (source.handedness || 'right') + '_grip';
-              if (isGrip && !this.triggerPressedMap[handKey]) {
-                this.triggerPressedMap[handKey] = true;
-                this.onGripDown(source.handedness === 'left');
-              } else if (!isGrip && this.triggerPressedMap[handKey]) {
-                this.triggerPressedMap[handKey] = false;
-              }
-            }
+            checkBtn(1, '_grip', () => this.onGripDown(isLeft));
 
             // A & B Buttons (and X & Y) -> Return to Home (exit game) during play, or select in menu
-            if (source.gamepad.buttons) {
-              const btnA = source.gamepad.buttons[4];
-              const btnB = source.gamepad.buttons[5];
+            if (btns) {
+              const btnA = btns[4];
+              const btnB = btns[5];
               const isAPressed = !!(btnA && btnA.pressed === true);
               const isBPressed = !!(btnB && btnB.pressed === true);
 

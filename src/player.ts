@@ -72,42 +72,33 @@ export class Player {
     this.groundMarker = new THREE.Group();
     this.groundMarker.rotation.x = -0.03;
 
+    const makeMat = (color: number, opacity: number) =>
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity,
+        side: THREE.DoubleSide,
+        depthTest: true,
+        depthWrite: false,
+      });
+
+    const addMesh = (geom: any, mat: any, order = 60) => {
+      geom.rotateX(-Math.PI / 2);
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.renderOrder = order;
+      this.groundMarker.add(mesh);
+      return mesh;
+    };
+
     // 1. Outer glowing starlight ring (renderOrder 60)
-    const ringGeom = new THREE.RingGeometry(0.20, 0.25, 32);
-    ringGeom.rotateX(-Math.PI / 2);
-    this.groundMarkerMat = new THREE.MeshBasicMaterial({
-      color: 0x10e052,
-      transparent: true,
-      opacity: 0.95,
-      side: THREE.DoubleSide,
-      depthTest: true,
-      depthWrite: false,
-    });
-    const ringMesh = new THREE.Mesh(ringGeom, this.groundMarkerMat);
-    ringMesh.renderOrder = 60;
-    this.groundMarker.add(ringMesh);
+    this.groundMarkerMat = makeMat(0x10e052, 0.95);
+    addMesh(new THREE.RingGeometry(0.20, 0.25, 32), this.groundMarkerMat);
 
     // 2. Inner concentric ring
-    const innerGeom = new THREE.RingGeometry(0.08, 0.12, 32);
-    innerGeom.rotateX(-Math.PI / 2);
-    const innerMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.85,
-      side: THREE.DoubleSide,
-      depthTest: true,
-      depthWrite: false,
-    });
-    const innerMesh = new THREE.Mesh(innerGeom, innerMat);
-    innerMesh.renderOrder = 60;
-    this.groundMarker.add(innerMesh);
+    addMesh(new THREE.RingGeometry(0.08, 0.12, 32), makeMat(0xffffff, 0.85));
 
     // 3. Central disc fill
-    const discGeom = new THREE.CircleGeometry(0.06, 24);
-    discGeom.rotateX(-Math.PI / 2);
-    const discMesh = new THREE.Mesh(discGeom, this.groundMarkerMat);
-    discMesh.renderOrder = 60;
-    this.groundMarker.add(discMesh);
+    addMesh(new THREE.CircleGeometry(0.06, 24), this.groundMarkerMat);
 
     // 4. Forward-pointing magical chevron / arrow indicating lane direction
     const arrowGeom = new THREE.BufferGeometry();
@@ -207,39 +198,28 @@ export class Player {
     this.vrController = controller;
   }
 
-  public attachHornToHand(controller?: any, showPointer: boolean = false): void {
-    const c = controller || this.vrController;
-    if (!c) return;
-    if (this.horn.parent !== c) {
+  private mountHorn(parent: any, py: number, pz: number, rx: number, scale = 1.0, showPointer = false): void {
+    if (!parent) return;
+    if (this.horn.parent !== parent) {
       if (this.horn.parent) this.horn.parent.remove(this.horn);
-      c.add(this.horn);
+      parent.add(this.horn);
     }
-    this.horn.position.set(0, -0.02, -0.08);
-    this.horn.rotation.set(-0.65, 0, 0);
-    this.horn.scale.set(1.0, 1.0, 1.0);
+    this.horn.position.set(0, py, pz);
+    this.horn.rotation.set(rx, 0, 0);
+    this.horn.scale.set(scale, scale, scale);
     if (this.pointerBeam) this.pointerBeam.visible = showPointer;
   }
 
+  public attachHornToHand(controller?: any, showPointer: boolean = false): void {
+    this.mountHorn(controller || this.vrController, -0.02, -0.08, -0.65, 1.0, showPointer);
+  }
+
   public attachHornToHead(): void {
-    if (this.horn.parent !== this.camera) {
-      if (this.horn.parent) this.horn.parent.remove(this.horn);
-      this.camera.add(this.horn);
-    }
-    this.horn.position.set(0, 0.22, -0.15);
-    this.horn.rotation.set(-0.16, 0, 0);
-    this.horn.scale.set(0.75, 0.75, 0.75);
-    if (this.pointerBeam) this.pointerBeam.visible = false;
+    this.mountHorn(this.camera, 0.22, -0.15, -0.16, 0.75, false);
   }
 
   public attachHornToDesktop(): void {
-    if (this.horn.parent !== this.camera) {
-      if (this.horn.parent) this.horn.parent.remove(this.horn);
-      this.camera.add(this.horn);
-    }
-    this.horn.position.set(0, -0.42, -0.48);
-    this.horn.rotation.set(0.38, 0, 0);
-    this.horn.scale.set(1.0, 1.0, 1.0);
-    if (this.pointerBeam) this.pointerBeam.visible = false;
+    this.mountHorn(this.camera, -0.42, -0.48, 0.38, 1.0, false);
   }
 
   public setMenuMode(isVR: boolean, controller?: any): void {
@@ -523,29 +503,20 @@ export class Player {
     }
 
     // 4. Gallop bobbing
-    if (this.isGrounded && isMoving && !this.isFalling && !this.isFallen) {
+    const isGalloping = this.isGrounded && isMoving && !this.isFalling && !this.isFallen;
+    if (isGalloping) {
       this.gallopTimer += dt * speed * 1.5;
     }
-
-    let gallopY = 0;
-    if (this.isGrounded && isMoving && !this.isFalling && !this.isFallen && !isVR) {
-      gallopY = sin(this.gallopTimer) * 0.012;
-    }
+    const gallopY = isGalloping && !isVR ? sin(this.gallopTimer) * 0.012 : 0;
 
     // 5. Update root position & orientation
     const isDesktop = this.vrMode === GameMode.DESKTOP;
     const baseH = isDesktop ? 2.05 : 0.85;
 
-    if (isVR) {
-      // In VR: camera rig stays centered at x=0 so physical room-scale movement maps directly to the track
-      this.root.position.x = 0;
-      this.root.position.y = baseH + this.y + gallopY;
-      this.root.rotation.set(0, 0, 0);
-    } else {
-      this.root.position.x = this.x;
-      this.root.position.y = baseH + this.y + gallopY;
-      this.root.rotation.set(0, 0, 0);
-    }
+    // In VR: camera rig stays centered at x=0 so physical room-scale movement maps directly to the track
+    this.root.position.x = isVR ? 0 : this.x;
+    this.root.position.y = baseH + this.y + gallopY;
+    this.root.rotation.set(0, 0, 0);
 
     // 6. Update Ground Position Marker
     if (this.groundMarker) {
