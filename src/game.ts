@@ -297,6 +297,27 @@ export class Game {
       if (el) el.addEventListener('click', fn);
     };
 
+    // Check WebXR immersive-vr support on startup; disable VR button on desktop if not available
+    const checkVRSupport = async () => {
+      const vrBtn = document.getElementById('btn-enter-vr') as HTMLButtonElement | null;
+      const vrSub = document.getElementById('vr-btn-sub');
+      let isSupported = false;
+      if (typeof navigator !== 'undefined' && 'xr' in navigator && (navigator as any).xr) {
+        try {
+          isSupported = await (navigator as any).xr.isSessionSupported('immersive-vr');
+        } catch (_) {
+          isSupported = false;
+        }
+      }
+      this.hasWebXR = isSupported;
+      if (!isSupported && vrBtn) {
+        vrBtn.disabled = true;
+        vrBtn.classList.add('disabled');
+        if (vrSub) vrSub.textContent = 'VR Headset Required (Not Available on Desktop)';
+      }
+    };
+    checkVRSupport();
+
     on('btn-enter-vr', () => {
       this.requestVRSession();
     });

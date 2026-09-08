@@ -82,9 +82,34 @@ h1 {
   border-color: #00d4ff;
   background: rgba(0, 212, 255, 0.14);
 }
+.vr-btn:disabled, .vr-btn.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: #667788;
+  background: rgba(50, 60, 75, 0.25);
+  filter: grayscale(0.8);
+  pointer-events: none;
+}
 .pc-btn {
   border-color: #10e052;
   background: rgba(16, 224, 82, 0.14);
+}
+.unicorn-notice {
+  background: linear-gradient(135deg, rgba(255, 221, 0, 0.12), rgba(184, 43, 251, 0.15));
+  border: 1.5px solid rgba(255, 221, 0, 0.4);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #f7efff;
+  text-align: left;
+}
+.unicorn-notice strong {
+  color: #ffdd00;
+  display: block;
+  margin-bottom: 3px;
+  font-size: 13px;
 }
 .bottom-bar {
   display: flex;
