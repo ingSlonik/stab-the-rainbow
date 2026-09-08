@@ -44,6 +44,10 @@ export class UIManager {
   private dialogTexture: any;
   private reticle3DMesh: any;
 
+  // 4. 3D Dynamic Lane Health Gauges on rainbow road (zero canvas overhead, 90/120Hz native WebGL)
+  private laneGaugeGroup: any;
+  private laneGaugeMeshes: any[] = [];
+
   // Interaction & Raycasting (for VR pointer/controller clicks)
   private raycaster: any;
   private mouseVec: any;
@@ -156,13 +160,25 @@ export class UIManager {
   }
 
   private initCanvasMesh(): void {
-    // 1. Sleek lower-view HUD: attached to camera so it is static in the lower viewport in VR and Desktop
-    this.hudCanvas = document.createElement('canvas');
-    this.hudCanvas.width = 1024;
-    this.hudCanvas.height = 256;
-    this.hudCtx = this.hudCanvas.getContext('2d')!;
+    // Helper to create active DOM-attached canvas elements (prevents Chromium / WebXR from freezing unattached canvas buffers)
+    const createActiveCanvas = (w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] => {
+      const cvs = document.createElement('canvas');
+      cvs.width = w;
+      cvs.height = h;
+      cvs.style.cssText =
+        'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1000;';
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.appendChild(cvs);
+      }
+      const ctx = cvs.getContext('2d')!;
+      return [cvs, ctx];
+    };
 
+    // 1. Sleek lower-view HUD: attached to camera so it is static in the lower viewport in VR and Desktop
+    [this.hudCanvas, this.hudCtx] = createActiveCanvas(1024, 256);
     this.hudTexture = new THREE.CanvasTexture(this.hudCanvas);
+    this.hudTexture.generateMipmaps = false;
+    this.hudTexture.magFilter = THREE.LinearFilter;
     this.hudTexture.minFilter = THREE.LinearFilter;
 
     const hudGeom = new THREE.PlaneGeometry(2.4, 0.60);
@@ -182,12 +198,10 @@ export class UIManager {
     this.group.add(this.hudMesh);
 
     // 2. Rainbow track health percentages: written directly on the rainbow track in front of the player!
-    this.trackPercentCanvas = document.createElement('canvas');
-    this.trackPercentCanvas.width = 1024;
-    this.trackPercentCanvas.height = 256;
-    this.trackPercentCtx = this.trackPercentCanvas.getContext('2d')!;
-
+    [this.trackPercentCanvas, this.trackPercentCtx] = createActiveCanvas(1024, 256);
     this.trackPercentTexture = new THREE.CanvasTexture(this.trackPercentCanvas);
+    this.trackPercentTexture.generateMipmaps = false;
+    this.trackPercentTexture.magFilter = THREE.LinearFilter;
     this.trackPercentTexture.minFilter = THREE.LinearFilter;
 
     const trackGeom = new THREE.PlaneGeometry(6.65, 1.45);
@@ -207,12 +221,10 @@ export class UIManager {
     this.group.add(this.trackPercentMesh);
 
     // 3. Centered 3D Dialog panel (Menu & Game Over) in 3D world space (comfortable VR reading distance)
-    this.dialogCanvas = document.createElement('canvas');
-    this.dialogCanvas.width = 1024;
-    this.dialogCanvas.height = 1024;
-    this.dialogCtx = this.dialogCanvas.getContext('2d')!;
-
+    [this.dialogCanvas, this.dialogCtx] = createActiveCanvas(1024, 1024);
     this.dialogTexture = new THREE.CanvasTexture(this.dialogCanvas);
+    this.dialogTexture.generateMipmaps = false;
+    this.dialogTexture.magFilter = THREE.LinearFilter;
     this.dialogTexture.minFilter = THREE.LinearFilter;
 
     const dialogGeom = new THREE.PlaneGeometry(2.4, 2.4);
@@ -244,6 +256,27 @@ export class UIManager {
     this.reticle3DMesh.renderOrder = 3000;
     this.reticle3DMesh.visible = false;
     this.dialogMesh.add(this.reticle3DMesh);
+
+    // 5. 3D Dynamic Lane Health Indicator Gauges along the rainbow track surface (native WebGL 90Hz)
+    this.laneGaugeGroup = new THREE.Group();
+    this.group.add(this.laneGaugeGroup);
+
+    for (let i = 0; i < LANE_COUNT; i++) {
+      const barGeom = new THREE.BoxGeometry(0.88, 0.05, 1.3);
+      barGeom.translate(0, 0.025, 0.65); // Pivot at front edge for backward scaling
+      const barMat = new THREE.MeshBasicMaterial({
+        color: RAINBOW_COLORS[i],
+        transparent: true,
+        opacity: 0.88,
+        depthTest: true,
+        depthWrite: false,
+      });
+      const barMesh = new THREE.Mesh(barGeom, barMat);
+      barMesh.position.set(1.1 * (i - 3), 0.04, -4.7);
+      barMesh.renderOrder = 120;
+      this.laneGaugeGroup.add(barMesh);
+      this.laneGaugeMeshes.push(barMesh);
+    }
   }
 
   public updateHoverRay(origin: any, direction: any): { hit: boolean; point?: any } {
@@ -418,18 +451,45 @@ export class UIManager {
       this.trackPercentMesh.visible = true;
       this.trackPercentMesh.position.set(0, 0.20, -4.8);
       this.trackPercentMesh.rotation.set(-Math.PI / 2 + 0.40, 0, 0);
-      this.drawTrackPercentages(
-        this.trackPercentCtx,
-        laneHealth,
-        urgentLane,
-        time,
-        score,
-        combo,
-        this.getHighScore(vrMode),
-        isVR,
-        vrMode
-      );
+      try {
+        this.drawTrackPercentages(
+          this.trackPercentCtx,
+          laneHealth,
+          urgentLane,
+          time,
+          score,
+          combo,
+          this.getHighScore(vrMode),
+          isVR,
+          vrMode
+        );
+      } catch (_) {}
       this.trackPercentTexture.needsUpdate = true;
+      if (this.trackPercentMesh.material && this.trackPercentMesh.material.map) {
+        this.trackPercentMesh.material.map.needsUpdate = true;
+      }
+    }
+
+    // Always update 3D Lane Health Gauge bars on the rainbow road (real-time WebGL scaling)
+    if (this.laneGaugeMeshes.length > 0) {
+      for (let i = 0; i < LANE_COUNT; i++) {
+        const h = laneHealth[i] ?? 1.0;
+        const isUrgent = i === urgentLane;
+        const isCritical = h < 0.32;
+        const gauge = this.laneGaugeMeshes[i];
+        if (gauge) {
+          gauge.visible = h > 0.03;
+          gauge.scale.set(1, 1, max(0.04, h));
+          const blink = sin(time * 18) > 0;
+          if (isUrgent) {
+            gauge.material.color.setHex(blink ? 0xffffff : RAINBOW_COLORS[i]);
+          } else if (isCritical) {
+            gauge.material.color.setHex(blink ? 0xffffff : 0xff2a4b);
+          } else {
+            gauge.material.color.setHex(RAINBOW_COLORS[i]);
+          }
+        }
+      }
     }
 
     if (state === GameState.MENU) {
@@ -441,6 +501,9 @@ export class UIManager {
       this.drawMenu(this.dialogCtx, onStartGame, time, isVR, vrMode);
       this.drawPointerReticle(this.dialogCtx);
       this.dialogTexture.needsUpdate = true;
+      if (this.dialogMesh.material && this.dialogMesh.material.map) {
+        this.dialogMesh.material.map.needsUpdate = true;
+      }
       return;
     }
 
@@ -476,6 +539,9 @@ export class UIManager {
       this.drawGameOver(this.dialogCtx, score, onRestart, onHome, onToggleMode, time, isVR, vrMode);
       this.drawPointerReticle(this.dialogCtx);
       this.dialogTexture.needsUpdate = true;
+      if (this.dialogMesh.material && this.dialogMesh.material.map) {
+        this.dialogMesh.material.map.needsUpdate = true;
+      }
       return;
     }
   }
@@ -674,6 +740,10 @@ export class UIManager {
     ctx.font = '600 17px system-ui, sans-serif';
     ctx.fillStyle = '#9cb3d0';
     ctx.fillText('Jump: Controller A / X or Thumbstick Up • Pause: Esc', 512, 778);
+
+    try {
+      (window as any)._df = ctx.getImageData(0, 0, 1, 1);
+    } catch (_) {}
   }
 
   private drawGameOver(
@@ -766,12 +836,16 @@ export class UIManager {
         640,
         744,
         100,
-        `SWITCH TO ${otherModeName}`,
+        'SWITCH TO ' + otherModeName,
         '',
         '#ffdd00',
         () => onToggleMode()
       );
     }
+
+    try {
+      (window as any)._gof = ctx.getImageData(0, 0, 1, 1);
+    } catch (_) {}
   }
 
   private drawHUD(
@@ -927,7 +1001,18 @@ export class UIManager {
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = '#00d4ff';
     ctx.shadowBlur = 10;
-    ctx.fillText(`SCORE: ${score.toLocaleString()}`, 28, 32);
+    const scoreStr = Math.floor(score).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    ctx.fillText(`SCORE: ${scoreStr}`, 28, 32);
+    ctx.shadowBlur = 0;
+
+    // Heartbeat Pulse Indicator on header to visually guarantee active frame loop
+    const pulseX = 260 + sin(time * 6) * 35;
+    ctx.beginPath();
+    ctx.arc(pulseX, 32, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = combo > 1 ? '#ffdd00' : '#00d4ff';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 10;
+    ctx.fill();
     ctx.shadowBlur = 0;
 
     // Center: Combo or Best Score
@@ -942,7 +1027,8 @@ export class UIManager {
     } else {
       ctx.font = '800 21px system-ui, sans-serif';
       ctx.fillStyle = '#ffd24d';
-      ctx.fillText(`BEST: ${highScore.toLocaleString()}`, 512, 32);
+      const bestStr = Math.floor(highScore).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      ctx.fillText(`BEST: ${bestStr}`, 512, 32);
     }
 
     // Right: Mode
@@ -1037,6 +1123,11 @@ export class UIManager {
       }
       ctx.restore();
     }
+
+    // Force Chromium / WebXR GPU synchronization flush
+    try {
+      (window as any)._cf = ctx.getImageData(0, 0, 1, 1);
+    } catch (_) {}
   }
 
   private roundRect(

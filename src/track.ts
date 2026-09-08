@@ -226,7 +226,8 @@ export class TrackManager {
           const flicker = 0.45 + sin(time * 24 + i * 2) * 0.4;
           mat.opacity = flicker * (h / 0.32);
         } else {
-          mat.opacity = 0.88;
+          // Dynamically scale opacity so health decay is visible on the track itself
+          mat.opacity = 0.52 + 0.38 * h;
         }
 
         // Color boost on replenish flash
