@@ -3,57 +3,53 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Stab the Rainbow</title>
   <script src="https://play.js13kgames.com/2026/webxr/aframe.js"></script>
   <link rel="stylesheet" href="./src/style.css">
 </head>
 
 <body>
-  <!-- Gateway to Immersive Mode -->
-  <div id="modal" class="overlay">
-    <div class="card">
-      <h1>✨ STAB THE RAINBOW ✨</h1>
-      <p class="sub">🦄 Ethereal Unicorn Gallop & Cloud Piercer 🌈</p>
 
-      <div class="unicorn-notice">
+  <div id="m" class="f jcc">
+    <div class="c">
+      <h1>✨ STAB THE RAINBOW ✨</h1>
+
+      <div class="u mb">
         <strong>🦄 Best experienced in VR Headset!</strong>
-        This game was crafted primarily for WebXR VR headsets, giving you the authentic, embodied feeling of being a galloping unicorn! You can play on desktop, but you will miss out on the magical sensation of physically being the unicorn.
+        This game was crafted primarily for WebXR VR headsets, giving you the authentic, embodied feeling of being a
+        galloping unicorn! You can play on desktop, but you will miss out on the magical sensation of physically being
+        the unicorn.
       </div>
 
-      <div class="choices">
-        <button id="btn-enter-vr" class="choice-btn vr-btn">
+      <div class="f dc ch mb">
+        <button id="bv" class="f b vb dc">
           <strong>🥽 VR MODE (IMMERSIVE)</strong>
-          <small id="vr-btn-sub">Enter VR • 3D Easy / Hard selection above the rainbow</small>
+          <small id="vs">Enter VR • 3D Easy / Hard selection above the rainbow</small>
         </button>
 
-        <button id="btn-desktop" class="choice-btn pc-btn">
+        <button id="bd" class="f b pb dc">
           <strong>💻 PLAY ON DESKTOP</strong>
           <small>Mouse move: steer • Left-click: stab • Right-click / Wheel: jump</small>
         </button>
       </div>
 
-      <div id="vr-warning" class="vr-warning" style="display: none;"></div>
-
-      <div class="bottom-bar">
-        <button id="btn-music" class="mini-btn">🎵 MUSIC: ON</button>
-        <button id="btn-sfx" class="mini-btn">🔊 SFX: ON</button>
-        <button id="btn-fs" class="mini-btn">⛶ FULLSCREEN (F)</button>
-      </div>
+      <div id="w"></div>
     </div>
   </div>
 
-  <!-- A-Frame Scene -->
-  <a-scene id="game-scene" rainbow-game vr-mode-ui="enabled:false" keyboard-shortcuts="enterVR:false"
+  <!-- A-Frame Scene: #r: rig, #c: camera, #lc: left controller, #rc: right controller -->
+  <a-scene rainbow-game vr-mode-ui="enabled:false" keyboard-shortcuts="enterVR:false"
     device-orientation-permission-ui="enabled:false" renderer="antialias:true;powerPreference:high-performance"
     fog="type:exponential;color:#180932;density:0.008">
     <a-sky color="#040011"></a-sky>
     <a-light type="ambient" color="#c4b8ea" intensity="0.8"></a-light>
     <a-light type="directional" color="#fff0d0" intensity="1.15" position="0 25 -100"></a-light>
-    <a-entity id="rig" position="0 2.25 0">
-      <a-camera id="camera" position="0 0 0" look-controls="mouseEnabled: false; touchEnabled: false" wasd-controls="enabled: false"></a-camera>
-      <a-entity id="left-controller" oculus-touch-controls="hand: left" meta-touch-controls="hand: left"></a-entity>
-      <a-entity id="right-controller" oculus-touch-controls="hand: right" meta-touch-controls="hand: right"></a-entity>
+    <a-entity id="r" position="0 2.25 0">
+      <a-camera id="c" position="0 0 0" look-controls="mouseEnabled:false;touchEnabled:false"
+        wasd-controls="enabled:false"></a-camera>
+      <a-entity id="lc" oculus-touch-controls="hand:left" meta-touch-controls="hand:left"></a-entity>
+      <a-entity id="rc" oculus-touch-controls="hand:right" meta-touch-controls="hand:right"></a-entity>
     </a-entity>
   </a-scene>
   <script type="module" src="./src/game.ts"></script>
