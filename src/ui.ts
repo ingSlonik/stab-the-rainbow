@@ -22,7 +22,7 @@ export interface UIButton {
 
 const THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
 
-const uiFont = (size: number) => `900 ${size}px system-ui, sans-serif`;
+const uiFont = (size: number, weight: number | string = 900) => `${weight} ${size}px system-ui, sans-serif`;
 
 const createQuad = (w: number, h: number, mat: any, x: number, y: number, z: number, order: number, parent: any): any => {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
@@ -132,13 +132,12 @@ export class UIManager {
   }
 
   private loadHighScores(): void {
-    try {
-      this.highScoreDesktop = parseInt(localStorage.getItem('str_h_desktop') || '0', 10) || 0;
-      this.highScoreEasy = parseInt(localStorage.getItem('str_h_easy') || '0', 10) || 0;
-      this.highScoreHard = parseInt(localStorage.getItem('str_h_hard') || '0', 10) || 0;
-    } catch (_) {
-      this.highScoreDesktop = this.highScoreEasy = this.highScoreHard = 0;
-    }
+    const get = (k: string) => {
+      try { return parseInt(localStorage.getItem(k) || '0', 10) || 0; } catch (_) { return 0; }
+    };
+    this.highScoreDesktop = get('str_h_desktop');
+    this.highScoreEasy = get('str_h_easy');
+    this.highScoreHard = get('str_h_hard');
   }
 
   public saveHighScore(score: number, mode: GameMode): boolean {
@@ -169,24 +168,14 @@ export class UIManager {
 
   public setGameOverPosition(playerX: number, playerY: number, isVR: boolean = false): void {
     if (!this.dialogMesh) return;
-    if (isVR) {
-      this.dialogMesh.position.set(playerX, playerY + 0.35, -2.8);
-      this.dialogMesh.rotation.x = -0.05;
-    } else {
-      this.dialogMesh.position.set(0, playerY - 0.20, -3.2);
-      this.dialogMesh.rotation.x = -0.08;
-    }
+    this.dialogMesh.position.set(isVR ? playerX : 0, playerY + (isVR ? 0.35 : -0.20), isVR ? -2.8 : -3.2);
+    this.dialogMesh.rotation.x = isVR ? -0.05 : -0.08;
   }
 
   public setMenuPosition(isVR: boolean = false): void {
     if (!this.dialogMesh) return;
-    if (isVR) {
-      this.dialogMesh.position.set(0, 2.15, -2.8);
-      this.dialogMesh.rotation.x = -0.03;
-    } else {
-      this.dialogMesh.position.set(0, 2.25, -3.2);
-      this.dialogMesh.rotation.x = -0.04;
-    }
+    this.dialogMesh.position.set(0, isVR ? 2.15 : 2.25, isVR ? -2.8 : -3.2);
+    this.dialogMesh.rotation.x = isVR ? -0.03 : -0.04;
   }
 
   private createTextMaterial(
@@ -332,6 +321,11 @@ export class UIManager {
 
     // 3. Bottom: 7 Rainbow Lane Columns (spaced at 0.40m matching the rainbow, with snug card widths)
     this.laneColumns = [];
+    const cardGeom = new THREE.PlaneGeometry(0.38, 0.50);
+    const borderEdges = new THREE.EdgesGeometry(cardGeom);
+    const gaugeGeom = new THREE.PlaneGeometry(0.36, 0.48);
+    gaugeGeom.translate(0, 0.24, 0); // pivot at bottom
+
     for (let i = 0; i < LANE_COUNT; i++) {
       const cx = LANE_WIDTH * (i - 3);
       const colGroup = new THREE.Group();
@@ -339,24 +333,21 @@ export class UIManager {
       this.board3DGroup.add(colGroup);
 
       // Card Background Plane
-      const cardMesh = createQuad(0.38, 0.50, createMat(0x0c091c, 0.88), 0, 0, 0, 102, colGroup);
+      const cardMesh = new THREE.Mesh(cardGeom, createMat(0x0c091c, 0.88));
+      cardMesh.renderOrder = 102;
+      colGroup.add(cardMesh);
 
       // Card Border Outline
-      const borderEdges = new THREE.EdgesGeometry(cardMesh.geometry);
-      const borderMat = new THREE.LineBasicMaterial({
+      const borderMesh = new THREE.LineSegments(borderEdges, new THREE.LineBasicMaterial({
         color: RAINBOW_COLORS[i],
         linewidth: 2,
-      });
-      const borderMesh = new THREE.LineSegments(borderEdges, borderMat);
+      }));
       borderMesh.position.z = 0.005;
       borderMesh.renderOrder = 103;
       colGroup.add(borderMesh);
 
       // 3D Gauge Fill inside card (pivoted at bottom, scales with lane health)
-      const gaugeGeom = new THREE.PlaneGeometry(0.36, 0.48);
-      gaugeGeom.translate(0, 0.24, 0); // pivot at bottom
-      const gaugeMat = createMat(RAINBOW_COLORS[i], 0.50);
-      const gaugeMesh = new THREE.Mesh(gaugeGeom, gaugeMat);
+      const gaugeMesh = new THREE.Mesh(gaugeGeom, createMat(RAINBOW_COLORS[i], 0.50));
       gaugeMesh.position.set(0, -0.24, 0.01);
       gaugeMesh.renderOrder = 103;
       colGroup.add(gaugeMesh);
@@ -426,10 +417,7 @@ export class UIManager {
   public spawnWorldPopup(text: '100%' | '-5%', colorIdx: number): void {
     const baseMat = this.labelMaterials[text];
     if (!baseMat) return;
-    let p = this.floatingPopups.find(item => !item.active);
-    if (!p) {
-      p = this.floatingPopups[0];
-    }
+    const p = this.floatingPopups.find(item => !item.active) || this.floatingPopups[0];
     p.active = true;
     p.life = 0;
     p.maxLife = 0.95;
@@ -438,10 +426,7 @@ export class UIManager {
     p.mesh.material.opacity = 1.0;
 
     // Position further forward in front of player, directly above the corresponding color lane
-    const laneX = (colorIdx - 3) * LANE_WIDTH;
-    const forwardZ = -2.65;
-    const spawnY = text === '100%' ? 1.45 : 1.25;
-    p.mesh.position.set(laneX, spawnY, forwardZ);
+    p.mesh.position.set((colorIdx - 3) * LANE_WIDTH, text === '100%' ? 1.45 : 1.25, -2.65);
     p.mesh.scale.set(0.70, 0.70, 0.70);
     p.mesh.visible = true;
   }
@@ -541,21 +526,9 @@ export class UIManager {
       }
 
       // Status Badge and Status Pill
-      let stKey = '● OK';
-      let pillColor = 0x10e052;
-      if (h > 0.70) {
-        stKey = '● OK';
-        pillColor = 0x10e052;
-      } else if (h > 0.32) {
-        stKey = '▲ DRAIN';
-        pillColor = 0xffdd00;
-      } else if (h > 0.0) {
-        stKey = '⚠ ALERT';
-        pillColor = 0xff2a4b;
-      } else {
-        stKey = '✖ GONE';
-        pillColor = 0x888888;
-      }
+      const [stKey, pillColor] = h > 0.70 ? ['● OK', 0x10e052] :
+        h > 0.32 ? ['▲ DRAIN', 0xffdd00] :
+        h > 0.0 ? ['⚠ ALERT', 0xff2a4b] : ['✖ GONE', 0x888888];
       if (this.labelMaterials[stKey]) {
         col.statusTextMesh.material = this.labelMaterials[stKey];
       }
@@ -564,22 +537,17 @@ export class UIManager {
   }
 
   private initCanvasMesh(): void {
-    // Helper to create active DOM-attached canvas elements (prevents Chromium / WebXR from freezing unattached canvas buffers)
-    const createActiveCanvas = (w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] => {
-      const cvs = document.createElement('canvas');
-      cvs.width = w;
-      cvs.height = h;
-      cvs.style.cssText =
-        'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1000;';
-      if (typeof document !== 'undefined' && document.body) {
-        document.body.appendChild(cvs);
-      }
-      const ctx = cvs.getContext('2d')!;
-      return [cvs, ctx];
-    };
-
     // 1. Centered 3D Dialog panel (Menu & Game Over) in 3D world space (comfortable VR reading distance)
-    [this.dialogCanvas, this.dialogCtx] = createActiveCanvas(1024, 1024);
+    const cvs = document.createElement('canvas');
+    cvs.width = cvs.height = 1024;
+    cvs.style.cssText =
+      'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1000;';
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.appendChild(cvs);
+    }
+    this.dialogCanvas = cvs;
+    this.dialogCtx = cvs.getContext('2d')!;
+
     this.dialogTexture = new THREE.CanvasTexture(this.dialogCanvas);
     this.dialogTexture.generateMipmaps = false;
     this.dialogTexture.magFilter = THREE.LinearFilter;
@@ -640,40 +608,35 @@ export class UIManager {
     }
   }
 
-  public updateHoverRay(origin: any, direction: any): { hit: boolean; point?: any } {
-    if (!this.dialogMesh || !this.dialogMesh.visible) {
-      this.setHoveredButton(null);
-      this.pointerX = -100;
-      this.pointerY = -100;
-      if (this.reticle3DMesh) this.reticle3DMesh.visible = false;
-      return { hit: false };
+  private clearHover(): { hit: boolean } {
+    this.setHoveredButton(null);
+    this.pointerX = this.pointerY = -100;
+    if (this.reticle3DMesh) {
+      this.reticle3DMesh.visible = false;
+      this.reticle3DMesh.position.set(0, -999, 0);
     }
-    this.dialogMesh.updateMatrixWorld(true);
-    this.raycaster.set(origin, direction);
-    const intersects = this.raycaster.intersectObject(this.dialogMesh);
-    const res = this.processIntersects(intersects);
+    return { hit: false };
+  }
+
+  private intersectDialog(): { hit: boolean; point?: any } {
+    const res = this.processIntersects(this.raycaster.intersectObject(this.dialogMesh));
     this.updateReticle3D(res.hit, res.point);
     return res;
   }
 
+  public updateHoverRay(origin: any, direction: any): { hit: boolean; point?: any } {
+    if (!this.dialogMesh?.visible) return this.clearHover();
+    this.dialogMesh.updateMatrixWorld(true);
+    this.raycaster.set(origin, direction);
+    return this.intersectDialog();
+  }
+
   public updateHoverNdc(pointerNdcX: number, pointerNdcY: number): { hit: boolean; point?: any } {
-    if (!this.dialogMesh || !this.dialogMesh.visible) {
-      this.setHoveredButton(null);
-      this.pointerX = -100;
-      this.pointerY = -100;
-      if (this.reticle3DMesh) {
-        this.reticle3DMesh.visible = false;
-        this.reticle3DMesh.position.set(0, -999, 0);
-      }
-      return { hit: false };
-    }
+    if (!this.dialogMesh?.visible) return this.clearHover();
     this.dialogMesh.updateMatrixWorld(true);
     this.mouseVec.set(pointerNdcX, pointerNdcY);
     this.raycaster.setFromCamera(this.mouseVec, this.camera);
-    const intersects = this.raycaster.intersectObject(this.dialogMesh);
-    const res = this.processIntersects(intersects);
-    this.updateReticle3D(res.hit, res.point);
-    return res;
+    return this.intersectDialog();
   }
 
   private processIntersects(intersects: any[]): { hit: boolean; point?: any } {
@@ -813,23 +776,8 @@ export class UIManager {
       return;
     }
 
-    if (state === GameState.PLAYING) {
-      this.dialogMesh.visible = false;
-      this.dialogMesh.position.set(0, -999, 0);
-      if (this.reticle3DMesh) {
-        this.reticle3DMesh.visible = false;
-        this.reticle3DMesh.position.set(0, -999, 0);
-      }
-      return;
-    }
-
-    if (state === GameState.FALLING) {
-      this.dialogMesh.visible = false;
-      this.dialogMesh.position.set(0, -999, 0);
-      if (this.reticle3DMesh) {
-        this.reticle3DMesh.visible = false;
-        this.reticle3DMesh.position.set(0, -999, 0);
-      }
+    if (state === GameState.PLAYING || state === GameState.FALLING) {
+      this.hideDialog();
       return;
     }
 
@@ -864,6 +812,10 @@ export class UIManager {
   ): void {
     this.buttons.push({ id, x, y, w, h, action });
     const isHover = this.hoveredButtonId === id;
+    const pad = isHover ? 4 : 0;
+    const bx = x - pad, by = y - pad, bw = w + pad * 2, bh = h + pad * 2, br = 20 + pad / 2;
+    const titleY = subtitle ? y + h * 0.40 : y + h * 0.5 + 10;
+    ctx.textAlign = 'center';
 
     if (isHover) {
       // Vivid glowing gradient fill
@@ -880,7 +832,7 @@ export class UIManager {
       grad.addColorStop(1, c2);
 
       ctx.fillStyle = grad;
-      this.roundRect(ctx, x - 4, y - 4, w + 8, h + 8, 22);
+      this.roundRect(ctx, bx, by, bw, bh, br);
       ctx.fill();
 
       // Glowing multi-layer border
@@ -889,7 +841,7 @@ export class UIManager {
       ctx.shadowBlur = 24;
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 5.5;
-      this.roundRect(ctx, x - 4, y - 4, w + 8, h + 8, 22);
+      this.roundRect(ctx, bx, by, bw, bh, br);
       ctx.stroke();
       ctx.restore();
 
@@ -898,20 +850,12 @@ export class UIManager {
       ctx.shadowColor = '#ffffff';
       ctx.shadowBlur = 14;
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 32px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      const titleY = subtitle ? y + h * 0.40 : y + h * 0.5 + 10;
+      ctx.font = uiFont(32);
       ctx.fillText(`✨  ${title}  ✨`, x + w / 2, titleY);
       ctx.restore();
-
-      if (subtitle) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '700 19px system-ui, sans-serif';
-        ctx.fillText(subtitle, x + w / 2, y + h * 0.72);
-      }
     } else {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
-      this.roundRect(ctx, x, y, w, h, 20);
+      this.roundRect(ctx, bx, by, bw, bh, br);
       ctx.fill();
 
       ctx.strokeStyle = color;
@@ -919,16 +863,14 @@ export class UIManager {
       ctx.stroke();
 
       ctx.fillStyle = color;
-      ctx.font = '800 29px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      const titleY = subtitle ? y + h * 0.40 : y + h * 0.5 + 10;
+      ctx.font = uiFont(29, 800);
       ctx.fillText(title, x + w / 2, titleY);
+    }
 
-      if (subtitle) {
-        ctx.fillStyle = '#c8d6e5';
-        ctx.font = '600 18px system-ui, sans-serif';
-        ctx.fillText(subtitle, x + w / 2, y + h * 0.72);
-      }
+    if (subtitle) {
+      ctx.fillStyle = isHover ? '#ffffff' : '#c8d6e5';
+      ctx.font = uiFont(isHover ? 19 : 18, isHover ? 700 : 600);
+      ctx.fillText(subtitle, x + w / 2, y + h * 0.72);
     }
   }
 
@@ -989,22 +931,22 @@ export class UIManager {
     showDesktop: boolean = false
   ): void {
     ctx.textAlign = 'center';
-    ctx.font = '800 19px system-ui, sans-serif';
+    ctx.font = uiFont(19, 800);
     ctx.fillStyle = '#ffffff';
     ctx.fillText('🌈 STEER: Take real side-steps across the 2m rainbow!', 512, baseY);
 
-    ctx.font = '700 17px system-ui, sans-serif';
+    ctx.font = uiFont(17, 700);
     ctx.fillStyle = '#00d4ff';
     ctx.fillText('🥽 VR CONTROLLER: Trigger = Stab  •  Grip = Jump  •  A / B = Return to Home', 512, baseY + gap);
 
     let offset = 2;
     if (showDesktop) {
-      ctx.font = '600 15px system-ui, sans-serif';
+      ctx.font = uiFont(15, 600);
       ctx.fillStyle = '#10e052';
       ctx.fillText('💻 DESKTOP: Mouse Move to Steer  •  Left-Click: Stab  •  Right-Click / Wheel: Jump', 512, baseY + gap * offset++);
     }
 
-    ctx.font = '600 15px system-ui, sans-serif';
+    ctx.font = uiFont(15, 600);
     ctx.fillStyle = '#9cb3d0';
     ctx.fillText(aimText, 512, baseY + gap * offset);
   }
@@ -1025,7 +967,7 @@ export class UIManager {
 
     // Title
     ctx.textAlign = 'center';
-    ctx.font = '900 52px system-ui, sans-serif';
+    ctx.font = uiFont(52);
     ctx.fillStyle = '#00d4ff';
     ctx.shadowColor = '#00d4ff';
     ctx.shadowBlur = 20;
@@ -1033,12 +975,12 @@ export class UIManager {
     ctx.shadowBlur = 0;
 
     // Subtitle
-    ctx.font = '700 21px system-ui, sans-serif';
+    ctx.font = uiFont(21, 700);
     ctx.fillStyle = '#ffdd00';
     ctx.fillText('CHOOSE DIFFICULTY ABOVE THE RAINBOW', 512, 206);
 
     // High Scores - Easy & Hard separated
-    ctx.font = '700 21px system-ui, sans-serif';
+    ctx.font = uiFont(21, 700);
     ctx.fillStyle = '#ffffff';
     ctx.fillText(
       `HIGH SCORES:   EASY: ${this.highScoreEasy}   •   HARD: ${this.highScoreHard}`,
@@ -1123,7 +1065,7 @@ export class UIManager {
 
     // Title
     ctx.textAlign = 'center';
-    ctx.font = '900 50px system-ui, sans-serif';
+    ctx.font = uiFont(50);
     ctx.fillStyle = '#ff7b00';
     ctx.shadowColor = '#ff7b00';
     ctx.shadowBlur = 20;
@@ -1131,21 +1073,21 @@ export class UIManager {
     ctx.shadowBlur = 0;
 
     // Death quote
-    ctx.font = 'italic 600 22px system-ui, sans-serif';
+    ctx.font = uiFont(22, 'italic 600');
     ctx.fillStyle = '#ffd2d9';
     ctx.fillText(this.lastQuote || 'Gravity was faster this time.', 512, 218);
 
     // Final Score
-    ctx.font = '900 46px system-ui, sans-serif';
+    ctx.font = uiFont(46);
     ctx.fillStyle = '#ffffff';
     ctx.fillText(`SCORE (${modeName}): ${score.toLocaleString()}`, 512, 290);
 
     if (isNewHigh) {
-      ctx.font = '800 26px system-ui, sans-serif';
+      ctx.font = uiFont(26, 800);
       ctx.fillStyle = '#ffdd00';
       ctx.fillText('NEW HIGH SCORE!', 512, 335);
     } else {
-      ctx.font = '700 22px system-ui, sans-serif';
+      ctx.font = uiFont(22, 700);
       ctx.fillStyle = '#ffdd00';
       ctx.fillText(`BEST SCORE (${modeName}): ${highScore.toLocaleString()}`, 512, 335);
     }
