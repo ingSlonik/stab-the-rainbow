@@ -104,8 +104,8 @@ export class Player {
     const arrowGeom = new THREE.BufferGeometry();
     const vertices = new Float32Array([
       -0.09, 0.002, -0.04,
-       0.00, 0.002, -0.16,
-       0.09, 0.002, -0.04,
+      0.00, 0.002, -0.16,
+      0.09, 0.002, -0.04,
     ]);
     arrowGeom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
     const arrowMat = new THREE.LineBasicMaterial({
@@ -121,7 +121,7 @@ export class Player {
     this.groundMarker.add(arrowLine);
 
     // 5. Lateral boundary brackets (+/- LANE_WIDTH / 2) showing precise lane occupancy
-    const bracketGeom = new THREE.BufferGeometry();
+    /*const bracketGeom = new THREE.BufferGeometry();
     const halfW = LANE_WIDTH * 0.49; // ~0.196m
     const bracketVerts = new Float32Array([
       -halfW, 0.002, -0.12,
@@ -133,6 +133,7 @@ export class Player {
     const bracketLines = new THREE.LineSegments(bracketGeom, arrowMat);
     bracketLines.renderOrder = 61;
     this.groundMarker.add(bracketLines);
+    */
 
     this.groundMarker.visible = true;
     scene.add(this.groundMarker);

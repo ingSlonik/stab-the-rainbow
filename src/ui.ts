@@ -978,6 +978,83 @@ export class UIManager {
     }
   }
 
+  private drawAudioBar(
+    ctx: CanvasRenderingContext2D,
+    x1: number,
+    x2: number,
+    y: number,
+    w: number,
+    musicSub: string,
+    sfxSub: string
+  ): void {
+    const isMusicMuted = getAudioMuted();
+    const isSfxMuted = getSfxMuted();
+
+    this.drawButton(
+      ctx,
+      'btn-music-3d',
+      x1,
+      y,
+      w,
+      85,
+      isMusicMuted ? '🎵 MUSIC: OFF' : '🎵 MUSIC: ON',
+      musicSub,
+      isMusicMuted ? '#8899aa' : '#00d4ff',
+      () => {
+        toggleAudio();
+        const b = document.getElementById('btn-music');
+        if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
+        this.dialogDirty = true;
+      }
+    );
+
+    this.drawButton(
+      ctx,
+      'btn-sfx-3d',
+      x2,
+      y,
+      w,
+      85,
+      isSfxMuted ? '🔊 SFX: OFF' : '🔊 SFX: ON',
+      sfxSub,
+      isSfxMuted ? '#8899aa' : '#10e052',
+      () => {
+        toggleSfx();
+        const b = document.getElementById('btn-sfx');
+        if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
+        this.dialogDirty = true;
+      }
+    );
+  }
+
+  private drawControlsText(
+    ctx: CanvasRenderingContext2D,
+    baseY: number,
+    gap: number,
+    aimText: string,
+    showDesktop: boolean = false
+  ): void {
+    ctx.textAlign = 'center';
+    ctx.font = '800 19px system-ui, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('🌈 STEER: Take real side-steps across the 2m rainbow!', 512, baseY);
+
+    ctx.font = '700 17px system-ui, sans-serif';
+    ctx.fillStyle = '#00d4ff';
+    ctx.fillText('🥽 VR CONTROLLER: Trigger = Stab  •  Grip = Jump  •  A / B = Return to Home', 512, baseY + gap);
+
+    let offset = 2;
+    if (showDesktop) {
+      ctx.font = '600 15px system-ui, sans-serif';
+      ctx.fillStyle = '#10e052';
+      ctx.fillText('💻 DESKTOP: Mouse Move to Steer  •  Left-Click: Stab  •  Right-Click / Wheel: Jump', 512, baseY + gap * offset++);
+    }
+
+    ctx.font = '600 15px system-ui, sans-serif';
+    ctx.fillStyle = '#9cb3d0';
+    ctx.fillText(aimText, 512, baseY + gap * offset);
+  }
+
   private drawMenu(
     ctx: CanvasRenderingContext2D,
     onStartGame: (mode: GameMode) => void,
@@ -1051,18 +1128,7 @@ export class UIManager {
     );
 
     // Controls Instructions (Clear, stylish and aligned)
-    ctx.textAlign = 'center';
-    ctx.font = '800 20px system-ui, sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText('🌈 STEER: Take real side-steps across the 2m rainbow!', 512, 625);
-
-    ctx.font = '700 17px system-ui, sans-serif';
-    ctx.fillStyle = '#00d4ff';
-    ctx.fillText('🥽 VR CONTROLLER: Trigger = Stab  •  Grip = Jump  •  A / B = Return to Home', 512, 660);
-
-    ctx.font = '600 15px system-ui, sans-serif';
-    ctx.fillStyle = '#9cb3d0';
-    ctx.fillText('🎯 Aim pointer beam & pull Trigger to select difficulty', 512, 695);
+    this.drawControlsText(ctx, 625, 35, '🎯 Aim pointer beam & pull Trigger to select difficulty');
 
     // Separator line before Audio Bar
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
@@ -1073,44 +1139,7 @@ export class UIManager {
     ctx.stroke();
 
     // 3D Audio Buttons (Side-by-side in bottom bar)
-    const isMusicMuted = getAudioMuted();
-    const isSfxMuted = getSfxMuted();
-
-    this.drawButton(
-      ctx,
-      'btn-music-3d',
-      110,
-      755,
-      380,
-      85,
-      isMusicMuted ? '🎵 MUSIC: OFF' : '🎵 MUSIC: ON',
-      'Click to toggle music soundtrack',
-      isMusicMuted ? '#8899aa' : '#00d4ff',
-      () => {
-        toggleAudio();
-        const b = document.getElementById('btn-music');
-        if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
-        this.dialogDirty = true;
-      }
-    );
-
-    this.drawButton(
-      ctx,
-      'btn-sfx-3d',
-      534,
-      755,
-      380,
-      85,
-      isSfxMuted ? '🔊 SFX: OFF' : '🔊 SFX: ON',
-      'Click to toggle sound effects',
-      isSfxMuted ? '#8899aa' : '#10e052',
-      () => {
-        toggleSfx();
-        const b = document.getElementById('btn-sfx');
-        if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
-        this.dialogDirty = true;
-      }
-    );
+    this.drawAudioBar(ctx, 110, 534, 755, 380, 'Click to toggle music soundtrack', 'Click to toggle sound effects');
   }
 
   private drawGameOver(
@@ -1212,22 +1241,13 @@ export class UIManager {
     // Controls Instructions (Consistent with VR Menu + Desktop)
     const instrBaseY = isVR ? 684 : 598;
     const lineGap = isVR ? 27 : 29;
-    ctx.textAlign = 'center';
-    ctx.font = '800 19px system-ui, sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText('🌈 STEER: Take real side-steps across the 2m rainbow!', 512, instrBaseY);
-
-    ctx.font = '700 16.5px system-ui, sans-serif';
-    ctx.fillStyle = '#00d4ff';
-    ctx.fillText('🥽 VR CONTROLLER: Trigger = Stab  •  Grip = Jump  •  A / B = Return to Home', 512, instrBaseY + lineGap);
-
-    ctx.font = '600 15px system-ui, sans-serif';
-    ctx.fillStyle = '#10e052';
-    ctx.fillText('💻 DESKTOP: Mouse Move to Steer  •  Left-Click: Stab  •  Right-Click / Wheel: Jump', 512, instrBaseY + lineGap * 2);
-
-    ctx.font = '600 14.5px system-ui, sans-serif';
-    ctx.fillStyle = '#9cb3d0';
-    ctx.fillText(isVR ? '🎯 Aim pointer beam & pull Trigger to select' : '🎯 Aim with mouse & left-click button to select', 512, instrBaseY + lineGap * 3);
+    this.drawControlsText(
+      ctx,
+      instrBaseY,
+      lineGap,
+      isVR ? '🎯 Aim pointer beam & pull Trigger to select' : '🎯 Aim with mouse & left-click button to select',
+      true
+    );
 
     // Separator line before Audio Bar
     const audioY = isVR ? 782 : 706;
@@ -1239,45 +1259,8 @@ export class UIManager {
     ctx.stroke();
 
     // 3D Audio Buttons (Side-by-side in bottom bar)
-    const isMusicMuted = getAudioMuted();
-    const isSfxMuted = getSfxMuted();
     const btnAudioY = isVR ? 802 : 726;
-
-    this.drawButton(
-      ctx,
-      'btn-music-3d',
-      140,
-      btnAudioY,
-      355,
-      85,
-      isMusicMuted ? '🎵 MUSIC: OFF' : '🎵 MUSIC: ON',
-      'Toggle music',
-      isMusicMuted ? '#8899aa' : '#00d4ff',
-      () => {
-        toggleAudio();
-        const b = document.getElementById('btn-music');
-        if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
-        this.dialogDirty = true;
-      }
-    );
-
-    this.drawButton(
-      ctx,
-      'btn-sfx-3d',
-      529,
-      btnAudioY,
-      355,
-      85,
-      isSfxMuted ? '🔊 SFX: OFF' : '🔊 SFX: ON',
-      'Toggle sound effects',
-      isSfxMuted ? '#8899aa' : '#10e052',
-      () => {
-        toggleSfx();
-        const b = document.getElementById('btn-sfx');
-        if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
-        this.dialogDirty = true;
-      }
-    );
+    this.drawAudioBar(ctx, 140, 529, btnAudioY, 355, 'Toggle music', 'Toggle sound effects');
   }
 
 
