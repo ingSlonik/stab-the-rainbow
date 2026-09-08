@@ -11,6 +11,37 @@ import process from 'node:process';
 
 const JS13K_LIMIT_BYTES = 13312;
 
+function getInternalPropertiesToMangle(): RegExp {
+  const reserved = new Set([
+    'camera', 'scene', 'renderer', 'root', 'x', 'y', 'z', 'vx', 'vy', 'vz',
+    'speed', 'score', 'combo', 'state', 'width', 'height', 'action', 'id', 'w', 'h',
+    'color', 'type', 'time', 'dt', 'name', 'life', 'active', 'length', 'target',
+    'constructor', 'setup', 'loop', 'update', 'reset', 'init', 'tick', 'push', 'pop',
+    'map', 'filter', 'slice', 'find', 'indexOf', 'includes', 'forEach', 'sort',
+    'position', 'rotation', 'quaternion', 'scale', 'matrixWorld', 'visible',
+    'renderOrder', 'geometry', 'material', 'opacity', 'transparent', 'depthWrite',
+    'depthTest', 'side', 'object3D', 'el', 'xrSession', 'inputSources', 'gamepad',
+    'buttons', 'axes', 'pressed', 'value', 'handedness'
+  ]);
+
+  const safeInternal = new Set<string>();
+  const srcDir = path.resolve('src');
+  const files = fs.readdirSync(srcDir).filter(f => f.endsWith('.ts') && !f.endsWith('.d.ts'));
+
+  for (const f of files) {
+    const content = fs.readFileSync(path.join(srcDir, f), 'utf8');
+    const matches = content.matchAll(/(?:private|public|readonly)\s+([a-zA-Z0-9_$]+)/g);
+    for (const m of matches) {
+      const name = m[1];
+      if (!reserved.has(name) && name.length > 2 && !name.startsWith('THREE')) {
+        safeInternal.add(name);
+      }
+    }
+  }
+
+  return new RegExp('^(' + Array.from(safeInternal).join('|') + ')$');
+}
+
 async function build() {
   console.log('🌈 Starting Stab the Rainbow JS13k build...');
   const startTime = Date.now();
@@ -61,6 +92,9 @@ async function build() {
     },
     mangle: {
       toplevel: true,
+      properties: {
+        regex: getInternalPropertiesToMangle(),
+      },
     },
     format: {
       comments: false,
