@@ -189,9 +189,9 @@ export class CloudManager {
     const lane = floor(random() * LANE_COUNT);
     const x = (lane - 3) * LANE_WIDTH + randRange(-0.35, 0.35);
 
-    // Pick color: 40% chance of preferred urgent color if provided, else random
+    // Pick color: 65% chance of preferred urgent color if provided, else random
     let colorIdx = floor(random() * LANE_COUNT);
-    if (preferredColorIdx !== undefined && preferredColorIdx >= 0 && random() < 0.45) {
+    if (preferredColorIdx !== undefined && preferredColorIdx >= 0 && random() < 0.65) {
       colorIdx = preferredColorIdx;
     }
 
@@ -306,11 +306,16 @@ export class CloudManager {
         playCloudEcho(c.colorIdx, c.x / 4, 0.22);
       }
 
-      // Passed behind player without being stabbed
-      if (c.z > 5) {
-        if (!c.stabbed && !isMenu && this.onMissedCloud) {
+      // Passed behind player without being stabbed: immediate damage trigger!
+      if (c.z > 2.0 && !c.stabbed && !c.missTriggered) {
+        c.missTriggered = true;
+        if (!isMenu && this.onMissedCloud) {
           this.onMissedCloud(c.colorIdx);
         }
+      }
+
+      // Out of view behind player: cleanup mesh
+      if (c.z > 6.0) {
         this.group.remove(c.mesh);
         this.clouds.splice(i, 1);
       }

@@ -25,15 +25,15 @@ export class TrackManager {
     this.group = new THREE.Group();
     scene.add(this.group);
 
-    this.laneHealth = new Array(LANE_COUNT).fill(1.0);
+    // Attract mode initial healths: lively and varied so numbers are dynamic from the first frame!
+    this.laneHealth = [0.92, 0.70, 0.45, 0.88, 0.35, 0.60, 0.82];
     this.laneFlash = new Array(LANE_COUNT).fill(0.0);
     this.laneRespawnTimer = new Array(LANE_COUNT).fill(0.0);
     this.activeDecayLanes = [];
 
     this.initTexture();
     this.initMeshes();
-    this.timeUntilNextTarget = 14.0;
-    this.currentUrgentLane = -1;
+    this.pickNextUrgentLane();
   }
 
   private initTexture(): void {
@@ -122,7 +122,7 @@ export class TrackManager {
     } else {
       this.currentUrgentLane = floor(random() * LANE_COUNT);
     }
-    this.timeUntilNextTarget = 6.0 + random() * 4.0;
+    this.timeUntilNextTarget = 5.0 + random() * 3.0;
   }
 
   public replenishLane(colorIdx: number): void {
@@ -135,10 +135,10 @@ export class TrackManager {
     }
   }
 
-  public drainLane(colorIdx: number, amount = 0.15): void {
+  public drainLane(colorIdx: number, amount = 0.20): void {
     if (colorIdx >= 0 && colorIdx < LANE_COUNT) {
       this.laneHealth[colorIdx] = max(0, this.laneHealth[colorIdx] - amount);
-      this.laneFlash[colorIdx] = -1.0;
+      this.laneFlash[colorIdx] = 1.0;
     }
   }
 
@@ -167,8 +167,7 @@ export class TrackManager {
       this.laneFlash[i] = 0.0;
       this.laneRespawnTimer[i] = 0.0;
     }
-    this.timeUntilNextTarget = 14.0;
-    this.currentUrgentLane = -1;
+    this.pickNextUrgentLane();
   }
 
   public update(dt: number, speed: number, time: number, runTime = 60, isMenu = false): void {
@@ -183,17 +182,17 @@ export class TrackManager {
       this.pickNextUrgentLane();
     }
 
-    // Active decay: steady and visible progress
-    const ramp = min(1.0, 0.45 + (runTime / 35) * 0.55);
-    const baseDecay = (0.022 + speed * 0.0009) * ramp;
-    const urgentMult = 1.6 + 1.2 * ramp;
+    // Active decay: clear, noticeable progress
+    const ramp = min(1.0, 0.55 + (runTime / 20) * 0.45);
+    const baseDecay = (0.032 + speed * 0.001) * ramp;
+    const urgentMult = 2.4;
 
     for (let i = 0; i < LANE_COUNT; i++) {
-      // In menu mode, when a lane completely dissolves, revive it after a brief moment with a flash
+      // In menu mode, cycle health smoothly so attract screen stays dynamic forever
       if (isMenu) {
-        if (this.laneHealth[i] <= 0.04) {
+        if (this.laneHealth[i] <= 0.08) {
           this.laneRespawnTimer[i] += dt;
-          if (this.laneRespawnTimer[i] >= 1.8) {
+          if (this.laneRespawnTimer[i] >= 1.2) {
             this.replenishLane(i);
             this.laneRespawnTimer[i] = 0;
             continue;
@@ -203,7 +202,7 @@ export class TrackManager {
         }
       }
 
-      // Urgent lane decays faster
+      // Urgent lane decays fast so player visibly sees the ticking countdown!
       const rate = i === this.currentUrgentLane ? baseDecay * urgentMult : baseDecay;
       this.laneHealth[i] = max(0, this.laneHealth[i] - rate * dt);
 

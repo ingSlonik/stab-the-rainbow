@@ -71,6 +71,8 @@ export interface CloudData {
   popping: boolean;
   popTimer: number;
   popDuration: number;
+  missTriggered?: boolean;
+  echoed?: boolean;
   panner?: any;
   gainNode?: any;
 }

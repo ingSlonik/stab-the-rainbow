@@ -33,7 +33,12 @@ const server = http.createServer((req: http.IncomingMessage, res: http.ServerRes
 
   const ext = path.extname(filePath);
   const contentType = mimeTypes[ext] || 'application/octet-stream';
-  res.writeHead(200, { 'Content-Type': contentType });
+  res.writeHead(200, {
+    'Content-Type': contentType,
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  });
   res.end(fs.readFileSync(filePath));
 });
 

@@ -50,6 +50,7 @@ export class Game {
   public state: GameState = GameState.MENU;
   public currentVRMode: VRMode | GameMode = GameMode.DESKTOP;
   public score = 0;
+  public scoreFloat = 0;
   public combo = 1;
   public speed = 18;
   public runTime = 0;
@@ -100,7 +101,7 @@ export class Game {
     this.clouds = new CloudManager(this.scene);
     this.clouds.onMissedCloud = (colorIdx: number) => {
       if (this.state === GameState.PLAYING) {
-        this.track.drainLane(colorIdx, 0.15);
+        this.track.drainLane(colorIdx, 0.20);
         this.combo = 1;
       }
     };
@@ -474,6 +475,7 @@ export class Game {
 
     this.state = GameState.MENU;
     this.score = 0;
+    this.scoreFloat = 0;
     this.combo = 1;
     this.speed = 18;
     this.runTime = 0;
@@ -503,6 +505,7 @@ export class Game {
 
     this.state = GameState.PLAYING;
     this.score = 0;
+    this.scoreFloat = 0;
     this.combo = 1;
     this.speed = 18;
     this.runTime = 0;
@@ -573,7 +576,8 @@ export class Game {
           this.track.replenishLane(c.colorIdx);
           this.cloudsStabbed++;
           playStabSound(c.colorIdx);
-          this.score += 150 * this.combo;
+          this.scoreFloat += 150 * this.combo;
+          this.score = floor(this.scoreFloat);
           this.combo = min(8, this.combo + 1);
 
           // Hard mode humorous quips on cloud stabbing
@@ -758,7 +762,8 @@ export class Game {
     } else if (this.state === GameState.PLAYING) {
       this.runTime += dt;
       this.speed = min(36, 18 + this.runTime * 0.28);
-      this.score += floor(this.speed * dt * 2.5);
+      this.scoreFloat += this.speed * dt * 3.5;
+      this.score = floor(this.scoreFloat);
 
       this.player.update(dt, this.speed, true, isVR);
       this.track.update(dt, this.speed, totalTime, this.runTime);
@@ -836,7 +841,7 @@ export class Game {
       this.score,
       this.combo,
       this.track.laneHealth,
-      this.state === GameState.PLAYING ? this.track.getUrgentLane() : -1,
+      this.track.getUrgentLane(),
       totalTime,
       dt,
       (m) => this.startGame(m),
