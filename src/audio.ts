@@ -549,15 +549,6 @@ export function playCloudEcho(colorIdx: number, panX: number, intensity = 0.22):
   osc.stop(t + 0.5);
 }
 
-// Backward compatibility stubs for clouds.ts
-export interface CloudAudioVoice {
-  colorIdx: number;
-}
-export function createCloudVoice(colorIdx: number): CloudAudioVoice {
-  return { colorIdx };
-}
-export function updateCloudVoice(_voice: CloudAudioVoice | null, _x: number, _z: number): void {}
-export function stopCloudVoice(_voice: CloudAudioVoice | null): void {}
 
 // -------------------------------------------------------------
 // Crisp Sound Effects (SFX)

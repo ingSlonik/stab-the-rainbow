@@ -1105,10 +1105,6 @@ export class UIManager {
     ctx.font = '600 17px system-ui, sans-serif';
     ctx.fillStyle = '#9cb3d0';
     ctx.fillText('Jump: Controller A / X or Thumbstick Up • Pause: Esc', 512, 778);
-
-    try {
-      (window as any)._df = ctx.getImageData(0, 0, 1, 1);
-    } catch (_) {}
   }
 
   private drawGameOver(

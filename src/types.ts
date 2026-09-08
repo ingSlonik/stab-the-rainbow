@@ -52,7 +52,6 @@ export const COLOR_NAMES_EN = [
   'Blue',
   'Violet',
 ];
-export const COLOR_NAMES_CZ = COLOR_NAMES_EN;
 
 export interface CloudData {
   mesh: any;
@@ -73,8 +72,6 @@ export interface CloudData {
   popDuration: number;
   missTriggered?: boolean;
   echoed?: boolean;
-  panner?: any;
-  gainNode?: any;
 }
 
 export interface Particle {

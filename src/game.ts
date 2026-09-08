@@ -6,7 +6,6 @@ import {
   GameMode,
   LANE_COUNT,
   RAINBOW_COLORS,
-  RAINBOW_HEX_STRINGS,
 } from './types';
 import { sin, cos, max, min, floor, lerp } from './math';
 import {
@@ -304,20 +303,6 @@ export class Game {
     }
   }
 
-  public async checkVRSupport(): Promise<boolean> {
-    if (typeof navigator !== 'undefined' && 'xr' in navigator && (navigator as any).xr?.isSessionSupported) {
-      try {
-        const supported = await (navigator as any).xr.isSessionSupported('immersive-vr');
-        this.hasWebXR = !!supported;
-        return !!supported;
-      } catch (_) {
-        this.hasWebXR = false;
-        return false;
-      }
-    }
-    this.hasWebXR = false;
-    return false;
-  }
 
   public requestVRSession(): void {
     const warningEl = document.getElementById('vr-warning');

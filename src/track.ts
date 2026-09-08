@@ -3,7 +3,6 @@ import {
   LANE_WIDTH,
   TRACK_WIDTH,
   RAINBOW_COLORS,
-  RAINBOW_HEX_STRINGS,
 } from './types';
 import { sin, cos, max, min, floor, random } from './math';
 
@@ -13,7 +12,6 @@ export class TrackManager {
   public group: any;
   public laneHealth: number[];
   public laneFlash: number[];
-  public activeDecayLanes: number[];
   private laneMeshes: any[] = [];
   private laneMaterials: any[] = [];
   private trackTexture: any;
@@ -29,7 +27,6 @@ export class TrackManager {
     this.laneHealth = [0.92, 0.70, 0.45, 0.88, 0.35, 0.60, 0.82];
     this.laneFlash = new Array(LANE_COUNT).fill(0.0);
     this.laneRespawnTimer = new Array(LANE_COUNT).fill(0.0);
-    this.activeDecayLanes = [];
 
     this.initTexture();
     this.initMeshes();
@@ -140,10 +137,6 @@ export class TrackManager {
       this.laneHealth[colorIdx] = max(0, this.laneHealth[colorIdx] - amount);
       this.laneFlash[colorIdx] = 1.0;
     }
-  }
-
-  public getLaneHealth(colorIdx: number): number {
-    return this.laneHealth[colorIdx] ?? 0;
   }
 
   public getUrgentLane(): number {
