@@ -4,7 +4,6 @@ import {
   RAINBOW_HEX_STRINGS,
   COLOR_NAMES_EN,
   GameState,
-  VRMode,
   GameMode,
 } from './types';
 import { sin, max, min, floor } from './math';
@@ -99,9 +98,9 @@ export class UIManager {
     }
   }
 
-  public saveHighScore(score: number, mode: VRMode | GameMode): boolean {
-    const isHard = mode === (VRMode.UNICORN_HARD as any) || mode === GameMode.VR_HARD;
-    const isEasy = mode === (VRMode.RIDER_EASY as any) || mode === GameMode.VR_EASY;
+  public saveHighScore(score: number, mode: GameMode): boolean {
+    const isHard = mode === GameMode.VR_HARD;
+    const isEasy = mode === GameMode.VR_EASY;
 
     if (isHard) {
       if (score > this.highScoreHard) {
@@ -131,9 +130,9 @@ export class UIManager {
     return false;
   }
 
-  public getHighScore(mode: VRMode | GameMode): number {
-    if (mode === (VRMode.UNICORN_HARD as any) || mode === GameMode.VR_HARD) return this.highScoreHard;
-    if (mode === (VRMode.RIDER_EASY as any) || mode === GameMode.VR_EASY) return this.highScoreEasy;
+  public getHighScore(mode: GameMode): number {
+    if (mode === GameMode.VR_HARD) return this.highScoreHard;
+    if (mode === GameMode.VR_EASY) return this.highScoreEasy;
     return this.highScoreDesktop;
   }
 
@@ -523,7 +522,7 @@ export class UIManager {
     laneHealth: number[],
     urgentLane: number,
     time: number,
-    vrMode: VRMode | GameMode
+    vrMode: GameMode
   ): void {
     if (!this.board3DGroup) return;
 
@@ -572,8 +571,8 @@ export class UIManager {
     }
 
     // 4. Mode Label
-    const isHard = vrMode === (VRMode.UNICORN_HARD as any) || (vrMode as any) === GameMode.VR_HARD;
-    const isEasy = vrMode === (VRMode.RIDER_EASY as any) || (vrMode as any) === GameMode.VR_EASY;
+    const isHard = vrMode === GameMode.VR_HARD;
+    const isEasy = vrMode === GameMode.VR_EASY;
     const modeKey = isHard ? 'VR HARD' : (isEasy ? 'VR EASY' : 'DESKTOP');
     if (this.modeLabelMesh && this.labelMaterials[modeKey]) {
       this.modeLabelMesh.material = this.labelMaterials[modeKey];
@@ -691,6 +690,7 @@ export class UIManager {
     this.reticle3DMesh.renderOrder = 3000;
     this.reticle3DMesh.visible = false;
     this.dialogMesh.add(this.reticle3DMesh);
+
   }
 
   public updateHoverRay(origin: any, direction: any): { hit: boolean; point?: any } {
@@ -844,12 +844,12 @@ export class UIManager {
     urgentLane: number,
     time: number,
     dt: number,
-    onStartGame: (mode: VRMode | GameMode) => void,
+    onStartGame: (mode: GameMode) => void,
     onRestart: () => void,
     onHome: () => void,
     onToggleMode: () => void,
     isVR: boolean = false,
-    vrMode: VRMode | GameMode = GameMode.DESKTOP
+    vrMode: GameMode = GameMode.DESKTOP
   ): void {
     this.buttons = [];
 
@@ -862,7 +862,6 @@ export class UIManager {
 
     // 1. Update 100% Native 3D HUD Board (zero dynamic canvas uploads, 90/120Hz native WebGL)
     this.update3DBoard(score, combo, laneHealth, urgentLane, time, vrMode);
-
 
 
     if (state === GameState.MENU) {
@@ -1026,10 +1025,10 @@ export class UIManager {
 
   private drawMenu(
     ctx: CanvasRenderingContext2D,
-    onStartGame: (mode: VRMode | GameMode) => void,
+    onStartGame: (mode: GameMode) => void,
     time: number,
     isVR: boolean,
-    currentMode: VRMode | GameMode
+    currentMode: GameMode
   ): void {
     // Elegant dialog card
     ctx.fillStyle = 'rgba(12, 8, 28, 0.94)';
@@ -1115,10 +1114,10 @@ export class UIManager {
     onToggleMode: () => void,
     time: number,
     isVR: boolean,
-    vrMode: VRMode | GameMode
+    vrMode: GameMode
   ): void {
-    const isHard = vrMode === (VRMode.UNICORN_HARD as any) || (vrMode as any) === GameMode.VR_HARD;
-    const isEasy = vrMode === (VRMode.RIDER_EASY as any) || (vrMode as any) === GameMode.VR_EASY;
+    const isHard = vrMode === GameMode.VR_HARD;
+    const isEasy = vrMode === GameMode.VR_EASY;
     const modeName = isHard ? 'VR HARD' : (isEasy ? 'VR EASY' : 'DESKTOP');
     const otherModeName = isHard ? 'VR EASY' : 'VR HARD';
     const highScore = this.getHighScore(vrMode);

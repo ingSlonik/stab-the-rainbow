@@ -11,12 +11,6 @@ export const enum GameMode {
   VR_HARD = 2,
 }
 
-export const enum VRMode {
-  NONE = 0,
-  RIDER_EASY = 1,
-  UNICORN_HARD = 2,
-}
-
 export const LANE_COUNT = 7;
 export const LANE_WIDTH = 1.1;
 export const TRACK_WIDTH = LANE_COUNT * LANE_WIDTH;

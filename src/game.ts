@@ -2,7 +2,6 @@ const THREE = (window as any).THREE = (window as any).THREE || (typeof AFRAME !=
 
 import {
   GameState,
-  VRMode,
   GameMode,
   LANE_COUNT,
   RAINBOW_COLORS,
@@ -47,7 +46,7 @@ export class Game {
   public ui!: UIManager;
 
   public state: GameState = GameState.MENU;
-  public currentVRMode: VRMode | GameMode = GameMode.DESKTOP;
+  public currentVRMode: GameMode = GameMode.DESKTOP;
   public score = 0;
   public scoreFloat = 0;
   public combo = 1;
@@ -192,7 +191,7 @@ export class Game {
         this.restartGame();
       }
     } else if (this.state === GameState.PLAYING) {
-      const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
+      const isHard = this.currentVRMode === GameMode.VR_HARD;
       if (isHard) {
         this.player.jump();
       } else {
@@ -478,7 +477,7 @@ export class Game {
     }
   }
 
-  public startGame(mode: VRMode | GameMode = this.currentVRMode || GameMode.DESKTOP): void {
+  public startGame(mode: GameMode = this.currentVRMode ?? GameMode.DESKTOP): void {
     const warningEl = document.getElementById('vr-warning');
     if (warningEl) warningEl.style.display = 'none';
 
@@ -509,7 +508,7 @@ export class Game {
       this.menuButtonDebounce = false;
     }, 800);
 
-    const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
+    const isHard = this.currentVRMode === GameMode.VR_HARD;
     if (isHard) {
       const startQuip = getRandomStartQuip();
       this.ui?.setQuip(startQuip);
@@ -526,7 +525,7 @@ export class Game {
     const hornTipPos = this.player.getHornTipPosition();
     const isAirborne = !this.player.isGrounded;
     const isStabbing = this.player.isStabbing;
-    const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
+    const isHard = this.currentVRMode === GameMode.VR_HARD;
 
     // Strict vertical bounds: Cloud vertical half-thickness is ~0.55m.
     // Horn tip MUST be at the height of the cloud to pierce it!
@@ -597,7 +596,7 @@ export class Game {
         this.player.startFalling();
         playFallSound();
         this.ui.setGameOverDeathQuote();
-        const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
+        const isHard = this.currentVRMode === GameMode.VR_HARD;
         if (isHard) {
           speakQuip(this.ui.getLastQuote(), true);
         }
@@ -645,8 +644,8 @@ export class Game {
 
     // VR Controls
     if (isVR) {
-      const isEasy = this.currentVRMode === (VRMode.RIDER_EASY as any) || this.currentVRMode === GameMode.VR_EASY;
-      const isHard = this.currentVRMode === (VRMode.UNICORN_HARD as any) || this.currentVRMode === GameMode.VR_HARD;
+      const isEasy = this.currentVRMode === GameMode.VR_EASY;
+      const isHard = this.currentVRMode === GameMode.VR_HARD;
 
       // 1. Easy mode: VR Controller steering with hand or thumbstick
       if (isEasy && this.player.vrController) {
@@ -832,9 +831,7 @@ export class Game {
       () => this.restartGame(),
       () => this.goToMenu(),
       () => {
-        const isHard =
-          this.currentVRMode === (VRMode.UNICORN_HARD as any) ||
-          this.currentVRMode === GameMode.VR_HARD;
+        const isHard = this.currentVRMode === GameMode.VR_HARD;
         const toggled = isHard ? GameMode.VR_EASY : GameMode.VR_HARD;
         this.startGame(toggled);
       },
