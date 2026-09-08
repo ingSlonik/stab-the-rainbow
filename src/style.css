@@ -21,24 +21,35 @@ canvas {
   display: block;
 }
 
-.overlay {
+/* Unified Flexbox */
+.f {
+  display: flex;
+}
+
+.jcc {
+  justify-content: center;
+}
+
+.dc {
+  flex-direction: column;
+}
+
+/* Modal overlay and card container */
+#m {
   position: fixed;
   inset: 0;
-  z-index: 1000;
-  display: flex;
+  z-index: 9;
   align-items: center;
-  justify-content: center;
   background: #07041266;
   backdrop-filter: blur(8px);
 }
 
-.card {
+.c {
   background: #120c26f5;
   border: 2px solid #fff3;
   border-radius: 20px;
   padding: 20px 24px;
-  max-width: 520px;
-  width: 90%;
+  width: 500px;
   text-align: center;
   color: #fff;
 }
@@ -49,121 +60,104 @@ h1 {
   background: linear-gradient(90deg, #ff2a4b, #ffdd00, #10e052, #00d4ff, #b82bfb);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
-.sub {
-  color: #c9d5ea;
-  font-size: 13px;
+/* Unified 16px bottom margin */
+.mb,
+#w {
   margin-bottom: 16px;
 }
 
-.choices {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.choice-btn {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+/* Unified notice and warning boxes */
+.u,
+#w {
   padding: 12px 16px;
+  border: 1.5px solid;
   border-radius: 14px;
-  border: 2px solid transparent;
-  cursor: pointer;
-  color: #fff;
-  text-align: left;
-}
-
-.choice-btn strong {
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.choice-btn small {
-  font-size: 11px;
-  color: #c0cedf;
-}
-
-.choice-btn:hover {
-  filter: brightness(1.25);
-}
-
-.vr-btn {
-  border-color: #00d4ff;
-  background: #00d4ff24;
-}
-
-.vr-btn:disabled,
-.vr-btn.disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  border-color: #667788;
-  background: #323c4b40;
-  filter: grayscale(0.8);
-  pointer-events: none;
-}
-
-.pc-btn {
-  border-color: #10e052;
-  background: #10e05224;
-}
-
-.unicorn-notice {
-  background: linear-gradient(135deg, #fd02, #b82bfb26);
-  border: 1.5px solid #fd06;
-  border-radius: 14px;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.45;
+}
+
+.u {
+  background: linear-gradient(135deg, #fd02, #b82bfb26);
+  border-color: #fd06;
   color: #f7efff;
   text-align: left;
 }
 
-.unicorn-notice strong {
+.u strong {
   color: #ffdd00;
   display: block;
   margin-bottom: 3px;
-  font-size: 13px;
 }
 
-.bottom-bar {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
-.mini-btn {
-  background: #fff1;
-  border: 1px solid #fff3;
-  color: #e0e8f8;
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.mini-btn:hover {
-  border-color: #00d4ff;
-}
-
-.vr-warning {
-  margin-bottom: 16px;
-  padding: 12px 16px;
+#w {
+  display: none;
   background: #ff2a4b29;
-  border: 1.5px solid #ff2a4b;
-  border-radius: 12px;
+  border-color: #ff2a4b;
   color: #ffc2cc;
-  font-size: 13px;
-  line-height: 1.45;
   text-align: center;
 }
 
-.vr-warning strong {
+#w strong {
   color: #fff;
   font-size: 14px;
+}
+
+/* Unified base button rules */
+button {
+  cursor: pointer;
+  font-family: inherit;
+  color: #fff;
+  border: 1px solid transparent;
+}
+
+.ch {
+  gap: 10px;
+}
+
+/* Choice buttons (.b = choice-btn) */
+.b {
+  gap: 3px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border-width: 2px;
+  text-align: left;
+}
+
+.b strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.b small {
+  font-size: 11px;
+  color: #c0cedf;
+}
+
+.b:hover {
+  filter: brightness(1.25);
+}
+
+/* Button color themes */
+.vb {
+  border-color: #00d4ff;
+  background: #00d4ff24;
+}
+
+.pb {
+  border-color: #10e052;
+  background: #10e05224;
+}
+
+/* Disabled VR button state (.d = disabled) */
+.vb:disabled,
+.vb.d {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: #678;
+  background: #323c4b40;
+  filter: grayscale(0.8);
+  pointer-events: none;
 }
