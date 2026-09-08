@@ -89,12 +89,13 @@ export class Game {
     this.scene = this.sceneEl.object3D;
     this.renderer = this.sceneEl.renderer;
 
-    this.cameraEl = this.sceneEl.querySelector('#camera') || this.sceneEl.camera?.el;
+    // Camera and rig entities: #c = camera, #r = rig, #lc = left-controller, #rc = right-controller
+    this.cameraEl = this.sceneEl.querySelector('#c') || this.sceneEl.camera?.el;
     this.camera = this.sceneEl.camera || this.cameraEl?.getObject3D('camera');
 
-    this.rigEl = this.sceneEl.querySelector('#rig');
-    this.leftControllerEl = this.sceneEl.querySelector('#left-controller');
-    this.rightControllerEl = this.sceneEl.querySelector('#right-controller');
+    this.rigEl = this.sceneEl.querySelector('#r');
+    this.leftControllerEl = this.sceneEl.querySelector('#lc');
+    this.rightControllerEl = this.sceneEl.querySelector('#rc');
 
     this.track = new TrackManager(this.scene);
     this.clouds = new CloudManager(this.scene);
@@ -240,18 +241,19 @@ export class Game {
     if (!this.isImmersiveVR()) {
       console.warn('Blocked non-immersive VR mode attempt');
       this.sceneEl?.exitVR();
-      const warningEl = document.getElementById('vr-warning');
+      // w = vr-warning, m = modal
+      const warningEl = document.getElementById('w');
       if (warningEl) {
         warningEl.innerHTML = '⚠️ <strong>Immersive VR headset required</strong><br>No active WebXR headset detected. Connect a VR headset or click PLAY ON DESKTOP.';
         warningEl.style.display = 'block';
       }
-      const modal = document.getElementById('modal');
+      const modal = document.getElementById('m');
       if (modal) modal.style.display = 'flex';
       this.onExitVR();
       return;
     }
 
-    // Sdružené skrytí 2D varovného dialogu a startovacího modálu
+    // Combined hide for 2D warning banner (w) and start modal (m)
     this.hideModal();
 
     if (this.camera) {
@@ -276,16 +278,28 @@ export class Game {
     this.goToMenu();
   }
 
+  /*
+    DOM Identifiers:
+    bv = #bv (#btn-enter-vr)
+    vs = #vs (#vr-btn-sub)
+    d  = .d (.disabled)
+    bd = #bd (#btn-desktop)
+    bm = #bm (#btn-music)
+    bs = #bs (#btn-sfx)
+    bf = #bf (#btn-fs)
+    w  = #w (#vr-warning)
+    m  = #m (#modal)
+  */
   private initDOM(): void {
     const on = (id: string, fn: () => void) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('click', fn);
     };
 
-    // Check WebXR immersive-vr support on startup; disable VR button on desktop if not available
+    // Check WebXR support; disable VR button on desktop if no headset detected
     const checkVRSupport = async () => {
-      const vrBtn = document.getElementById('btn-enter-vr') as HTMLButtonElement | null;
-      const vrSub = document.getElementById('vr-btn-sub');
+      const vrBtn = document.getElementById('bv') as HTMLButtonElement | null;
+      const vrSub = document.getElementById('vs');
       let isSupported = false;
       if (typeof navigator !== 'undefined' && 'xr' in navigator && (navigator as any).xr) {
         try {
@@ -297,42 +311,42 @@ export class Game {
       this.hasWebXR = isSupported;
       if (!isSupported && vrBtn) {
         vrBtn.disabled = true;
-        vrBtn.classList.add('disabled');
+        vrBtn.classList.add('d');
         if (vrSub) vrSub.textContent = 'VR Headset Required (Not Available on Desktop)';
       }
     };
     checkVRSupport();
 
-    on('btn-enter-vr', () => {
+    on('bv', () => {
       this.requestVRSession();
     });
-    on('btn-desktop', () => {
+    on('bd', () => {
       this.startGame(GameMode.DESKTOP);
     });
 
-    on('btn-music', () => {
+    on('bm', () => {
       toggleAudio();
       this.syncAudioDOM();
     });
-    on('btn-sfx', () => {
+    on('bs', () => {
       toggleSfx();
       this.syncAudioDOM();
     });
-    on('btn-fs', () => this.toggleFullscreen());
+    on('bf', () => this.toggleFullscreen());
   }
 
   private syncAudioDOM(): void {
-    const bm = document.getElementById('btn-music');
+    const bm = document.getElementById('bm');
     if (bm) bm.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
-    const bs = document.getElementById('btn-sfx');
+    const bs = document.getElementById('bs');
     if (bs) bs.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
   }
 
-  // Sdružené skrytí 2D varovného dialogu a startovacího modálu
+  // Combined hide for 2D warning banner (w) and start modal (m)
   private hideModal(): void {
-    const w = document.getElementById('vr-warning');
+    const w = document.getElementById('w');
     if (w) w.style.display = 'none';
-    const m = document.getElementById('modal');
+    const m = document.getElementById('m');
     if (m) m.style.display = 'none';
   }
 
@@ -345,7 +359,7 @@ export class Game {
   }
 
   public requestVRSession(): void {
-    const warningEl = document.getElementById('vr-warning');
+    const warningEl = document.getElementById('w');
     if (warningEl) warningEl.style.display = 'none';
 
     initAudio();
@@ -517,7 +531,8 @@ export class Game {
 
   public goToMenu(): void {
     const isVR = this.isImmersiveVR();
-    const modal = document.getElementById('modal');
+    // m = #modal
+    const modal = document.getElementById('m');
     if (modal) {
       modal.style.display = isVR ? 'none' : 'flex';
     }
