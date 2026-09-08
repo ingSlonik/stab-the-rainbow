@@ -6,7 +6,7 @@
   "author": "Filip Paulů",
   "license": "MIT",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "node scripts/build.ts",
     "typecheck": "tsc --noEmit"
   },
