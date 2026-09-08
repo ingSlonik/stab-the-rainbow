@@ -124,8 +124,8 @@ export class TrackManager {
 
   public replenishLane(colorIdx: number): void {
     if (colorIdx >= 0 && colorIdx < LANE_COUNT) {
-      this.laneHealth[colorIdx] = min(1.0, this.laneHealth[colorIdx] + 0.35);
-      this.laneFlash[colorIdx] = 1.0;
+      this.laneHealth[colorIdx] = 1.0;
+      this.laneFlash[colorIdx] = 1.6;
       if (this.currentUrgentLane === colorIdx) {
         this.pickNextUrgentLane();
       }

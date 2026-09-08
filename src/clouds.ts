@@ -74,8 +74,10 @@ export class CloudManager {
     return cloudRoot;
   }
 
+  private static readonly MAX_BURST = 1200;
+
   private initParticles(): void {
-    const MAX_BURST = 300;
+    const MAX_BURST = CloudManager.MAX_BURST;
     this.burstPosArr = new Float32Array(MAX_BURST * 3);
     this.burstColArr = new Float32Array(MAX_BURST * 3);
 
@@ -90,10 +92,10 @@ export class CloudManager {
     );
 
     const mat = new THREE.PointsMaterial({
-      size: 0.22,
+      size: 0.28,
       vertexColors: true,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.98,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
@@ -136,27 +138,23 @@ export class CloudManager {
   }
 
   public spawnBurst(x: number, y: number, z: number, colorHex: number): void {
-    const r = ((colorHex >> 16) & 255) / 255;
-    const g = ((colorHex >> 8) & 255) / 255;
-    const b = (colorHex & 255) / 255;
-
-    const count = 45;
+    const count = 160;
     for (let i = 0; i < count; i++) {
-      const speed = randRange(3.0, 9.0);
+      const speed = randRange(4.0, 13.0);
       const theta = random() * Math.PI * 2;
-      const phi = randRange(-Math.PI / 3, Math.PI / 3);
+      const phi = randRange(-Math.PI / 2.5, Math.PI / 2.5);
 
       this.burstParticles.push({
         x,
         y,
         z,
         vx: cos(phi) * sin(theta) * speed,
-        vy: sin(phi) * speed + randRange(1, 4),
+        vy: sin(phi) * speed + randRange(1.5, 5.5),
         vz: cos(phi) * cos(theta) * speed,
         life: 0,
-        maxLife: randRange(0.45, 0.95),
+        maxLife: randRange(0.45, 1.15),
         color: colorHex,
-        size: randRange(0.14, 0.32),
+        size: randRange(0.20, 0.45),
       });
     }
   }
@@ -165,8 +163,8 @@ export class CloudManager {
     if (c.stabbed) return;
     c.stabbed = true;
     c.popping = true;
-    c.popTimer = 0.32;
-    c.popDuration = 0.32;
+    c.popTimer = 0.35;
+    c.popDuration = 0.35;
     this.spawnBurst(c.x, c.y, c.z, RAINBOW_COLORS[c.colorIdx]);
   }
 
@@ -254,11 +252,11 @@ export class CloudManager {
           if (child.material) {
             if (progress < 0.35) {
               child.material.emissive.setHex(0xffffff);
-              child.material.emissiveIntensity = 1.0 + (1 - progress / 0.35) * 2.2;
+              child.material.emissiveIntensity = 4.0 + (1 - progress / 0.35) * 5.0;
               child.material.opacity = 1.0;
             } else {
-              child.material.opacity = fade * 0.9;
-              child.material.emissiveIntensity = fade * 0.7;
+              child.material.opacity = fade * 0.95;
+              child.material.emissiveIntensity = fade * 1.5;
             }
           }
         });
@@ -313,6 +311,7 @@ export class CloudManager {
     // 3. Update Burst Particles
     const posAttr = this.burstGeom.attributes.position;
     const colAttr = this.burstGeom.attributes.color;
+    const maxB = CloudManager.MAX_BURST;
     let pIdx = 0;
 
     for (let i = this.burstParticles.length - 1; i >= 0; i--) {
@@ -328,7 +327,7 @@ export class CloudManager {
       p.z += p.vz * dt;
       p.vy -= 9.8 * dt * 0.4; // gentle gravity
 
-      if (pIdx < 300) {
+      if (pIdx < maxB) {
         const i3 = pIdx * 3;
         this.burstPosArr[i3] = p.x;
         this.burstPosArr[i3 + 1] = p.y;
@@ -347,7 +346,7 @@ export class CloudManager {
     }
 
     // Clear unused particle slots
-    for (let j = pIdx; j < 300; j++) {
+    for (let j = pIdx; j < maxB; j++) {
       const j3 = j * 3;
       this.burstPosArr[j3] = 0;
       this.burstPosArr[j3 + 1] = -999;
