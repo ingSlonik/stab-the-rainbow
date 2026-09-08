@@ -239,6 +239,11 @@ export class CloudManager {
     }
   }
 
+  private removeCloud(i: number): void {
+    this.group.remove(this.clouds[i].mesh);
+    this.clouds.splice(i, 1);
+  }
+
   public update(dt: number, speed: number, time: number, isMenu = false): void {
     // 1. Spawning logic
     this.spawnTimer -= dt;
@@ -255,8 +260,7 @@ export class CloudManager {
       if (c.popping) {
         c.popTimer -= dt;
         if (c.popTimer <= 0) {
-          this.group.remove(c.mesh);
-          this.clouds.splice(i, 1);
+          this.removeCloud(i);
           continue;
         }
 
@@ -289,8 +293,7 @@ export class CloudManager {
 
       // In menu mode, clouds must never pass in front of the 3D menu dialog
       if (isMenu && c.z > -4.5) {
-        this.group.remove(c.mesh);
-        this.clouds.splice(i, 1);
+        this.removeCloud(i);
         continue;
       }
 
@@ -320,8 +323,7 @@ export class CloudManager {
 
       // Out of view behind player: cleanup mesh
       if (c.z > 6.0) {
-        this.group.remove(c.mesh);
-        this.clouds.splice(i, 1);
+        this.removeCloud(i);
       }
     }
 
@@ -350,14 +352,10 @@ export class CloudManager {
         this.burstPosArr[i3 + 1] = p.y;
         this.burstPosArr[i3 + 2] = p.z;
 
-        const fade = 1 - p.life / p.maxLife;
-        const r = ((p.color >> 16) & 255) / 255;
-        const g = ((p.color >> 8) & 255) / 255;
-        const b = (p.color & 255) / 255;
-
-        this.burstColArr[i3] = r * fade;
-        this.burstColArr[i3 + 1] = g * fade;
-        this.burstColArr[i3 + 2] = b * fade;
+        const f = (1 - p.life / p.maxLife) / 255;
+        this.burstColArr[i3] = ((p.color >> 16) & 255) * f;
+        this.burstColArr[i3 + 1] = ((p.color >> 8) & 255) * f;
+        this.burstColArr[i3 + 2] = (p.color & 255) * f;
         pIdx++;
       }
     }

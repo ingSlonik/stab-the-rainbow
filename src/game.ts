@@ -314,15 +314,20 @@ export class Game {
 
     on('btn-music', () => {
       toggleAudio();
-      const b = document.getElementById('btn-music');
-      if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
+      this.syncAudioDOM();
     });
     on('btn-sfx', () => {
       toggleSfx();
-      const b = document.getElementById('btn-sfx');
-      if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
+      this.syncAudioDOM();
     });
     on('btn-fs', () => this.toggleFullscreen());
+  }
+
+  private syncAudioDOM(): void {
+    const bm = document.getElementById('btn-music');
+    if (bm) bm.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
+    const bs = document.getElementById('btn-sfx');
+    if (bs) bs.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
   }
 
   public toggleFullscreen(): void {
@@ -471,13 +476,11 @@ export class Game {
       } else if (c === 'KeyM') {
         e.preventDefault();
         toggleAudio();
-        const b = document.getElementById('btn-music');
-        if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
+        this.syncAudioDOM();
       } else if (c === 'KeyN') {
         e.preventDefault();
         toggleSfx();
-        const b = document.getElementById('btn-sfx');
-        if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
+        this.syncAudioDOM();
       } else if (c === 'KeyH' || c === 'Escape') {
         // Return to menu at any time
         this.goToMenu();
@@ -497,6 +500,15 @@ export class Game {
     });
   }
 
+  private resetRunStats(): void {
+    this.score = this.scoreFloat = this.runTime = this.cloudsStabbed = 0;
+    this.combo = 1;
+    this.speed = 18;
+    this.track?.reset();
+    this.clouds?.reset();
+    this.scenery?.reset();
+  }
+
   public goToMenu(): void {
     const isVR = this.isImmersiveVR();
     const modal = document.getElementById('modal');
@@ -505,15 +517,7 @@ export class Game {
     }
 
     this.state = GameState.MENU;
-    this.score = 0;
-    this.scoreFloat = 0;
-    this.combo = 1;
-    this.speed = 18;
-    this.runTime = 0;
-    this.cloudsStabbed = 0;
-    this.track?.reset();
-    this.clouds?.reset();
-    this.scenery?.reset();
+    this.resetRunStats();
     this.player?.reset(isVR);
     this.player?.setMenuMode(isVR, isVR ? this.rightControllerEl?.object3D : null);
 
@@ -541,15 +545,7 @@ export class Game {
     this.player?.setVRMode(mode, this.rightControllerEl?.object3D);
 
     this.state = GameState.PLAYING;
-    this.score = 0;
-    this.scoreFloat = 0;
-    this.combo = 1;
-    this.speed = 18;
-    this.runTime = 0;
-    this.cloudsStabbed = 0;
-    this.track?.reset();
-    this.clouds?.reset();
-    this.scenery?.reset();
+    this.resetRunStats();
     this.player?.reset();
 
     // Immediately hide 3D menu dialog
@@ -621,12 +617,10 @@ export class Game {
 
           // Hard mode humorous quips on cloud stabbing
           if (isHard) {
-            if (this.combo >= 3 && Math.random() < 0.6) {
-              const q = getRandomComboQuip();
-              this.ui.setQuip(q);
-              speakQuip(q);
-            } else if (Math.random() < 0.4) {
-              const q = getRandomStabQuip();
+            const q = this.combo >= 3 && Math.random() < 0.6
+              ? getRandomComboQuip()
+              : (Math.random() < 0.4 ? getRandomStabQuip() : null);
+            if (q) {
               this.ui.setQuip(q);
               speakQuip(q);
             }

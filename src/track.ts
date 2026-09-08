@@ -132,11 +132,9 @@ export class TrackManager {
   }
 
   public reset(): void {
-    for (let i = 0; i < LANE_COUNT; i++) {
-      this.laneHealth[i] = 1.0;
-      this.laneFlash[i] = 0.0;
-      this.laneRespawnTimer[i] = 0.0;
-    }
+    this.laneHealth.fill(1.0);
+    this.laneFlash.fill(0.0);
+    this.laneRespawnTimer.fill(0.0);
   }
 
   public update(dt: number, speed: number, time: number, runTime = 60, isMenu = false): void {
