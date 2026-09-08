@@ -27,6 +27,32 @@ let musicSpeedMult = 1.0;
 // Convert semitone offset from C4 (261.63 Hz)
 const semitoneFreq = (semi: number): number => 261.626 * pow(2, semi / 12);
 
+// Web Audio API Compact Helpers (100% identical audio behavior)
+const setVal = (p: AudioParam, v: number, t: number) => p.setValueAtTime(v, t);
+const rampExp = (p: AudioParam, v: number, t: number) => p.exponentialRampToValueAtTime(v, t);
+const rampLin = (p: AudioParam, v: number, t: number) => p.linearRampToValueAtTime(v, t);
+const createOsc = (type: OscillatorType, f: number, t: number, dest?: AudioNode): OscillatorNode => {
+  const osc = audioCtx!.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(f, t);
+  if (dest) osc.connect(dest);
+  return osc;
+};
+const createGain = (vol: number, t: number, dest?: AudioNode): GainNode => {
+  const g = audioCtx!.createGain();
+  g.gain.setValueAtTime(vol, t);
+  if (dest) g.connect(dest);
+  return g;
+};
+const createFilter = (type: BiquadFilterType, freq: number, t: number, q?: number, dest?: AudioNode): BiquadFilterNode => {
+  const filter = audioCtx!.createBiquadFilter();
+  filter.type = type;
+  filter.frequency.setValueAtTime(freq, t);
+  if (q !== undefined) filter.Q.setValueAtTime(q, t);
+  if (dest) filter.connect(dest);
+  return filter;
+};
+
 // 7 Rainbow Chords & Scales (C Lydian/Major: Red, Orange, Yellow, Green, Cyan, Blue, Violet)
 // Relative to C4:
 const RAINBOW_CHORD_SEMIS: number[][] = [
@@ -58,26 +84,20 @@ export function initAudio(): void {
 
     // Master Dynamics Compressor: delivers punchy "grády", glues bass & hooves without clipping
     masterCompressor = audioCtx.createDynamicsCompressor();
-    masterCompressor.threshold.setValueAtTime(-14, t);
-    masterCompressor.knee.setValueAtTime(8, t);
-    masterCompressor.ratio.setValueAtTime(5, t);
-    masterCompressor.attack.setValueAtTime(0.003, t);
-    masterCompressor.release.setValueAtTime(0.12, t);
+    setVal(masterCompressor.threshold, -14, t);
+    setVal(masterCompressor.knee, 8, t);
+    setVal(masterCompressor.ratio, 5, t);
+    setVal(masterCompressor.attack, 0.003, t);
+    setVal(masterCompressor.release, 0.12, t);
     masterCompressor.connect(audioCtx.destination);
 
-    masterGain = audioCtx.createGain();
-    masterGain.gain.setValueAtTime(0.85, t);
-    masterGain.connect(masterCompressor);
+    masterGain = createGain(0.85, t, masterCompressor);
 
     // Music Bus
-    musicGain = audioCtx.createGain();
-    musicGain.gain.setValueAtTime(isMuted ? 0 : 0.42, t);
-    musicGain.connect(masterGain);
+    musicGain = createGain(isMuted ? 0 : 0.42, t, masterGain);
 
     // SFX Bus
-    sfxGain = audioCtx.createGain();
-    sfxGain.gain.setValueAtTime(sfxMuted ? 0 : 0.65, t);
-    sfxGain.connect(masterGain);
+    sfxGain = createGain(sfxMuted ? 0 : 0.65, t, masterGain);
 
     // Spatial Echo / Reverb Bus ("Dozvuky" for clouds and rainbow stabs)
     initEchoBus();
@@ -100,27 +120,23 @@ export function initAudio(): void {
 function initEchoBus(): void {
   if (!audioCtx || !masterGain) return;
 
-  echoBus = audioCtx.createGain();
-  echoBus.gain.setValueAtTime(isMuted ? 0 : 0.35, audioCtx.currentTime);
+  const t = audioCtx.currentTime;
+  echoBus = createGain(isMuted ? 0 : 0.35, t);
 
   const delayL = audioCtx.createDelay();
-  delayL.delayTime.setValueAtTime(0.18, audioCtx.currentTime);
+  setVal(delayL.delayTime, 0.18, t);
 
   const delayR = audioCtx.createDelay();
-  delayR.delayTime.setValueAtTime(0.27, audioCtx.currentTime);
+  setVal(delayR.delayTime, 0.27, t);
 
-  const feedback = audioCtx.createGain();
-  feedback.gain.setValueAtTime(0.38, audioCtx.currentTime);
-
-  const lowpass = audioCtx.createBiquadFilter();
-  lowpass.type = 'lowpass';
-  lowpass.frequency.setValueAtTime(2400, audioCtx.currentTime);
+  const feedback = createGain(0.38, t, delayL);
+  const lowpass = createFilter('lowpass', 2400, t);
 
   const panL = audioCtx.createStereoPanner();
-  panL.pan.setValueAtTime(-0.6, audioCtx.currentTime);
+  setVal(panL.pan, -0.6, t);
 
   const panR = audioCtx.createStereoPanner();
-  panR.pan.setValueAtTime(0.6, audioCtx.currentTime);
+  setVal(panR.pan, 0.6, t);
 
   // Cross-feedback stereo echo loop
   echoBus.connect(delayL);
@@ -130,7 +146,6 @@ function initEchoBus(): void {
   lowpass.connect(delayR);
   delayR.connect(panR);
   panR.connect(feedback);
-  feedback.connect(delayL);
 
   panL.connect(masterGain);
   panR.connect(masterGain);
@@ -179,84 +194,46 @@ export function setAudioState(state: GameState, isGrounded: boolean, speedMultip
 function playHoof(time: number, isLeft: boolean, intensity: number): void {
   if (!audioCtx || !musicGain || isMuted) return;
 
-  const hoofGain = audioCtx.createGain();
   const pan = audioCtx.createStereoPanner();
   // Clear stereo separation between left and right hooves
-  pan.pan.setValueAtTime(isLeft ? -0.28 : 0.28, time);
+  setVal(pan.pan, isLeft ? -0.28 : 0.28, time);
+  pan.connect(musicGain);
+  const hoofGain = createGain(0.9, time, pan);
 
   // 1. Resonant hollow cavity knock ("clop/klap" - characteristic acoustic body)
-  const knockOsc = audioCtx.createOscillator();
-  const knockFilter = audioCtx.createBiquadFilter();
-  const knockGain = audioCtx.createGain();
-
-  knockOsc.type = 'triangle';
   const startF = isLeft ? 500 : 640;
   const endF = isLeft ? 140 : 180;
-  knockOsc.frequency.setValueAtTime(startF, time);
-  knockOsc.frequency.exponentialRampToValueAtTime(endF, time + 0.04);
-
+  const knockGain = createGain(0.75 * intensity, time, hoofGain);
+  rampExp(knockGain.gain, 0.0001, time + 0.046);
   // Bandpass filter produces the distinctive wooden / keratin "tok-tok" hollow knock
-  knockFilter.type = 'bandpass';
-  knockFilter.frequency.setValueAtTime(isLeft ? 520 : 700, time);
-  knockFilter.Q.setValueAtTime(4.0, time);
-
-  knockGain.gain.setValueAtTime(0.75 * intensity, time);
-  knockGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.046);
-
-  knockOsc.connect(knockFilter);
-  knockFilter.connect(knockGain);
-  knockGain.connect(hoofGain);
+  const knockFilter = createFilter('bandpass', isLeft ? 520 : 700, time, 4.0, knockGain);
+  const knockOsc = createOsc('triangle', startF, time, knockFilter);
+  rampExp(knockOsc.frequency, endF, time + 0.04);
 
   // 2. Crisp crystal / horseshoe contact transient ("clip/cvak" - cuts through the mix)
-  const clickOsc = audioCtx.createOscillator();
-  const clickGain = audioCtx.createGain();
-  clickOsc.type = 'square';
-  clickOsc.frequency.setValueAtTime(isLeft ? 1700 : 2200, time);
-  clickOsc.frequency.exponentialRampToValueAtTime(isLeft ? 650 : 850, time + 0.015);
-
-  clickGain.gain.setValueAtTime(0.28 * intensity, time);
-  clickGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.018);
-
-  clickOsc.connect(clickGain);
-  clickGain.connect(hoofGain);
+  const clickGain = createGain(0.28 * intensity, time, hoofGain);
+  rampExp(clickGain.gain, 0.0001, time + 0.018);
+  const clickOsc = createOsc('square', isLeft ? 1700 : 2200, time, clickGain);
+  rampExp(clickOsc.frequency, isLeft ? 650 : 850, time + 0.015);
 
   // 3. Low-end punch / thud (weight of the hoof landing on the rainbow track)
-  const thudOsc = audioCtx.createOscillator();
-  const thudGain = audioCtx.createGain();
-  thudOsc.type = 'sine';
-  thudOsc.frequency.setValueAtTime(170, time);
-  thudOsc.frequency.exponentialRampToValueAtTime(55, time + 0.038);
-
-  thudGain.gain.setValueAtTime(0.52 * intensity, time);
-  thudGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.042);
-
-  thudOsc.connect(thudGain);
-  thudGain.connect(hoofGain);
+  const thudGain = createGain(0.52 * intensity, time, hoofGain);
+  rampExp(thudGain.gain, 0.0001, time + 0.042);
+  const thudOsc = createOsc('sine', 170, time, thudGain);
+  rampExp(thudOsc.frequency, 55, time + 0.038);
 
   // 4. Crisp surface friction noise transient using reusable noiseBuffer
   if (noiseBuffer) {
     const noise = audioCtx.createBufferSource();
     noise.buffer = noiseBuffer;
-    const noiseFilter = audioCtx.createBiquadFilter();
-    noiseFilter.type = 'bandpass';
-    noiseFilter.frequency.setValueAtTime(isLeft ? 2400 : 3100, time);
-    noiseFilter.Q.setValueAtTime(2.2, time);
-
-    const noiseGain = audioCtx.createGain();
-    noiseGain.gain.setValueAtTime(0.20 * intensity, time);
-    noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.02);
-
+    const noiseGain = createGain(0.20 * intensity, time, hoofGain);
+    rampExp(noiseGain.gain, 0.0001, time + 0.02);
+    const noiseFilter = createFilter('bandpass', isLeft ? 2400 : 3100, time, 2.2, noiseGain);
     noise.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(hoofGain);
 
     noise.start(time);
     noise.stop(time + 0.024);
   }
-
-  hoofGain.gain.setValueAtTime(0.9, time);
-  hoofGain.connect(pan);
-  pan.connect(musicGain);
 
   knockOsc.start(time);
   knockOsc.stop(time + 0.05);
@@ -270,17 +247,11 @@ function playHoof(time: number, isLeft: boolean, intensity: number): void {
 function playKick(time: number, intensity: number): void {
   if (!audioCtx || !musicGain || isMuted) return;
 
-  const osc = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
+  const g = createGain(0.55 * intensity, time, musicGain);
+  rampExp(g.gain, 0.0001, time + 0.11);
+  const osc = createOsc('sine', 140, time, g);
+  rampExp(osc.frequency, 42, time + 0.09);
 
-  osc.frequency.setValueAtTime(140, time);
-  osc.frequency.exponentialRampToValueAtTime(42, time + 0.09);
-
-  g.gain.setValueAtTime(0.55 * intensity, time);
-  g.gain.exponentialRampToValueAtTime(0.0001, time + 0.11);
-
-  osc.connect(g);
-  g.connect(musicGain);
   osc.start(time);
   osc.stop(time + 0.12);
 }
@@ -292,17 +263,10 @@ function playSnare(time: number, intensity: number): void {
   const noise = audioCtx.createBufferSource();
   noise.buffer = noiseBuffer;
 
-  const filter = audioCtx.createBiquadFilter();
-  filter.type = 'highpass';
-  filter.frequency.setValueAtTime(1200, time);
-
-  const g = audioCtx.createGain();
-  g.gain.setValueAtTime(0.32 * intensity, time);
-  g.gain.exponentialRampToValueAtTime(0.0001, time + 0.08);
-
+  const g = createGain(0.32 * intensity, time, musicGain);
+  rampExp(g.gain, 0.0001, time + 0.08);
+  const filter = createFilter('highpass', 1200, time, undefined, g);
   noise.connect(filter);
-  filter.connect(g);
-  g.connect(musicGain);
 
   noise.start(time);
   noise.stop(time + 0.09);
@@ -312,25 +276,14 @@ function playSnare(time: number, intensity: number): void {
 function playBassNote(time: number, semi: number, dur: number, intensity: number): void {
   if (!audioCtx || !musicGain || isMuted) return;
 
-  const osc = audioCtx.createOscillator();
-  const filter = audioCtx.createBiquadFilter();
-  const g = audioCtx.createGain();
-
-  osc.type = 'sawtooth';
-  const f = semitoneFreq(semi);
-  osc.frequency.setValueAtTime(f, time);
+  const g = createGain(0.36 * intensity, time, musicGain);
+  rampExp(g.gain, 0.0001, time + dur);
 
   // Lowpass filter envelope for pluck attack
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(1800 * intensity, time);
-  filter.frequency.exponentialRampToValueAtTime(320, time + dur);
+  const filter = createFilter('lowpass', 1800 * intensity, time, undefined, g);
+  rampExp(filter.frequency, 320, time + dur);
 
-  g.gain.setValueAtTime(0.36 * intensity, time);
-  g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
-
-  osc.connect(filter);
-  filter.connect(g);
-  g.connect(musicGain);
+  const osc = createOsc('sawtooth', semitoneFreq(semi), time, filter);
 
   osc.start(time);
   osc.stop(time + dur + 0.02);
@@ -340,17 +293,9 @@ function playBassNote(time: number, semi: number, dur: number, intensity: number
 function playArpNote(time: number, semi: number, intensity: number): void {
   if (!audioCtx || !musicGain || isMuted) return;
 
-  const osc = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(semitoneFreq(semi), time);
-
-  g.gain.setValueAtTime(0.16 * intensity, time);
-  g.gain.exponentialRampToValueAtTime(0.0001, time + 0.085);
-
-  osc.connect(g);
-  g.connect(musicGain);
+  const g = createGain(0.16 * intensity, time, musicGain);
+  rampExp(g.gain, 0.0001, time + 0.085);
+  const osc = createOsc('triangle', semitoneFreq(semi), time, g);
 
   osc.start(time);
   osc.stop(time + 0.09);
@@ -360,36 +305,20 @@ function playArpNote(time: number, semi: number, intensity: number): void {
 function playLeadNote(time: number, semi: number, dur: number, intensity: number): void {
   if (!audioCtx || !musicGain || isMuted) return;
 
-  const osc1 = audioCtx.createOscillator();
-  const osc2 = audioCtx.createOscillator();
-  const filter = audioCtx.createBiquadFilter();
-  const g = audioCtx.createGain();
+  const g = createGain(0.0001, time, musicGain);
+  rampLin(g.gain, 0.24 * intensity, time + 0.025);
+  setVal(g.gain, 0.22 * intensity, time + dur - 0.03);
+  rampExp(g.gain, 0.0001, time + dur);
 
-  osc1.type = 'square';
-  osc2.type = 'sawtooth';
+  const filter = createFilter('lowpass', 2600, time, undefined, g);
 
   const f = semitoneFreq(semi);
-  osc1.frequency.setValueAtTime(f, time);
-  osc2.frequency.setValueAtTime(f * 1.004, time); // Subtle shimmer detune
-
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(2600, time);
-
-  g.gain.setValueAtTime(0.0001, time);
-  g.gain.linearRampToValueAtTime(0.24 * intensity, time + 0.025);
-  g.gain.setValueAtTime(0.22 * intensity, time + dur - 0.03);
-  g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
-
-  osc1.connect(filter);
-  osc2.connect(filter);
-  filter.connect(g);
-  g.connect(musicGain);
+  const osc1 = createOsc('square', f, time, filter);
+  const osc2 = createOsc('sawtooth', f * 1.004, time, filter); // Subtle shimmer detune
 
   if (echoBus) {
-    const echoSend = audioCtx.createGain();
-    echoSend.gain.setValueAtTime(0.12 * intensity, time);
+    const echoSend = createGain(0.12 * intensity, time, echoBus);
     g.connect(echoSend);
-    echoSend.connect(echoBus);
   }
 
   osc1.start(time);
@@ -579,25 +508,18 @@ export function playCloudEcho(colorIdx: number, panX: number, intensity = 0.22):
   if (!audioCtx || !echoBus || isMuted) return;
 
   const t = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const pan = audioCtx.createStereoPanner();
-  const g = audioCtx.createGain();
-
   const chord = RAINBOW_CHORD_SEMIS[colorIdx] || RAINBOW_CHORD_SEMIS[0];
   const semi = chord[2] + 12; // Shimmering harmonic chime
 
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(semitoneFreq(semi), t);
-
-  pan.pan.setValueAtTime(max(-0.95, min(0.95, panX)), t);
-
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.linearRampToValueAtTime(0.2 * intensity, t + 0.04);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
-
-  osc.connect(g);
-  g.connect(pan);
+  const pan = audioCtx.createStereoPanner();
+  setVal(pan.pan, max(-0.95, min(0.95, panX)), t);
   pan.connect(echoBus); // Feeds directly into the stereo delay reverb tail!
+
+  const g = createGain(0.0001, t, pan);
+  rampLin(g.gain, 0.2 * intensity, t + 0.04);
+  rampExp(g.gain, 0.0001, t + 0.45);
+
+  const osc = createOsc('sine', semitoneFreq(semi), t, g);
 
   osc.start(t);
   osc.stop(t + 0.5);
@@ -619,35 +541,21 @@ export function playStabSound(colorIdx: number): void {
   const chord = RAINBOW_CHORD_SEMIS[colorIdx] || RAINBOW_CHORD_SEMIS[0];
 
   // 1. Crystal impact transient
-  const click = audioCtx.createOscillator();
-  const clickGain = audioCtx.createGain();
-  click.type = 'sawtooth';
-  click.frequency.setValueAtTime(1400, t);
-  click.frequency.exponentialRampToValueAtTime(200, t + 0.05);
+  const clickGain = createGain(0.4, t, sfxGain);
+  rampExp(clickGain.gain, 0.001, t + 0.06);
+  const click = createOsc('sawtooth', 1400, t, clickGain);
+  rampExp(click.frequency, 200, t + 0.05);
 
-  clickGain.gain.setValueAtTime(0.4, t);
-  clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-
-  click.connect(clickGain);
-  clickGain.connect(sfxGain);
   click.start(t);
   click.stop(t + 0.07);
 
   // 2. Multi-octave rainbow shimmer feeding directly into the echo bus!
   chord.forEach((s, idx) => {
     const noteTime = t + idx * 0.032;
-    const osc = audioCtx!.createOscillator();
-    const g = audioCtx!.createGain();
-
-    osc.type = idx % 2 === 0 ? 'triangle' : 'sine';
-    osc.frequency.setValueAtTime(semitoneFreq(s + 24), noteTime);
-
-    g.gain.setValueAtTime(0.32 / (idx * 0.35 + 1), noteTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, noteTime + 0.55);
-
-    osc.connect(g);
-    g.connect(sfxGain!);
+    const g = createGain(0.32 / (idx * 0.35 + 1), noteTime, sfxGain!);
+    rampExp(g.gain, 0.0001, noteTime + 0.55);
     if (echoBus) g.connect(echoBus); // Blossoms into the spatial echo tail!
+    const osc = createOsc(idx % 2 === 0 ? 'triangle' : 'sine', semitoneFreq(s + 24), noteTime, g);
 
     osc.start(noteTime);
     osc.stop(noteTime + 0.6);
@@ -661,18 +569,11 @@ export function playJumpSound(): void {
   if (!audioCtx || !sfxGain || sfxMuted) return;
 
   const t = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
+  const g = createGain(0.42, t, sfxGain);
+  rampExp(g.gain, 0.001, t + 0.2);
+  const osc = createOsc('triangle', 240, t, g);
+  rampExp(osc.frequency, 680, t + 0.16);
 
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(240, t);
-  osc.frequency.exponentialRampToValueAtTime(680, t + 0.16);
-
-  g.gain.setValueAtTime(0.42, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-
-  osc.connect(g);
-  g.connect(sfxGain);
   osc.start(t);
   osc.stop(t + 0.22);
 }
@@ -684,24 +585,14 @@ export function playFallSound(): void {
   if (!audioCtx || !sfxGain || sfxMuted) return;
 
   const t = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const filter = audioCtx.createBiquadFilter();
-  const g = audioCtx.createGain();
+  const g = createGain(0.48, t, sfxGain);
+  rampExp(g.gain, 0.001, t + 0.9);
 
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(320, t);
-  osc.frequency.exponentialRampToValueAtTime(45, t + 0.85);
+  const filter = createFilter('lowpass', 500, t, undefined, g);
+  rampLin(filter.frequency, 120, t + 0.85);
 
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(500, t);
-  filter.frequency.linearRampToValueAtTime(120, t + 0.85);
-
-  g.gain.setValueAtTime(0.48, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
-
-  osc.connect(filter);
-  filter.connect(g);
-  g.connect(sfxGain);
+  const osc = createOsc('sawtooth', 320, t, filter);
+  rampExp(osc.frequency, 45, t + 0.85);
 
   osc.start(t);
   osc.stop(t + 0.95);
