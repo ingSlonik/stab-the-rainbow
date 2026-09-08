@@ -209,7 +209,7 @@ export class Game {
   }
 
   private onThumbstick(_detail: any): void {
-    // Commented out per spec: Thumbstick movement disabled
+    // 13kb optimalizace: Thumbstick movement disabled (staré ovládání páčkou)
     /*
     if (!_detail) return;
     const { x, y } = _detail;
@@ -225,7 +225,7 @@ export class Game {
   }
 
   private onAxisMove(_detail: any): void {
-    // Commented out per spec: Axis thumbstick movement disabled
+    // 13kb optimalizace: Axis thumbstick movement disabled (staré ovládání osou páčky)
     /*
     if (!_detail || !_detail.axis) return;
     const [x, y] = _detail.axis;
@@ -440,7 +440,7 @@ export class Game {
       initAudio();
       const c = e.code;
 
-      // Commented out per spec: Desktop controls are strictly MOUSE ONLY (Steer: Mouse, Stab: Left-click, Jump: Right-click/Wheel)
+      // 13kb optimalizace: Staré ovládání klávesnicí na desktopu (desktop je striktně pouze na myš)
       /*
       const isPlay = this.state === GameState.PLAYING;
       if (c === 'ArrowLeft' || c === 'KeyA') {
@@ -722,7 +722,7 @@ export class Game {
       const isEasy = this.currentVRMode === GameMode.VR_EASY;
       const isHard = this.currentVRMode === GameMode.VR_HARD;
 
-      // 1. Easy mode: Lateral steering is handled via physical side-stepping (same as Hard mode in Player.update)
+      // 13kb optimalizace: Staré ovládání pozicí ovladače ruky (zatáčení se provádí fyzickým úkrokem)
       /*
       if (isEasy && this.player.vrController) {
         const handX = this.player.vrController.position.x;
@@ -780,7 +780,7 @@ export class Game {
               }
             }
 
-            // Thumbstick check: Commented out per spec (only physical stepping, Trigger stab, Grip jump, and A/B home)
+            // 13kb optimalizace: Staré ovládání osami gamepadu (fyzické krokování nahrazuje thumbstick)
             /*
             if (source.gamepad.axes) {
               const axes = source.gamepad.axes;
