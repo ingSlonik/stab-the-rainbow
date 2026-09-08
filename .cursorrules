@@ -1,0 +1,68 @@
+# Stab the Rainbow - AI Agent Guidelines & Architecture Rules
+
+## 1. CRITICAL: 100% Native 3D UI for WebXR (Zero Dynamic 2D Canvas in Frame Loop)
+
+### The Problem in Meta Quest (Oculus Browser / WebXR Multiview)
+- **NEVER use dynamic `CanvasTexture` (updating a 2D canvas via `ctx.fillText` + `texture.needsUpdate = true` in the game render loop) for in-game HUDs, live scores, health percentages, or gauges.**
+- **Why?** On Meta Quest and other mobile VR headsets, WebXR runs with hardware multiview (`OCULUS_multiview`). The mobile GPU driver (Qualcomm Adreno) aggressively caches offscreen canvas surfaces and throttles or outright drops CPU-to-GPU `texSubImage2D` transfers during active WebXR projection rendering to avoid frame drops. This causes dynamic 2D canvas textures to **freeze permanently on their initial frame** while the rest of the 3D scene runs.
+
+### The Required Solution: 100% Native 3D Scene Objects
+All in-game HUD elements must be constructed purely out of native Three.js 3D meshes:
+1. **Static Character Materials (Sprite Font Atlas) - Uploaded ONCE at boot:**
+   - Create tiny textures for individual characters (`'0'` through `'9'`, `'%'`, `','`, `'-'`, `'x'`) and fixed labels (`"SCORE:"`, `"BEST:"`, `"COMBO"`, color names, status badges) **only once during initialization** (see `initStaticMaterials` in `src/ui.ts`).
+   - These textures are uploaded to GPU VRAM once and **NEVER call `needsUpdate = true` during gameplay**.
+2. **Live Digits via 3D Quad Meshes:**
+   - Each digit on the HUD is an individual 3D quad (`THREE.Mesh` with `PlaneGeometry`).
+   - When a value changes (e.g. score increases or lane percentage decays), **do not redraw pixels**. Simply swap the material reference on the quad:
+     ```ts
+     quadMesh.material = this.charMaterials[char] || this.charMaterials[' '];
+     ```
+   - This incurs **zero CPU-GPU bus transfers, zero rasterization, and runs at native 90/120 FPS**.
+3. **Gauges and Bars via 3D Geometric Transformations:**
+   - Health bars and meters must use native 3D geometry (`PlaneGeometry` or `BoxGeometry`) with a translated pivot (e.g., `geom.translate(0, height / 2, 0)`).
+   - In each frame, update their length or height directly on the GPU matrix:
+     ```ts
+     gaugeMesh.scale.y = Math.max(0.02, Math.min(1.0, health));
+     ```
+4. **Borders and Outlines via Native 3D Lines:**
+   - Use `LineSegments` created from `EdgesGeometry(planeGeom)`.
+   - To flash or change color (e.g. warning pulse or critical alert), modify the material color directly:
+     ```ts
+     borderMesh.material.color.setHex(isUrgent && blink ? 0xffffff : laneColor);
+     ```
+
+---
+
+## 2. 3D Scene Layering, Alpha Sorting & Transparency
+
+1. **Explicit `renderOrder` on Layered HUD Elements:**
+   - To prevent Z-fighting and Three.js alpha sorting artifacts on translucent panels, explicitly assign increasing `renderOrder` values to layers:
+     - Main Backplate: `renderOrder = 100`
+     - Backplate Outline: `renderOrder = 101`
+     - Card Backgrounds: `renderOrder = 102`
+     - Gauges and Card Borders: `renderOrder = 103`
+     - Text Quad Meshes and Badges: `renderOrder = 104`
+2. **Depth Testing & Writing:**
+   - For floating HUD elements and text quads, use `transparent: true, depthWrite: false, depthTest: true`.
+3. **Bounding Spheres on Dynamic / Offset Geometries:**
+   - Whenever geometry vertices are manually translated or morphed (such as the undulating rainbow track in `src/track.ts`), always call `geom.computeBoundingBox()` and `geom.computeBoundingSphere()`. Otherwise, Three.js camera distance sorting may calculate the wrong object center and render the track over the HUD.
+
+---
+
+## 3. WebXR Controller Raycasting & Alignment
+
+1. **Natural Grip Angle Offset:**
+   - Meta Quest / Oculus Touch controllers have a default grip coordinate space tilted ~35° to 40° downward relative to natural pointing.
+   - Any visual ray, pointer beam, or horn attached to the hand must include an upward pitch offset (e.g. `rotation.x = -0.65` radians / ~-37°) so the pointer aims where the user naturally points.
+2. **Reticle Parenting:**
+   - The 3D laser reticle (`reticle3DMesh`) must always be added as a **child** of the interactive 3D board (`dialogMesh.add(this.reticle3DMesh)`) and positioned in local coordinates via `worldToLocal()`.
+   - When the board hides or moves off-screen, the reticle moves with it, preventing orphaned cursor rings in space.
+
+---
+
+## 4. Build & Constraints
+
+1. **TypeScript Type Safety:**
+   - Always run `npm run typecheck` (`tsc --noEmit`) to ensure clean compilation before committing.
+2. **Bundle Size Limit:**
+   - While the project originates as a JS13k game, the user has explicitly authorized exceeding the 13KB limit to prioritize VR reliability, WebXR compatibility, and rich 3D gameplay. Do not strip essential WebXR features to satisfy the 13KB constraint.
