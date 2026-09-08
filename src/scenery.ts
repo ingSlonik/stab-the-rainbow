@@ -63,15 +63,10 @@ export class SceneryManager {
     // Shared low-poly cone geometry with base at Y = 0
     const hillGeom = new THREE.ConeGeometry(1, 1, 7);
     hillGeom.translate(0, 0.5, 0);
-    hillGeom.computeBoundingBox();
-    hillGeom.computeBoundingSphere();
 
-    // 3 Atmospheric hill materials for near, mid, and far layers
-    const mats = [
-      new THREE.MeshLambertMaterial({ color: 0x301852, flatShading: true }),
-      new THREE.MeshLambertMaterial({ color: 0x1e123c, flatShading: true }),
-      new THREE.MeshLambertMaterial({ color: 0x140e2a, flatShading: true }),
-    ];
+    // Sdružená tvorba 3 atmosférických materiálů pro vrstvy kopců
+    const makeHillMat = (color: number) => new THREE.MeshLambertMaterial({ color, flatShading: true });
+    const mats = [makeHillMat(0x301852), makeHillMat(0x1e123c), makeHillMat(0x140e2a)];
 
     // Layers: [count, extraMin, extraMax, rMin, rMax, hMin, hMax, origBaseY, speed, matIdx]
     const layers = [

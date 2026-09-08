@@ -30,6 +30,9 @@ export class Player {
   private hornMat: any;
 
   private hornTipWorldPos: any;
+  // Reusable vectors for raycasting and world calculations (zero runtime garbage)
+  private tempV1: any;
+  private tempV2: any;
   private gallopTimer = 0;
 
   // Head tracking calibration for Hard mode
@@ -61,6 +64,8 @@ export class Player {
     }
 
     this.hornTipWorldPos = new THREE.Vector3();
+    this.tempV1 = new THREE.Vector3();
+    this.tempV2 = new THREE.Vector3();
     this.initHorn();
     this.initGroundMarker(scene);
 
@@ -240,22 +245,20 @@ export class Player {
     this.horn.updateMatrixWorld(true);
     this.hornTip.updateMatrixWorld(true);
 
-    const basePos = new THREE.Vector3();
-    const tipPos = new THREE.Vector3();
-    this.horn.getWorldPosition(basePos);
-    this.hornTip.getWorldPosition(tipPos);
+    // Sdružené znovupoužití vektorů namísto per-frame alokací pro raycasting
+    this.horn.getWorldPosition(this.tempV1);
+    this.hornTip.getWorldPosition(this.tempV2);
 
-    outOrigin.copy(tipPos);
-    outDir.subVectors(tipPos, basePos).normalize();
+    outOrigin.copy(this.tempV2);
+    outDir.subVectors(this.tempV2, this.tempV1).normalize();
     return true;
   }
 
   public updatePointerBeam(hitPoint?: any): void {
     if (!this.pointerBeam || !this.pointerBeam.visible) return;
     if (hitPoint && this.hornTip) {
-      const tipPos = new THREE.Vector3();
-      this.hornTip.getWorldPosition(tipPos);
-      const dist = tipPos.distanceTo(hitPoint);
+      this.hornTip.getWorldPosition(this.tempV1);
+      const dist = this.tempV1.distanceTo(hitPoint);
       this.pointerBeam.scale.set(1, 1, Math.max(0.1, dist));
     } else {
       this.pointerBeam.scale.set(1, 1, 3.5);
@@ -266,19 +269,17 @@ export class Player {
     this.vrMode = mode;
     if (controller) this.vrController = controller;
     this.isCalibrated = false;
-    this.prevHeadZ = 0;
-    this.prevHeadY = 0;
-    this.prevHeadPitch = 0;
+    this.prevHeadZ = this.prevHeadY = this.prevHeadPitch = 0;
+
+    // Sjednocené nastavení výšky camera rigu: 2.05m pro desktop, 0.85m pro VR režimy
+    this.cameraRig.position.set(0, mode === GameMode.DESKTOP ? 2.05 : 0.85, 0);
 
     if (mode === GameMode.VR_EASY) {
       this.attachHornToHand(undefined, false);
-      this.cameraRig.position.set(0, 0.85, 0);
     } else if (mode === GameMode.VR_HARD) {
       this.attachHornToHead();
-      this.cameraRig.position.set(0, 0.85, 0);
     } else {
       this.attachHornToDesktop();
-      this.cameraRig.position.set(0, 2.05, 0);
     }
     if (this.pointerBeam) this.pointerBeam.visible = false;
   }
@@ -326,9 +327,9 @@ export class Player {
       if (this.camera) {
         if (this.camera.parent) this.camera.parent.updateMatrixWorld(true);
         this.camera.updateMatrixWorld(true);
-        const headPos = new THREE.Vector3();
-        this.camera.getWorldPosition(headPos);
-        return headPos.x;
+        // Sdružené znovupoužití vektoru pro snímání pozice hlavy v reálném čase
+        this.camera.getWorldPosition(this.tempV1);
+        return this.tempV1.x;
       }
       return this.getHornTipPosition().x;
     }
@@ -368,20 +369,13 @@ export class Player {
   }
 
   public reset(isVR: boolean = false): void {
-    this.x = 0;
-    this.y = 0;
-    this.targetX = 0;
-    this.vy = 0;
+    // Sdružené řetězené nulování stavů a parametrů hráče
+    this.x = this.y = this.targetX = this.vy = this.stabTimer = 0;
+    this.prevHeadZ = this.prevHeadY = this.prevHeadPitch = 0;
     this.isGrounded = true;
-    this.isFalling = false;
-    this.isFallen = false;
-    this.isStabbing = false;
-    this.stabTimer = 0;
+    this.isFalling = this.isFallen = this.isStabbing = this.isCalibrated = false;
     this.currentLane = 3;
-    this.isCalibrated = false;
-    this.prevHeadZ = 0;
-    this.prevHeadY = 0;
-    this.prevHeadPitch = 0;
+
     const isDesktop = !isVR && this.vrMode === GameMode.DESKTOP;
     this.root.position.set(0, isDesktop ? 2.05 : 0.85, 0);
     this.root.rotation.set(0, 0, 0);
@@ -398,7 +392,7 @@ export class Player {
     isPlaying: boolean = true,
     isLaneSolid: boolean = true
   ): void {
-    // 0. Horn thrust animation on stab
+    // 0. Horn thrust animation on stab (sdružený výpočet fází nápřahu a návratu)
     let thrustOffset = 0;
     if (this.stabTimer > 0) {
       this.stabTimer -= dt;
@@ -406,12 +400,8 @@ export class Player {
         this.stabTimer = 0;
         this.isStabbing = false;
       } else {
-        const progress = 1 - (this.stabTimer / this.STAB_DURATION);
-        if (progress < 0.35) {
-          thrustOffset = (progress / 0.35) * 0.58;
-        } else {
-          thrustOffset = (1 - (progress - 0.35) / 0.65) * 0.58;
-        }
+        const progress = 1 - this.stabTimer / this.STAB_DURATION;
+        thrustOffset = (progress < 0.35 ? progress / 0.35 : (1 - progress) / 0.65) * 0.58;
       }
     }
 
@@ -488,15 +478,12 @@ export class Player {
     }
     this.currentLane = clamp(Math.round(this.x / LANE_WIDTH + 3), 0, LANE_COUNT - 1);
 
-    // 3. Vertical Jump & Gravity physics
-    if (this.isFalling) {
+    // 3. Vertical Jump & Gravity physics (sdružená integrace vertikální rychlosti pádu i skoku)
+    if (this.isFalling || (!this.isGrounded && !this.isFallen)) {
       this.y += this.vy * dt;
-      this.vy -= 22 * dt;
-    } else if (!this.isGrounded && !this.isFallen) {
-      this.y += this.vy * dt;
-      this.vy -= 20 * dt;
+      this.vy -= (this.isFalling ? 22 : 20) * dt;
 
-      if (this.y <= 0) {
+      if (!this.isFalling && this.y <= 0) {
         this.y = 0;
         this.vy = 0;
         this.isGrounded = true;

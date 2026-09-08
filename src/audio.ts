@@ -52,6 +52,13 @@ const createFilter = (type: BiquadFilterType, freq: number, t: number, q?: numbe
   if (dest) filter.connect(dest);
   return filter;
 };
+// Sdružený helper pro vytvoření a nastavení stereo panoramatu
+const createPan = (panVal: number, t: number, dest?: AudioNode): StereoPannerNode => {
+  const p = audioCtx!.createStereoPanner();
+  p.pan.setValueAtTime(panVal, t);
+  if (dest) p.connect(dest);
+  return p;
+};
 
 // 7 Rainbow Chords & Scales (C Lydian/Major: Red, Orange, Yellow, Green, Cyan, Blue, Violet)
 // Relative to C4:
@@ -132,11 +139,8 @@ function initEchoBus(): void {
   const feedback = createGain(0.38, t, delayL);
   const lowpass = createFilter('lowpass', 2400, t);
 
-  const panL = audioCtx.createStereoPanner();
-  setVal(panL.pan, -0.6, t);
-
-  const panR = audioCtx.createStereoPanner();
-  setVal(panR.pan, 0.6, t);
+  const panL = createPan(-0.6, t);
+  const panR = createPan(0.6, t);
 
   // Cross-feedback stereo echo loop
   echoBus.connect(delayL);
@@ -194,10 +198,8 @@ export function setAudioState(state: GameState, isGrounded: boolean, speedMultip
 function playHoof(time: number, isLeft: boolean, intensity: number): void {
   if (!audioCtx || !musicGain || isMuted) return;
 
-  const pan = audioCtx.createStereoPanner();
   // Clear stereo separation between left and right hooves
-  setVal(pan.pan, isLeft ? -0.28 : 0.28, time);
-  pan.connect(musicGain);
+  const pan = createPan(isLeft ? -0.28 : 0.28, time, musicGain);
   const hoofGain = createGain(0.9, time, pan);
 
   // 1. Resonant hollow cavity knock ("clop/klap" - characteristic acoustic body)
@@ -511,9 +513,8 @@ export function playCloudEcho(colorIdx: number, panX: number, intensity = 0.22):
   const chord = RAINBOW_CHORD_SEMIS[colorIdx] || RAINBOW_CHORD_SEMIS[0];
   const semi = chord[2] + 12; // Shimmering harmonic chime
 
-  const pan = audioCtx.createStereoPanner();
-  setVal(pan.pan, max(-0.95, min(0.95, panX)), t);
-  pan.connect(echoBus); // Feeds directly into the stereo delay reverb tail!
+  // Feeds directly into the stereo delay reverb tail!
+  const pan = createPan(max(-0.95, min(0.95, panX)), t, echoBus);
 
   const g = createGain(0.0001, t, pan);
   rampLin(g.gain, 0.2 * intensity, t + 0.04);

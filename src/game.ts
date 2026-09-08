@@ -250,11 +250,8 @@ export class Game {
       return;
     }
 
-    const warningEl = document.getElementById('vr-warning');
-    if (warningEl) warningEl.style.display = 'none';
-
-    const modal = document.getElementById('modal');
-    if (modal) modal.style.display = 'none';
+    // Sdružené skrytí 2D varovného dialogu a startovacího modálu
+    this.hideModal();
 
     if (this.camera) {
       this.camera.rotation.set(0, 0, 0);
@@ -328,6 +325,14 @@ export class Game {
     if (bm) bm.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
     const bs = document.getElementById('btn-sfx');
     if (bs) bs.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
+  }
+
+  // Sdružené skrytí 2D varovného dialogu a startovacího modálu
+  private hideModal(): void {
+    const w = document.getElementById('vr-warning');
+    if (w) w.style.display = 'none';
+    const m = document.getElementById('modal');
+    if (m) m.style.display = 'none';
   }
 
   public toggleFullscreen(): void {
@@ -535,11 +540,7 @@ export class Game {
       mode = GameMode.DESKTOP;
     }
 
-    const warningEl = document.getElementById('vr-warning');
-    if (warningEl) warningEl.style.display = 'none';
-
-    const modal = document.getElementById('modal');
-    if (modal) modal.style.display = 'none';
+    this.hideModal();
 
     this.currentVRMode = mode;
     this.player?.setVRMode(mode, this.rightControllerEl?.object3D);
