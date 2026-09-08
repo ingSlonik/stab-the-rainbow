@@ -323,7 +323,7 @@ export class Game {
     on('bd', () => {
       this.startGame(GameMode.DESKTOP);
     });
-
+    /*
     on('bm', () => {
       toggleAudio();
       this.syncAudioDOM();
@@ -333,6 +333,7 @@ export class Game {
       this.syncAudioDOM();
     });
     on('bf', () => this.toggleFullscreen());
+    */
   }
 
   private syncAudioDOM(): void {
@@ -352,9 +353,9 @@ export class Game {
 
   public toggleFullscreen(): void {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+      document.documentElement.requestFullscreen().catch(() => { });
     } else {
-      document.exitFullscreen().catch(() => {});
+      document.exitFullscreen().catch(() => { });
     }
   }
 
