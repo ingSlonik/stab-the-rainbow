@@ -91,8 +91,22 @@ export class CloudManager {
       new THREE.BufferAttribute(this.burstColArr, 3)
     );
 
+    const cvs = document.createElement('canvas');
+    cvs.width = 32;
+    cvs.height = 32;
+    const ctx = cvs.getContext('2d')!;
+    const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    grad.addColorStop(0.25, 'rgba(255, 255, 255, 0.9)');
+    grad.addColorStop(0.65, 'rgba(255, 255, 255, 0.35)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 32, 32);
+    const sparkTex = new THREE.CanvasTexture(cvs);
+
     const mat = new THREE.PointsMaterial({
-      size: 0.28,
+      size: 0.10,
+      map: sparkTex,
       vertexColors: true,
       transparent: true,
       opacity: 0.98,
@@ -101,6 +115,8 @@ export class CloudManager {
     });
 
     this.burstPoints = new THREE.Points(this.burstGeom, mat);
+    this.burstPoints.frustumCulled = false;
+    this.burstPoints.renderOrder = 95;
     this.scene.add(this.burstPoints);
   }
 
@@ -138,29 +154,33 @@ export class CloudManager {
   }
 
   public spawnBurst(x: number, y: number, z: number, colorHex: number): void {
-    const count = 160;
+    const count = 200;
     for (let i = 0; i < count; i++) {
-      const speed = randRange(4.0, 13.0);
+      const speed = randRange(3.5, 12.5);
       const theta = random() * Math.PI * 2;
       const phi = randRange(-Math.PI / 2.5, Math.PI / 2.5);
+
+      // 35% sparkling white/gold stars, 65% vivid rainbow color
+      const isSpark = random() < 0.35;
+      const col = isSpark ? (random() < 0.5 ? 0xffffff : 0xffea88) : colorHex;
 
       this.burstParticles.push({
         x,
         y,
         z,
         vx: cos(phi) * sin(theta) * speed,
-        vy: sin(phi) * speed + randRange(1.5, 5.5),
+        vy: sin(phi) * speed + randRange(1.8, 5.5),
         vz: cos(phi) * cos(theta) * speed,
         life: 0,
-        maxLife: randRange(0.45, 1.15),
-        color: colorHex,
-        size: randRange(0.20, 0.45),
+        maxLife: randRange(0.45, 1.20),
+        color: col,
+        size: randRange(0.06, 0.12),
       });
     }
   }
 
   public popCloud(c: CloudData & { echoed?: boolean }): void {
-    if (c.stabbed) return;
+    if (c.popping) return;
     c.stabbed = true;
     c.popping = true;
     c.popTimer = 0.35;
@@ -168,16 +188,13 @@ export class CloudManager {
     this.spawnBurst(c.x, c.y, c.z, RAINBOW_COLORS[c.colorIdx]);
   }
 
-  public spawnCloud(preferredColorIdx?: number): void {
+  public spawnCloud(): void {
     // Spawn across lane positions (-1.20 to +1.20 for 0.40m lanes)
     const lane = floor(random() * LANE_COUNT);
     const x = (lane - 3) * LANE_WIDTH + randRange(-0.08, 0.08);
 
-    // Pick color: 65% chance of preferred urgent color if provided, else random
-    let colorIdx = floor(random() * LANE_COUNT);
-    if (preferredColorIdx !== undefined && preferredColorIdx >= 0 && random() < 0.65) {
-      colorIdx = preferredColorIdx;
-    }
+    // Pick color: uniform random distribution across all 7 rainbow colors
+    const colorIdx = floor(random() * LANE_COUNT);
 
     const colHex = RAINBOW_COLORS[colorIdx];
     const mesh = this.createCloudMesh(colHex);
@@ -222,11 +239,11 @@ export class CloudManager {
     }
   }
 
-  public update(dt: number, speed: number, time: number, urgentLane?: number, isMenu = false): void {
+  public update(dt: number, speed: number, time: number, isMenu = false): void {
     // 1. Spawning logic
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
-      this.spawnCloud(urgentLane);
+      this.spawnCloud();
       // Spawn interval decreases as speed increases
       this.spawnTimer = randRange(1.3, 2.4) * (20 / max(18, speed));
     }

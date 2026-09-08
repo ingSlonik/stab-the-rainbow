@@ -48,6 +48,14 @@ export class UIManager {
     gaugeMesh: any;
   }> = [];
 
+  // Floating 3D Popups (+100% on pierce, -5% on miss)
+  private floatingPopups: Array<{
+    mesh: any;
+    life: number;
+    maxLife: number;
+    active: boolean;
+  }> = [];
+
   // 2. 3D Dialog panel (Menu & Game Over)
   private dialogMesh: any;
   private dialogCanvas: HTMLCanvasElement;
@@ -85,6 +93,7 @@ export class UIManager {
     this.initStaticMaterials();
     this.initCanvasMesh();
     this.init3DBoard();
+    this.initFloatingPopups(scene);
   }
 
   private loadHighScores(): void {
@@ -314,6 +323,22 @@ export class UIManager {
       54,
       '#ff2a4b'
     );
+    this.labelMaterials['+100%'] = this.createTextMaterial(
+      '+100%',
+      '900 52px system-ui, sans-serif',
+      '#ffffff',
+      190,
+      64,
+      '#000000'
+    );
+    this.labelMaterials['-5%'] = this.createTextMaterial(
+      '-5%',
+      '900 52px system-ui, sans-serif',
+      '#ffffff',
+      150,
+      64,
+      '#000000'
+    );
   }
 
   private init3DBoard(): void {
@@ -518,12 +543,76 @@ export class UIManager {
     }
   }
 
+  private initFloatingPopups(scene: any): void {
+    const count = 16;
+    const geom = new THREE.PlaneGeometry(0.65, 0.26);
+    for (let i = 0; i < count; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false,
+        depthTest: true,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.visible = false;
+      mesh.renderOrder = 110;
+      scene.add(mesh);
+      this.floatingPopups.push({ mesh, life: 0, maxLife: 0.85, active: false });
+    }
+  }
+
+  public spawnWorldPopup(text: '+100%' | '-5%', colorIdx: number): void {
+    const baseMat = this.labelMaterials[text];
+    if (!baseMat) return;
+    let p = this.floatingPopups.find(item => !item.active);
+    if (!p) {
+      p = this.floatingPopups[0];
+    }
+    p.active = true;
+    p.life = 0;
+    p.maxLife = 0.95;
+    p.mesh.material = baseMat.clone();
+    p.mesh.material.color.setHex(RAINBOW_COLORS[colorIdx] ?? 0xffffff);
+    p.mesh.material.opacity = 1.0;
+
+    // Position further forward in front of player, directly above the corresponding color lane
+    const laneX = (colorIdx - 3) * LANE_WIDTH;
+    const forwardZ = -2.8;
+    const spawnY = text === '+100%' ? 1.45 : 1.25;
+    p.mesh.position.set(laneX, spawnY, forwardZ);
+    p.mesh.scale.set(0.70, 0.70, 0.70);
+    p.mesh.visible = true;
+  }
+
+  private updateFloatingPopups(dt: number): void {
+    for (const p of this.floatingPopups) {
+      if (!p.active) continue;
+      p.life += dt;
+      if (p.life >= p.maxLife) {
+        p.active = false;
+        p.mesh.visible = false;
+        continue;
+      }
+      const progress = p.life / p.maxLife;
+      p.mesh.position.y += dt * 1.5;
+      const popScale = progress < 0.25 ? 0.65 + (progress / 0.25) * 0.55 : 1.20 - (progress - 0.25) * 0.25;
+      p.mesh.scale.set(popScale, popScale, popScale);
+      if (progress > 0.40) {
+        const fade = (1 - progress) / 0.60;
+        p.mesh.material.opacity = Math.max(0, fade);
+      }
+      if (this.camera) {
+        p.mesh.quaternion.copy(this.camera.quaternion);
+      }
+    }
+  }
+
   private update3DBoard(
     score: number,
     combo: number,
     laneHealth: number[],
-    urgentLane: number,
     time: number,
+    dt: number,
     vrMode: GameMode
   ): void {
     if (!this.board3DGroup) return;
@@ -586,23 +675,20 @@ export class UIManager {
       const col = this.laneColumns[i];
       if (!col) continue;
       const h = laneHealth[i] ?? 1.0;
-      const isUrgent = i === urgentLane;
       const isCritical = h < 0.32;
 
-      // Dynamic border color
-      const borderCol = isUrgent
-        ? (blink ? 0xffffff : RAINBOW_COLORS[i])
-        : isCritical
-          ? (blink ? 0xffffff : 0xff2a4b)
-          : RAINBOW_COLORS[i];
+      // Dynamic border color: alerts red if critical, otherwise lane color
+      const borderCol = isCritical
+        ? (blink ? 0xffffff : 0xff2a4b)
+        : RAINBOW_COLORS[i];
       col.borderMesh.material.color.setHex(borderCol);
 
-      // Gauge fill
-      col.gaugeMesh.visible = h > 0.04;
+      // Gauge fill: visible as long as health > 0%
+      col.gaugeMesh.visible = h > 0.0;
       col.gaugeMesh.scale.y = Math.max(0.02, Math.min(1.0, h));
 
-      // Percent digits vs EMPTY
-      if (h > 0.04) {
+      // Percent digits vs EMPTY: EMPTY only at 0%
+      if (h > 0.0) {
         if (col.emptyMesh) col.emptyMesh.visible = false;
         const pct = Math.round(h * 100);
         const pctStr = `${pct}%`.padStart(4, ' ');
@@ -627,7 +713,7 @@ export class UIManager {
       } else if (h > 0.32) {
         stKey = '▲ DRAIN';
         pillColor = 0xffdd00;
-      } else if (h > 0.04) {
+      } else if (h > 0.0) {
         stKey = '⚠ ALERT';
         pillColor = 0xff2a4b;
       } else {
@@ -843,7 +929,6 @@ export class UIManager {
     score: number,
     combo: number,
     laneHealth: number[],
-    urgentLane: number,
     time: number,
     dt: number,
     onStartGame: (mode: GameMode) => void,
@@ -863,7 +948,10 @@ export class UIManager {
     }
 
     // 1. Update 100% Native 3D HUD Board (zero dynamic canvas uploads, 90/120Hz native WebGL)
-    this.update3DBoard(score, combo, laneHealth, urgentLane, time, vrMode);
+    this.update3DBoard(score, combo, laneHealth, time, dt, vrMode);
+
+    // 2. Update 3D Floating Popups (+100% / -5%)
+    this.updateFloatingPopups(dt);
 
 
     if (state === GameState.MENU) {

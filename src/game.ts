@@ -97,15 +97,16 @@ export class Game {
 
     this.track = new TrackManager(this.scene);
     this.clouds = new CloudManager(this.scene);
-    this.clouds.onMissedCloud = (colorIdx: number) => {
-      if (this.state === GameState.PLAYING) {
-        this.track.drainLane(colorIdx, 0.20);
-        this.combo = 1;
-      }
-    };
     this.scenery = new SceneryManager(this.scene);
     this.player = new Player(this.scene, this.camera, this.rigEl, this.rightControllerEl);
     this.ui = new UIManager(this.scene, this.camera);
+    this.clouds.onMissedCloud = (colorIdx: number) => {
+      if (this.state === GameState.PLAYING) {
+        this.track.drainLane(colorIdx, 0.05);
+        this.combo = 1;
+        this.ui.spawnWorldPopup('-5%', colorIdx);
+      }
+    };
     this.player.setMenuMode(this.isImmersiveVR(), this.isImmersiveVR() ? this.rightControllerEl?.object3D : null);
 
     if (this.camera && !this.isImmersiveVR()) {
@@ -625,6 +626,9 @@ export class Game {
           this.score = floor(this.scoreFloat);
           this.combo = min(8, this.combo + 1);
 
+          // Visual popup (+100%) in 3D world in lane color
+          this.ui.spawnWorldPopup('+100%', c.colorIdx);
+
           // Hard mode humorous quips on cloud stabbing
           if (isHard) {
             if (this.combo >= 3 && Math.random() < 0.6) {
@@ -821,9 +825,9 @@ export class Game {
     if (this.state === GameState.MENU) {
       const demoSpeed = 15;
       this.player.setTargetX(0);
-      this.player.update(dt, demoSpeed, true, isVR);
+      this.player.update(dt, demoSpeed, true, isVR, false, true);
       this.track.update(dt, demoSpeed, totalTime, 60, true);
-      this.clouds.update(dt, demoSpeed, totalTime, undefined, true);
+      this.clouds.update(dt, demoSpeed, totalTime, true);
       this.scenery.update(dt, demoSpeed, totalTime);
     } else if (this.state === GameState.PLAYING) {
       this.runTime += dt;
@@ -831,15 +835,10 @@ export class Game {
       this.scoreFloat += this.speed * dt * 3.5;
       this.score = floor(this.scoreFloat);
 
-      this.player.update(dt, this.speed, true, isVR);
+      const isSolid = this.track.isLaneSolid(this.player.currentLane);
+      this.player.update(dt, this.speed, true, isVR, true, isSolid);
       this.track.update(dt, this.speed, totalTime, this.runTime);
-      this.clouds.update(
-        dt,
-        this.speed,
-        totalTime,
-        this.track.getUrgentLane(),
-        false
-      );
+      this.clouds.update(dt, this.speed, totalTime, false);
       this.scenery.update(dt, this.speed, totalTime);
 
       this.checkHornCloudCollisions();
@@ -852,9 +851,9 @@ export class Game {
         this.player.vy = lerp(this.player.vy, 0, min(1, dt * 8));
       }
 
-      this.player.update(dt, this.speed * 0.35, false, isVR);
+      this.player.update(dt, this.speed * 0.35, false, isVR, false, false);
       this.track.update(dt, this.speed * 0.35, totalTime, this.runTime);
-      this.clouds.update(dt, this.speed * 0.35, totalTime, undefined, true);
+      this.clouds.update(dt, this.speed * 0.35, totalTime, true);
       this.scenery.update(dt, this.speed * 0.35, totalTime);
 
       if (this.fallTimer >= 1.05) {
@@ -864,8 +863,8 @@ export class Game {
         this.player.setMenuMode(isVR, isVR ? this.rightControllerEl?.object3D : null);
       }
     } else if (this.state === GameState.GAMEOVER) {
-      this.player.update(dt, 0, false, isVR);
-      this.clouds.update(dt, 10, totalTime, undefined, true);
+      this.player.update(dt, 0, false, isVR, false, false);
+      this.clouds.update(dt, 10, totalTime, true);
       this.scenery.update(dt, 10, totalTime);
     }
 
@@ -907,7 +906,6 @@ export class Game {
       this.score,
       this.combo,
       this.track.laneHealth,
-      this.track.getUrgentLane(),
       totalTime,
       dt,
       (m) => this.startGame(m),

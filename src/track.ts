@@ -15,8 +15,6 @@ export class TrackManager {
   private laneMeshes: any[] = [];
   private laneMaterials: any[] = [];
   private trackTexture: any;
-  private timeUntilNextTarget = 0;
-  private currentUrgentLane = -1;
   private laneRespawnTimer: number[];
 
   constructor(scene: any) {
@@ -31,7 +29,6 @@ export class TrackManager {
 
     this.initTexture();
     this.initMeshes();
-    this.pickNextUrgentLane();
   }
 
   private initTexture(): void {
@@ -109,39 +106,18 @@ export class TrackManager {
     }
   }
 
-  private pickNextUrgentLane(): void {
-    // Pick a lane to accelerate decay on, creating dynamic gameplay goals
-    const candidates = [];
-    for (let i = 0; i < LANE_COUNT; i++) {
-      if (this.laneHealth[i] > 0.4) candidates.push(i);
-    }
-    if (candidates.length > 0) {
-      this.currentUrgentLane = candidates[floor(random() * candidates.length)];
-    } else {
-      this.currentUrgentLane = floor(random() * LANE_COUNT);
-    }
-    this.timeUntilNextTarget = 5.0 + random() * 3.0;
-  }
-
   public replenishLane(colorIdx: number): void {
     if (colorIdx >= 0 && colorIdx < LANE_COUNT) {
       this.laneHealth[colorIdx] = 1.0;
       this.laneFlash[colorIdx] = 1.6;
-      if (this.currentUrgentLane === colorIdx) {
-        this.pickNextUrgentLane();
-      }
     }
   }
 
-  public drainLane(colorIdx: number, amount = 0.20): void {
+  public drainLane(colorIdx: number, amount = 0.05): void {
     if (colorIdx >= 0 && colorIdx < LANE_COUNT) {
       this.laneHealth[colorIdx] = max(0, this.laneHealth[colorIdx] - amount);
       this.laneFlash[colorIdx] = 1.0;
     }
-  }
-
-  public getUrgentLane(): number {
-    return this.currentUrgentLane;
   }
 
   public getLaneIndexFromX(x: number): number {
@@ -152,7 +128,7 @@ export class TrackManager {
   }
 
   public isLaneSolid(laneIdx: number): boolean {
-    return this.laneHealth[laneIdx] > 0.04;
+    return this.laneHealth[laneIdx] > 0.0;
   }
 
   public reset(): void {
@@ -161,7 +137,6 @@ export class TrackManager {
       this.laneFlash[i] = 0.0;
       this.laneRespawnTimer[i] = 0.0;
     }
-    this.pickNextUrgentLane();
   }
 
   public update(dt: number, speed: number, time: number, runTime = 60, isMenu = false): void {
@@ -170,16 +145,9 @@ export class TrackManager {
       this.trackTexture.offset.y += speed * dt * 0.12;
     }
 
-    // Update target urgency
-    this.timeUntilNextTarget -= dt;
-    if (this.timeUntilNextTarget <= 0 || (this.currentUrgentLane >= 0 && this.laneHealth[this.currentUrgentLane] <= 0.05)) {
-      this.pickNextUrgentLane();
-    }
-
-    // Active decay: clear, noticeable progress
+    // Active decay: clear, noticeable progress, uniform across all lanes
     const ramp = min(1.0, 0.55 + (runTime / 20) * 0.45);
     const baseDecay = (0.032 + speed * 0.001) * ramp;
-    const urgentMult = 2.4;
 
     for (let i = 0; i < LANE_COUNT; i++) {
       // In menu mode, cycle health smoothly so attract screen stays dynamic forever
@@ -196,9 +164,8 @@ export class TrackManager {
         }
       }
 
-      // Urgent lane decays fast so player visibly sees the ticking countdown!
-      const rate = i === this.currentUrgentLane ? baseDecay * urgentMult : baseDecay;
-      this.laneHealth[i] = max(0, this.laneHealth[i] - rate * dt);
+      // Uniform decay across all lanes
+      this.laneHealth[i] = max(0, this.laneHealth[i] - baseDecay * dt);
 
       // Flash decay
       if (this.laneFlash[i] > 0) {
@@ -208,8 +175,8 @@ export class TrackManager {
       const h = this.laneHealth[i];
       const mat = this.laneMaterials[i];
 
-      if (h <= 0.04) {
-        // Void! Completely invisible
+      if (h <= 0.0) {
+        // Void! Completely invisible - only at true 0%
         mat.opacity = 0;
         this.laneMeshes[i].visible = false;
       } else {
