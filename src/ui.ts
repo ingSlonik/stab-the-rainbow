@@ -1286,7 +1286,7 @@ export class UIManager {
     // Death quote
     ctx.font = 'italic 600 22px system-ui, sans-serif';
     ctx.fillStyle = '#ffd2d9';
-    ctx.fillText(`"${this.lastQuote || 'Gravity was faster this time.'}"`, 512, 218);
+    ctx.fillText(this.lastQuote || 'Gravity was faster this time.', 512, 218);
 
     // Final Score
     ctx.font = '900 46px system-ui, sans-serif';
@@ -1311,7 +1311,7 @@ export class UIManager {
       370,
       744,
       88,
-      `PLAY AGAIN (${modeName})`,
+      'PLAY AGAIN',
       '',
       '#10e052',
       () => onRestart()
@@ -1324,7 +1324,7 @@ export class UIManager {
       472,
       744,
       88,
-      'MAIN MENU (A / B)',
+      'MAIN MENU',
       '',
       '#00d4ff',
       () => onHome()
@@ -1345,8 +1345,28 @@ export class UIManager {
       );
     }
 
+    // Controls Instructions (Consistent with VR Menu + Desktop)
+    const instrBaseY = isVR ? 684 : 598;
+    const lineGap = isVR ? 27 : 29;
+    ctx.textAlign = 'center';
+    ctx.font = '800 19px system-ui, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('🌈 STEER: Take real side-steps across the 2m rainbow!', 512, instrBaseY);
+
+    ctx.font = '700 16.5px system-ui, sans-serif';
+    ctx.fillStyle = '#00d4ff';
+    ctx.fillText('🥽 VR CONTROLLER: Trigger = Stab  •  Grip = Jump  •  A / B = Return to Home', 512, instrBaseY + lineGap);
+
+    ctx.font = '600 15px system-ui, sans-serif';
+    ctx.fillStyle = '#10e052';
+    ctx.fillText('💻 DESKTOP: Mouse Move to Steer  •  Left-Click: Stab  •  Right-Click / Wheel: Jump', 512, instrBaseY + lineGap * 2);
+
+    ctx.font = '600 14.5px system-ui, sans-serif';
+    ctx.fillStyle = '#9cb3d0';
+    ctx.fillText(isVR ? '🎯 Aim pointer beam & pull Trigger to select' : '🎯 Aim with mouse & left-click button to select', 512, instrBaseY + lineGap * 3);
+
     // Separator line before Audio Bar
-    const audioY = isVR ? 688 : 586;
+    const audioY = isVR ? 782 : 706;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -1357,7 +1377,7 @@ export class UIManager {
     // 3D Audio Buttons (Side-by-side in bottom bar)
     const isMusicMuted = getAudioMuted();
     const isSfxMuted = getSfxMuted();
-    const btnAudioY = isVR ? 706 : 606;
+    const btnAudioY = isVR ? 802 : 726;
 
     this.drawButton(
       ctx,
