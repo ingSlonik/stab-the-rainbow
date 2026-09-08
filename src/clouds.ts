@@ -22,11 +22,14 @@ export class CloudManager {
   private burstPosArr: Float32Array;
   private burstColArr: Float32Array;
 
-  // Cosmic Dust / Speed Stars
-  private starPoints: any;
-  private starGeom: any;
-  private starPosArr: Float32Array;
-  private readonly STAR_COUNT = 150;
+  // Upper Atmosphere 3D Sky Motes / Dashes
+  private skyMotes: Array<{
+    mesh: any;
+    mat: any;
+    freq: number;
+    phase: number;
+    baseY: number;
+  }> = [];
 
   public onMissedCloud?: (colorIdx: number) => void;
   private spawnTimer = 0;
@@ -37,7 +40,7 @@ export class CloudManager {
     scene.add(this.group);
 
     this.initParticles();
-    this.initStars();
+    this.initSkyMotes();
   }
 
   private createCloudMesh(colorHex: number): any {
@@ -99,54 +102,37 @@ export class CloudManager {
     this.scene.add(this.burstPoints);
   }
 
-  private initStars(): void {
-    // 2 vertices per streak (head & tail) for vivid hyperspace motion
-    this.starPosArr = new Float32Array(this.STAR_COUNT * 6);
-    for (let i = 0; i < this.STAR_COUNT; i++) {
-      this.resetStar(i, randRange(-65, 5));
+  private initSkyMotes(): void {
+    const moteCount = 36;
+    const dashGeom = new THREE.BoxGeometry(0.08, 0.08, 0.48);
+    const dotGeom = new THREE.BoxGeometry(0.13, 0.13, 0.13);
+    const colors = [0xd8f2ff, 0xffe899, 0xffc4f2, 0xafe8ff, 0xf0e6ff];
+
+    for (let i = 0; i < moteCount; i++) {
+      const isDash = i % 2 === 0;
+      const geom = isDash ? dashGeom : dotGeom;
+      const col = colors[i % colors.length];
+      const mat = new THREE.MeshBasicMaterial({
+        color: col,
+        transparent: true,
+        opacity: 0.2,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+
+      const mesh = new THREE.Mesh(geom, mat);
+      const baseY = randRange(5.5, 11.5);
+      mesh.position.set(randRange(-16, 16), baseY, randRange(-95, 15));
+      this.group.add(mesh);
+
+      this.skyMotes.push({
+        mesh,
+        mat,
+        freq: randRange(1.8, 3.8),
+        phase: random() * Math.PI * 2,
+        baseY,
+      });
     }
-
-    this.starGeom = new THREE.BufferGeometry();
-    const posAttr = new THREE.BufferAttribute(this.starPosArr, 3);
-    posAttr.setUsage(THREE.DynamicDrawUsage);
-    this.starGeom.setAttribute('position', posAttr);
-
-    const mat = new THREE.LineBasicMaterial({
-      color: 0xd8f0ff,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-
-    this.starPoints = new THREE.LineSegments(this.starGeom, mat);
-    this.starPoints.frustumCulled = false;
-    this.scene.add(this.starPoints);
-  }
-
-  private resetStar(idx: number, z: number): void {
-    const base = idx * 6;
-    // Radial distribution around the player's view corridor (center: x=0, y=2.0)
-    const angle = random() * Math.PI * 2;
-    const dist = randRange(1.8, 14.0);
-    const x = cos(angle) * dist;
-    const y = 2.0 + sin(angle) * dist * 0.75;
-    const streakLen = randRange(1.8, 4.2);
-
-    // Radial expansion: streaks point backward along the 3D divergence vector
-    const radialScale = 0.28;
-    const dx = (x / max(1.0, dist)) * radialScale;
-    const dy = ((y - 2.0) / max(1.0, dist)) * radialScale;
-
-    // Head vertex
-    this.starPosArr[base] = x;
-    this.starPosArr[base + 1] = y;
-    this.starPosArr[base + 2] = z;
-
-    // Tail vertex (behind head along Z, trailing inwards towards vanishing point)
-    this.starPosArr[base + 3] = x - dx * streakLen;
-    this.starPosArr[base + 4] = y - dy * streakLen;
-    this.starPosArr[base + 5] = z - streakLen;
   }
 
   public spawnBurst(x: number, y: number, z: number, colorHex: number): void {
@@ -233,6 +219,9 @@ export class CloudManager {
     this.clouds = [];
     this.burstParticles = [];
     this.spawnTimer = 0;
+    for (let i = 0; i < this.skyMotes.length; i++) {
+      this.skyMotes[i].mesh.position.z = randRange(-95, 15);
+    }
   }
 
   public update(dt: number, speed: number, time: number, urgentLane?: number, isMenu = false): void {
@@ -368,28 +357,24 @@ export class CloudManager {
     posAttr.needsUpdate = true;
     colAttr.needsUpdate = true;
 
-    // 4. Update Cosmic Speed Stars (Hyperspace Streaks)
-    const starPos = this.starGeom.attributes.position;
-    const starVel = max(18, speed) * dt * 2.8;
-    for (let s = 0; s < this.STAR_COUNT; s++) {
-      const base = s * 6;
-      this.starPosArr[base + 2] += starVel;
-      this.starPosArr[base + 5] += starVel;
+    // 4. Update Upper Atmosphere 3D Sky Motes (moving backwards with clouds, pulsing in opacity)
+    for (let i = 0; i < this.skyMotes.length; i++) {
+      const m = this.skyMotes[i];
+      m.mesh.position.z += speed * dt;
 
-      // Radial outward flow as star approaches the player
-      const x = this.starPosArr[base];
-      const y = this.starPosArr[base + 1];
-      const outX = (x * 0.12) * dt * (starVel / 6);
-      const outY = ((y - 2.0) * 0.12) * dt * (starVel / 6);
-      this.starPosArr[base] += outX;
-      this.starPosArr[base + 1] += outY;
-      this.starPosArr[base + 3] += outX;
-      this.starPosArr[base + 4] += outY;
-
-      if (this.starPosArr[base + 2] > 7) {
-        this.resetStar(s, randRange(-85, -70));
+      // Wrap when passing behind the player
+      if (m.mesh.position.z > 15) {
+        m.mesh.position.z = randRange(-95, -80);
+        m.mesh.position.x = randRange(-16, 16);
+        m.baseY = randRange(5.5, 11.5);
+        m.mesh.position.y = m.baseY;
+        m.phase = random() * Math.PI * 2;
       }
+
+      // Gentle starlight pulse & twinkle: shine then fade
+      const s = sin(time * m.freq + m.phase);
+      const glow = max(0, s);
+      m.mat.opacity = 0.05 + 0.82 * (glow * glow);
     }
-    starPos.needsUpdate = true;
   }
 }

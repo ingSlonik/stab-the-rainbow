@@ -753,8 +753,7 @@ export class Game {
     // State-specific logic
     if (this.state === GameState.MENU) {
       const demoSpeed = 15;
-      const demoAutoX = sin(totalTime * 0.8) * 2.2;
-      this.player.setTargetX(demoAutoX / 3.5);
+      this.player.setTargetX(0);
       this.player.update(dt, demoSpeed, true, isVR);
       this.track.update(dt, demoSpeed, totalTime, 60, true);
       this.clouds.update(dt, demoSpeed, totalTime, undefined, true);

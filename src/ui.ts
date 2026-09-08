@@ -54,9 +54,6 @@ export class UIManager {
   private dialogTexture: any;
   private reticle3DMesh: any;
 
-  // 3. 3D Dynamic Lane Health Gauges on rainbow road (zero canvas overhead, 90/120Hz native WebGL)
-  private laneGaugeGroup: any;
-  private laneGaugeMeshes: any[] = [];
 
   // Interaction & Raycasting (for VR pointer/controller clicks)
   private raycaster: any;
@@ -694,27 +691,6 @@ export class UIManager {
     this.reticle3DMesh.renderOrder = 3000;
     this.reticle3DMesh.visible = false;
     this.dialogMesh.add(this.reticle3DMesh);
-
-    // 3. 3D Dynamic Lane Health Indicator Gauges along the rainbow track surface (native WebGL 90Hz)
-    this.laneGaugeGroup = new THREE.Group();
-    this.group.add(this.laneGaugeGroup);
-
-    for (let i = 0; i < LANE_COUNT; i++) {
-      const barGeom = new THREE.BoxGeometry(0.88, 0.05, 1.3);
-      barGeom.translate(0, 0.025, 0.65); // Pivot at front edge for backward scaling
-      const barMat = new THREE.MeshBasicMaterial({
-        color: RAINBOW_COLORS[i],
-        transparent: true,
-        opacity: 0.88,
-        depthTest: true,
-        depthWrite: false,
-      });
-      const barMesh = new THREE.Mesh(barGeom, barMat);
-      barMesh.position.set(1.1 * (i - 3), 0.04, -4.7);
-      barMesh.renderOrder = 120;
-      this.laneGaugeGroup.add(barMesh);
-      this.laneGaugeMeshes.push(barMesh);
-    }
   }
 
   public updateHoverRay(origin: any, direction: any): { hit: boolean; point?: any } {
@@ -887,27 +863,7 @@ export class UIManager {
     // 1. Update 100% Native 3D HUD Board (zero dynamic canvas uploads, 90/120Hz native WebGL)
     this.update3DBoard(score, combo, laneHealth, urgentLane, time, vrMode);
 
-    // 2. Always update 3D Lane Health Gauge bars on the rainbow road (real-time WebGL scaling)
-    if (this.laneGaugeMeshes.length > 0) {
-      for (let i = 0; i < LANE_COUNT; i++) {
-        const h = laneHealth[i] ?? 1.0;
-        const isUrgent = i === urgentLane;
-        const isCritical = h < 0.32;
-        const gauge = this.laneGaugeMeshes[i];
-        if (gauge) {
-          gauge.visible = h > 0.03;
-          gauge.scale.set(1, 1, max(0.04, h));
-          const blink = sin(time * 18) > 0;
-          if (isUrgent) {
-            gauge.material.color.setHex(blink ? 0xffffff : RAINBOW_COLORS[i]);
-          } else if (isCritical) {
-            gauge.material.color.setHex(blink ? 0xffffff : 0xff2a4b);
-          } else {
-            gauge.material.color.setHex(RAINBOW_COLORS[i]);
-          }
-        }
-      }
-    }
+
 
     if (state === GameState.MENU) {
       this.dialogMesh.visible = true;
