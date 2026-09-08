@@ -21,7 +21,8 @@ function getInternalPropertiesToMangle(): RegExp {
     'position', 'rotation', 'quaternion', 'scale', 'matrixWorld', 'visible',
     'renderOrder', 'geometry', 'material', 'opacity', 'transparent', 'depthWrite',
     'depthTest', 'side', 'object3D', 'el', 'xrSession', 'inputSources', 'gamepad',
-    'buttons', 'axes', 'pressed', 'value', 'handedness'
+    'buttons', 'axes', 'pressed', 'value', 'handedness',
+    'async', 'static', 'roundRect'
   ]);
 
   const safeInternal = new Set<string>();
@@ -30,7 +31,7 @@ function getInternalPropertiesToMangle(): RegExp {
 
   for (const f of files) {
     const content = fs.readFileSync(path.join(srcDir, f), 'utf8');
-    const matches = content.matchAll(/(?:private|public|readonly)\s+([a-zA-Z0-9_$]+)/g);
+    const matches = content.matchAll(/(?:private|public|readonly)\s+(?:async\s+|static\s+)?([a-zA-Z0-9_$]+)/g);
     for (const m of matches) {
       const name = m[1];
       if (!reserved.has(name) && name.length > 2 && !name.startsWith('THREE')) {
@@ -114,29 +115,8 @@ async function build() {
   const minifiedCss = cssoResult.css;
   console.log(`   CSS size: ${(rawCss.length / 1024).toFixed(2)} KB -> ${(minifiedCss.length / 1024).toFixed(2)} KB (${minifiedCss.length} bytes)`);
 
-  // 4. Crush with Roadroller
-  console.log('\n🛞 Step 4: Crushing with Roadroller...');
-  const jsPacker = new Packer(
-    [
-      {
-        data: minifiedJs,
-        type: 'js' as any,
-        action: 'eval' as any,
-      },
-    ],
-    {
-      allowFreeVars: true,
-      dynamicModels: 1,
-    }
-  );
-
-  await jsPacker.optimize(3);
-  const { firstLine, secondLine } = jsPacker.makeDecoder();
-  const roadrolledJs = firstLine + secondLine;
-  console.log(`   Roadroller JS size: ${(roadrolledJs.length / 1024).toFixed(2)} KB (${roadrolledJs.length} bytes)`);
-
-  // 5. Process index.html into dist/index.html
-  console.log('\n📄 Step 5: Processing index.html into dist/index.html...');
+  // 4. Process and minify full HTML (inlining CSS & JS)
+  console.log('\n📄 Step 4: Processing full index.html with inlined CSS & JS...');
   const indexHtmlRaw = fs.readFileSync('index.html', 'utf8');
 
   // Replace external CSS stylesheet link with inlined minified CSS
@@ -145,13 +125,16 @@ async function build() {
     `<style>${minifiedCss}</style>`
   );
 
-  // Replace module script with roadrolled JS
-  const roadrolledHtmlRaw = htmlWithCss.replace(
+  // Replace module script with minified JS
+  const fullHtmlRaw = htmlWithCss.replace(
     /<script\b[^>]*\bsrc=["'][^"']*game\.ts["'][^>]*>\s*<\/script>/i,
-    `<script>${roadrolledJs}</script>`
+    `<script>${minifiedJs}</script>`
   );
 
-  const finalHtml = await minifyHtml(roadrolledHtmlRaw, {
+  // Also write uncompressed version for easy debugging
+  fs.writeFileSync(path.join(distDir, 'index_debug.html'), fullHtmlRaw, 'utf8');
+
+  const minifiedFullHtml = await minifyHtml(fullHtmlRaw, {
     collapseWhitespace: true,
     removeComments: true,
     removeAttributeQuotes: true,
@@ -159,18 +142,34 @@ async function build() {
     removeRedundantAttributes: true,
     removeEmptyAttributes: true,
   });
+  console.log(`   Full HTML size: ${(fullHtmlRaw.length / 1024).toFixed(2)} KB -> ${(minifiedFullHtml.length / 1024).toFixed(2)} KB (${minifiedFullHtml.length} bytes)`);
 
+  // 5. Crush entire HTML with Roadroller
+  console.log('\n🛞 Step 5: Crushing full HTML with Roadroller...');
+  const htmlPacker = new Packer(
+    [
+      {
+        data: minifiedFullHtml,
+        type: 'text' as any,
+        action: 'write' as any,
+      },
+    ],
+    {
+      allowFreeVars: true,
+      dynamicModels: 1,
+    }
+  );
+
+  await htmlPacker.optimize(3);
+  const { firstLine, secondLine } = htmlPacker.makeDecoder();
+  const roadrolledJs = firstLine + secondLine;
+  console.log(`   Roadroller decoder size: ${(roadrolledJs.length / 1024).toFixed(2)} KB (${roadrolledJs.length} bytes)`);
+
+  const finalHtml = `<script>${roadrolledJs}</script>`;
   const htmlDistPath = path.join(distDir, 'index.html');
   fs.writeFileSync(htmlDistPath, finalHtml, 'utf8');
   const htmlSize = fs.statSync(htmlDistPath).size;
   console.log(`   dist/index.html size: ${(htmlSize / 1024).toFixed(2)} KB (${htmlSize} bytes)`);
-
-  // Also write uncompressed version for easy debugging
-  const debugHtmlRaw = htmlWithCss.replace(
-    /<script\b[^>]*\bsrc=["'][^"']*game\.ts["'][^>]*>\s*<\/script>/i,
-    `<script>${minifiedJs}</script>`
-  );
-  fs.writeFileSync(path.join(distDir, 'index_debug.html'), debugHtmlRaw, 'utf8');
 
   // 6. Compress with ECT for maximum ZIP compression
   console.log('\n🗜️ Step 6: Compressing archive with ECT (max compression)...');
