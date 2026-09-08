@@ -22,6 +22,25 @@ export interface UIButton {
 
 const THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
 
+const uiFont = (size: number) => `900 ${size}px system-ui, sans-serif`;
+
+const createQuad = (w: number, h: number, mat: any, x: number, y: number, z: number, order: number, parent: any): any => {
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  mesh.position.set(x, y, z);
+  mesh.renderOrder = order;
+  parent.add(mesh);
+  return mesh;
+};
+
+const createMat = (color: number | string, opacity = 1.0): any => {
+  return new THREE.MeshBasicMaterial({
+    color,
+    transparent: opacity < 1.0,
+    opacity,
+    depthWrite: false,
+  });
+};
+
 export class UIManager {
   public group: any;
   private camera: any;
@@ -233,7 +252,7 @@ export class UIManager {
     for (const ch of chars) {
       this.charMaterials[ch] = this.createTextMaterial(
         ch,
-        '900 110px system-ui, sans-serif',
+        uiFont(110),
         '#ffffff',
         112,
         140,
@@ -242,116 +261,38 @@ export class UIManager {
     }
 
     // 2. Fixed UI Labels (enlarged for crisp readability and prominent header)
-    this.labelMaterials['SCORE:'] = this.createTextMaterial(
-      'SCORE:',
-      '900 48px system-ui, sans-serif',
-      '#ffffff',
-      280,
-      72,
-      '#00d4ff'
-    );
-    this.labelMaterials['BEST:'] = this.createTextMaterial(
-      'BEST:',
-      '900 44px system-ui, sans-serif',
-      '#ffd24d',
-      240,
-      72
-    );
-    this.labelMaterials['COMBO'] = this.createTextMaterial(
-      'COMBO',
-      '900 48px system-ui, sans-serif',
-      '#ffdd00',
-      240,
-      72,
-      '#ffdd00'
-    );
-    this.labelMaterials['VR EASY'] = this.createTextMaterial(
-      'VR EASY',
-      '900 46px system-ui, sans-serif',
-      '#00d4ff',
-      340,
-      72
-    );
-    this.labelMaterials['VR HARD'] = this.createTextMaterial(
-      'VR HARD',
-      '900 46px system-ui, sans-serif',
-      '#ffdd00',
-      340,
-      72
-    );
-    this.labelMaterials['DESKTOP'] = this.createTextMaterial(
-      'DESKTOP',
-      '900 46px system-ui, sans-serif',
-      '#a0b8d8',
-      340,
-      72
-    );
+    const fixedLabels: [string, string, number, string, number, number, string?][] = [
+      ['SCORE:', 'SCORE:', 48, '#ffffff', 280, 72, '#00d4ff'],
+      ['BEST:', 'BEST:', 44, '#ffd24d', 240, 72],
+      ['COMBO', 'COMBO', 48, '#ffdd00', 240, 72, '#ffdd00'],
+      ['VR EASY', 'VR EASY', 46, '#00d4ff', 340, 72],
+      ['VR HARD', 'VR HARD', 46, '#ffdd00', 340, 72],
+      ['DESKTOP', 'DESKTOP', 46, '#a0b8d8', 340, 72],
+      // 4. Status Badges
+      ['● OK', '● OK', 30, '#10e052', 180, 48],
+      ['▲ DRAIN', '▲ DRAIN', 30, '#ffdd00', 180, 48],
+      ['⚠ ALERT', '⚠ ALERT', 30, '#ff2a4b', 180, 48],
+      ['✖ GONE', '✖ GONE', 30, '#888888', 180, 48],
+      ['EMPTY', 'EMPTY', 46, '#ff2a4b', 240, 72, '#ff2a4b'],
+      ['100%', '100%', 64, '#ffffff', 220, 76, '#000000'],
+      ['-5%', '-5%', 64, '#ffffff', 180, 76, '#000000'],
+    ];
+
+    for (const [key, text, sz, col, w, h, glow] of fixedLabels) {
+      this.labelMaterials[key] = this.createTextMaterial(text, uiFont(sz), col, w, h, glow);
+    }
 
     // 3. Lane Color Names
     for (let i = 0; i < LANE_COUNT; i++) {
       const name = COLOR_NAMES_EN[i].toUpperCase();
       this.labelMaterials[name] = this.createTextMaterial(
         name,
-        '900 36px system-ui, sans-serif',
+        uiFont(36),
         RAINBOW_HEX_STRINGS[i],
         220,
         56
       );
     }
-
-    // 4. Status Badges
-    this.labelMaterials['● OK'] = this.createTextMaterial(
-      '● OK',
-      '900 30px system-ui, sans-serif',
-      '#10e052',
-      180,
-      48
-    );
-    this.labelMaterials['▲ DRAIN'] = this.createTextMaterial(
-      '▲ DRAIN',
-      '900 30px system-ui, sans-serif',
-      '#ffdd00',
-      180,
-      48
-    );
-    this.labelMaterials['⚠ ALERT'] = this.createTextMaterial(
-      '⚠ ALERT',
-      '900 30px system-ui, sans-serif',
-      '#ff2a4b',
-      180,
-      48
-    );
-    this.labelMaterials['✖ GONE'] = this.createTextMaterial(
-      '✖ GONE',
-      '900 30px system-ui, sans-serif',
-      '#888888',
-      180,
-      48
-    );
-    this.labelMaterials['EMPTY'] = this.createTextMaterial(
-      'EMPTY',
-      '900 46px system-ui, sans-serif',
-      '#ff2a4b',
-      240,
-      72,
-      '#ff2a4b'
-    );
-    this.labelMaterials['100%'] = this.createTextMaterial(
-      '100%',
-      '900 64px system-ui, sans-serif',
-      '#ffffff',
-      220,
-      76,
-      '#000000'
-    );
-    this.labelMaterials['-5%'] = this.createTextMaterial(
-      '-5%',
-      '900 64px system-ui, sans-serif',
-      '#ffffff',
-      180,
-      76,
-      '#000000'
-    );
   }
 
   private init3DBoard(): void {
@@ -362,20 +303,10 @@ export class UIManager {
     this.group.add(this.board3DGroup);
 
     // 1. Dark Main Backplate (tightened to 2.80m width, exactly matching the 2.80m rainbow track with minimal side padding)
-    const bgGeom = new THREE.PlaneGeometry(2.80, 0.82);
-    const bgMat = new THREE.MeshBasicMaterial({
-      color: 0x080616,
-      transparent: true,
-      opacity: 0.90,
-      depthWrite: false,
-    });
-    const bgMesh = new THREE.Mesh(bgGeom, bgMat);
-    bgMesh.position.set(0, 0.09, 0);
-    bgMesh.renderOrder = 100;
-    this.board3DGroup.add(bgMesh);
+    const bgMesh = createQuad(2.80, 0.82, createMat(0x080616, 0.90), 0, 0.09, 0, 100, this.board3DGroup);
 
     // Subtle cyan frame outline
-    const frameEdges = new THREE.EdgesGeometry(bgGeom);
+    const frameEdges = new THREE.EdgesGeometry(bgMesh.geometry);
     const frameLine = new THREE.LineSegments(
       frameEdges,
       new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.4 })
@@ -385,34 +316,16 @@ export class UIManager {
     this.board3DGroup.add(frameLine);
 
     // Separator line between header and lane columns
-    const sepGeom = new THREE.PlaneGeometry(2.78, 0.012);
-    const sepMat = new THREE.MeshBasicMaterial({
-      color: 0x00d4ff,
-      transparent: true,
-      opacity: 0.35,
-      depthWrite: false,
-    });
-    const sepMesh = new THREE.Mesh(sepGeom, sepMat);
-    sepMesh.position.set(0, 0.24, 0.01);
-    sepMesh.renderOrder = 102;
-    this.board3DGroup.add(sepMesh);
+    createQuad(2.78, 0.012, createMat(0x00d4ff, 0.35), 0, 0.24, 0.01, 102, this.board3DGroup);
 
     // 2. Top Header Bar (prominently enlarged fonts for score, multiplier/combo, and game mode)
     // Left: "SCORE:" Label
-    const scoreLabelGeom = new THREE.PlaneGeometry(0.32, 0.11);
-    const scoreLabelMesh = new THREE.Mesh(scoreLabelGeom, this.labelMaterials['SCORE:']);
-    scoreLabelMesh.position.set(-1.18, 0.36, 0.02);
-    scoreLabelMesh.renderOrder = 104;
-    this.board3DGroup.add(scoreLabelMesh);
+    createQuad(0.32, 0.11, this.labelMaterials['SCORE:'], -1.18, 0.36, 0.02, 104, this.board3DGroup);
 
     // Score Digits (8 digit quads, enlarged for crisp visibility)
     this.scoreDigitMeshes = [];
     for (let d = 0; d < 8; d++) {
-      const dGeom = new THREE.PlaneGeometry(0.065, 0.11);
-      const dMesh = new THREE.Mesh(dGeom, this.charMaterials[' ']);
-      dMesh.position.set(-0.97 + d * 0.068, 0.36, 0.02);
-      dMesh.renderOrder = 104;
-      this.board3DGroup.add(dMesh);
+      const dMesh = createQuad(0.065, 0.11, this.charMaterials[' '], -0.97 + d * 0.068, 0.36, 0.02, 104, this.board3DGroup);
       this.scoreDigitMeshes.push(dMesh);
     }
 
@@ -425,33 +338,17 @@ export class UIManager {
     this.board3DGroup.add(this.heartbeatMesh);
 
     // Center: COMBO or BEST Label & Digits (significantly enlarged multiplier)
-    const centerLabelGeom = new THREE.PlaneGeometry(0.28, 0.11);
-    this.comboLabelMesh = new THREE.Mesh(centerLabelGeom, this.labelMaterials['COMBO']);
-    this.comboLabelMesh.position.set(-0.19, 0.36, 0.02);
-    this.comboLabelMesh.renderOrder = 104;
-    this.board3DGroup.add(this.comboLabelMesh);
-
-    this.bestLabelMesh = new THREE.Mesh(centerLabelGeom, this.labelMaterials['BEST:']);
-    this.bestLabelMesh.position.set(-0.19, 0.36, 0.02);
-    this.bestLabelMesh.renderOrder = 104;
-    this.board3DGroup.add(this.bestLabelMesh);
+    this.comboLabelMesh = createQuad(0.28, 0.11, this.labelMaterials['COMBO'], -0.19, 0.36, 0.02, 104, this.board3DGroup);
+    this.bestLabelMesh = createQuad(0.28, 0.11, this.labelMaterials['BEST:'], -0.19, 0.36, 0.02, 104, this.board3DGroup);
 
     this.bestDigitMeshes = [];
     for (let d = 0; d < 6; d++) {
-      const dGeom = new THREE.PlaneGeometry(0.065, 0.11);
-      const dMesh = new THREE.Mesh(dGeom, this.charMaterials[' ']);
-      dMesh.position.set(0.01 + d * 0.068, 0.36, 0.02);
-      dMesh.renderOrder = 104;
-      this.board3DGroup.add(dMesh);
+      const dMesh = createQuad(0.065, 0.11, this.charMaterials[' '], 0.01 + d * 0.068, 0.36, 0.02, 104, this.board3DGroup);
       this.bestDigitMeshes.push(dMesh);
     }
 
     // Right: Mode Label (prominently enlarged game mode indicator)
-    const modeGeom = new THREE.PlaneGeometry(0.46, 0.11);
-    this.modeLabelMesh = new THREE.Mesh(modeGeom, this.labelMaterials['DESKTOP']);
-    this.modeLabelMesh.position.set(1.11, 0.36, 0.02);
-    this.modeLabelMesh.renderOrder = 104;
-    this.board3DGroup.add(this.modeLabelMesh);
+    this.modeLabelMesh = createQuad(0.46, 0.11, this.labelMaterials['DESKTOP'], 1.11, 0.36, 0.02, 104, this.board3DGroup);
 
     // 3. Bottom: 7 Rainbow Lane Columns (spaced at 0.40m matching the rainbow, with snug card widths)
     this.laneColumns = [];
@@ -462,19 +359,10 @@ export class UIManager {
       this.board3DGroup.add(colGroup);
 
       // Card Background Plane
-      const cardGeom = new THREE.PlaneGeometry(0.38, 0.50);
-      const cardMat = new THREE.MeshBasicMaterial({
-        color: 0x0c091c,
-        transparent: true,
-        opacity: 0.88,
-        depthWrite: false,
-      });
-      const cardMesh = new THREE.Mesh(cardGeom, cardMat);
-      cardMesh.renderOrder = 102;
-      colGroup.add(cardMesh);
+      const cardMesh = createQuad(0.38, 0.50, createMat(0x0c091c, 0.88), 0, 0, 0, 102, colGroup);
 
       // Card Border Outline
-      const borderEdges = new THREE.EdgesGeometry(cardGeom);
+      const borderEdges = new THREE.EdgesGeometry(cardMesh.geometry);
       const borderMat = new THREE.LineBasicMaterial({
         color: RAINBOW_COLORS[i],
         linewidth: 2,
@@ -487,61 +375,41 @@ export class UIManager {
       // 3D Gauge Fill inside card (pivoted at bottom, scales with lane health)
       const gaugeGeom = new THREE.PlaneGeometry(0.36, 0.48);
       gaugeGeom.translate(0, 0.24, 0); // pivot at bottom
-      const gaugeMat = new THREE.MeshBasicMaterial({
-        color: RAINBOW_COLORS[i],
-        transparent: true,
-        opacity: 0.50,
-        depthWrite: false,
-      });
+      const gaugeMat = createMat(RAINBOW_COLORS[i], 0.50);
       const gaugeMesh = new THREE.Mesh(gaugeGeom, gaugeMat);
       gaugeMesh.position.set(0, -0.24, 0.01);
       gaugeMesh.renderOrder = 103;
       colGroup.add(gaugeMesh);
 
       // Color Name Quad
-      const nameGeom = new THREE.PlaneGeometry(0.34, 0.082);
-      const colorLabelMesh = new THREE.Mesh(
-        nameGeom,
-        this.labelMaterials[COLOR_NAMES_EN[i].toUpperCase()]
+      const colorLabelMesh = createQuad(
+        0.34,
+        0.082,
+        this.labelMaterials[COLOR_NAMES_EN[i].toUpperCase()],
+        0,
+        0.17,
+        0.02,
+        104,
+        colGroup
       );
-      colorLabelMesh.position.set(0, 0.17, 0.02);
-      colorLabelMesh.renderOrder = 104;
-      colGroup.add(colorLabelMesh);
 
       // 4 Percentage Digit Quads (e.g. '1', '0', '0', '%' or ' ', '8', '5', '%')
       const percentDigitMeshes: any[] = [];
       const pw = 0.066;
       for (let d = 0; d < 4; d++) {
-        const pGeom = new THREE.PlaneGeometry(pw, 0.096);
-        const pMesh = new THREE.Mesh(pGeom, this.charMaterials[' ']);
-        pMesh.position.set(-1.5 * pw + d * pw, 0.05, 0.025);
-        pMesh.renderOrder = 104;
-        colGroup.add(pMesh);
+        const pMesh = createQuad(pw, 0.096, this.charMaterials[' '], -1.5 * pw + d * pw, 0.05, 0.025, 104, colGroup);
         percentDigitMeshes.push(pMesh);
       }
 
       // EMPTY label (displayed when lane health is <= 0.04)
-      const emptyGeom = new THREE.PlaneGeometry(0.30, 0.092);
-      const emptyMesh = new THREE.Mesh(emptyGeom, this.labelMaterials['EMPTY']);
-      emptyMesh.position.set(0, 0.05, 0.025);
-      emptyMesh.renderOrder = 104;
+      const emptyMesh = createQuad(0.30, 0.092, this.labelMaterials['EMPTY'], 0, 0.05, 0.025, 104, colGroup);
       emptyMesh.visible = false;
-      colGroup.add(emptyMesh);
 
       // Status Text Mesh (● OK, ▲ DRAIN, ⚠ ALERT, ✖ GONE)
-      const stGeom = new THREE.PlaneGeometry(0.28, 0.070);
-      const statusTextMesh = new THREE.Mesh(stGeom, this.labelMaterials['● OK']);
-      statusTextMesh.position.set(0, -0.11, 0.02);
-      statusTextMesh.renderOrder = 104;
-      colGroup.add(statusTextMesh);
+      const statusTextMesh = createQuad(0.28, 0.070, this.labelMaterials['● OK'], 0, -0.11, 0.02, 104, colGroup);
 
       // Status Pill Mesh (glowing underline)
-      const pillGeom = new THREE.PlaneGeometry(0.24, 0.020);
-      const pillMat = new THREE.MeshBasicMaterial({ color: 0x10e052, depthWrite: false });
-      const statusPillMesh = new THREE.Mesh(pillGeom, pillMat);
-      statusPillMesh.position.set(0, -0.17, 0.02);
-      statusPillMesh.renderOrder = 104;
-      colGroup.add(statusPillMesh);
+      const statusPillMesh = createQuad(0.24, 0.020, createMat(0x10e052), 0, -0.17, 0.02, 104, colGroup);
 
       this.laneColumns.push({
         colGroup,
@@ -1047,19 +915,15 @@ export class UIManager {
       // Vivid glowing gradient fill
       const grad = ctx.createLinearGradient(x, y, x + w, y + h);
       const colLower = color.toLowerCase();
-      if (colLower.includes('ffdd00') || colLower.includes('yellow') || colLower.includes('ff7b00')) {
-        grad.addColorStop(0, 'rgba(255, 221, 0, 0.48)');
-        grad.addColorStop(1, 'rgba(255, 120, 0, 0.28)');
-      } else if (colLower.includes('00d4ff') || colLower.includes('cyan')) {
-        grad.addColorStop(0, 'rgba(0, 212, 255, 0.48)');
-        grad.addColorStop(1, 'rgba(0, 120, 255, 0.28)');
-      } else if (colLower.includes('10e052') || colLower.includes('green')) {
-        grad.addColorStop(0, 'rgba(16, 224, 82, 0.48)');
-        grad.addColorStop(1, 'rgba(0, 160, 60, 0.28)');
-      } else {
-        grad.addColorStop(0, 'rgba(255, 255, 255, 0.42)');
-        grad.addColorStop(1, 'rgba(200, 220, 255, 0.22)');
-      }
+      const [c1, c2] = colLower.includes('ffdd00') || colLower.includes('yellow') || colLower.includes('ff7b00')
+        ? ['rgba(255, 221, 0, 0.48)', 'rgba(255, 120, 0, 0.28)']
+        : colLower.includes('00d4ff') || colLower.includes('cyan')
+        ? ['rgba(0, 212, 255, 0.48)', 'rgba(0, 120, 255, 0.28)']
+        : colLower.includes('10e052') || colLower.includes('green')
+        ? ['rgba(16, 224, 82, 0.48)', 'rgba(0, 160, 60, 0.28)']
+        : ['rgba(255, 255, 255, 0.42)', 'rgba(200, 220, 255, 0.22)'];
+      grad.addColorStop(0, c1);
+      grad.addColorStop(1, c2);
 
       ctx.fillStyle = grad;
       this.roundRect(ctx, x - 4, y - 4, w + 8, h + 8, 22);
@@ -1425,16 +1289,21 @@ export class UIManager {
     h: number,
     r: number
   ): void {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
   }
 }
