@@ -654,7 +654,7 @@ export class UIManager {
     if (combo > 1) {
       if (this.comboLabelMesh) this.comboLabelMesh.visible = true;
       if (this.bestLabelMesh) this.bestLabelMesh.visible = false;
-      const cStr = `x${combo}!`.padStart(6, ' ');
+      const cStr = `x${combo}`.padStart(6, ' ');
       for (let d = 0; d < 6; d++) {
         const ch = cStr[d] || ' ';
         if (this.bestDigitMeshes[d]) {
