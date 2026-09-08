@@ -201,13 +201,13 @@ export class Player {
 
     if (mode === GameMode.VR_EASY) {
       this.attachHornToHand(undefined, false);
-      this.cameraRig.position.set(0, 1.40, 0);
+      this.cameraRig.position.set(0, 0.85, 0);
     } else if (mode === GameMode.VR_HARD) {
       this.attachHornToHead();
-      this.cameraRig.position.set(0, 1.45, 0);
+      this.cameraRig.position.set(0, 0.85, 0);
     } else {
       this.attachHornToDesktop();
-      this.cameraRig.position.set(0, 2.0, 0);
+      this.cameraRig.position.set(0, 2.05, 0);
     }
     if (this.pointerBeam) this.pointerBeam.visible = false;
   }
@@ -284,7 +284,7 @@ export class Player {
     this.prevHeadY = 0;
     this.prevHeadPitch = 0;
     const isDesktop = !isVR && this.vrMode === GameMode.DESKTOP;
-    this.root.position.set(0, isDesktop ? 2.0 : 1.45, 0);
+    this.root.position.set(0, isDesktop ? 2.05 : 0.85, 0);
     this.root.rotation.set(0, 0, 0);
     if (this.hornMat) this.hornMat.emissiveIntensity = 0.36;
     if (this.hornTip) this.hornTip.scale.set(1, 1, 1);
@@ -348,7 +348,7 @@ export class Player {
 
       // Lateral head position / physical side-steps steer across lanes (matching real room scale)
       const headLeanX = this.camera.position.x - this.calibratedHeadX;
-      const targetNormX = clamp(headLeanX * 3.2, -1.0, 1.0);
+      const targetNormX = clamp(headLeanX * 1.05, -1.0, 1.0);
       this.setTargetX(targetNormX);
 
       // Hard mode: Head forward thrust ("headbutt") or nod triggers STAB, physical vertical leap triggers JUMP
@@ -404,7 +404,7 @@ export class Player {
 
     // 5. Update root position & orientation
     const isDesktop = this.vrMode === GameMode.DESKTOP;
-    const baseH = isDesktop ? 2.0 : 1.45;
+    const baseH = isDesktop ? 2.05 : 0.85;
     this.root.position.x = this.x;
     this.root.position.y = baseH + this.y + gallopY;
 

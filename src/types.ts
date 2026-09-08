@@ -12,7 +12,7 @@ export const enum GameMode {
 }
 
 export const LANE_COUNT = 7;
-export const LANE_WIDTH = 1.1;
+export const LANE_WIDTH = 0.40;
 export const TRACK_WIDTH = LANE_COUNT * LANE_WIDTH;
 
 // 7 Rainbow Colors: Red, Orange, Yellow, Green, Cyan, Blue, Violet

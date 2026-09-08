@@ -191,8 +191,8 @@ export class Game {
         this.restartGame();
       }
     } else if (this.state === GameState.PLAYING) {
-      // Trigger ALWAYS stabs in both Easy and Hard modes (Grip is for jumping)
-      this.player.stab();
+      // Trigger = Stab (pích)
+      this.player?.stab();
     }
   }
 
@@ -589,10 +589,9 @@ export class Game {
     const isStabbing = this.player.isStabbing;
     const isHard = this.currentVRMode === GameMode.VR_HARD;
 
-    // Strict vertical bounds: Cloud vertical half-thickness is ~0.55m.
-    // Horn tip MUST be at the height of the cloud to pierce it!
-    const maxHalfY = isHard ? 0.65 : 0.58;
-    const maxHalfX = isHard ? 0.95 : 0.88;
+    // Scaled vertical & lateral bounds for the 0.40m lane width:
+    const maxHalfY = isHard ? 0.52 : 0.44;
+    const maxHalfX = isHard ? 0.35 : 0.30;
 
     const clouds = this.clouds.clouds;
     for (let i = 0; i < clouds.length; i++) {
@@ -764,8 +763,8 @@ export class Game {
             if (source.gamepad.buttons) {
               const btnA = source.gamepad.buttons[4];
               const btnB = source.gamepad.buttons[5];
-              const isAPressed = btnA && (btnA.pressed || btnA.value > 0.5);
-              const isBPressed = btnB && (btnB.pressed || btnB.value > 0.5);
+              const isAPressed = !!(btnA && btnA.pressed === true);
+              const isBPressed = !!(btnB && btnB.pressed === true);
 
               if ((isAPressed || isBPressed) && !this.menuButtonDebounce) {
                 this.menuButtonDebounce = true;
@@ -782,12 +781,15 @@ export class Game {
             if (source.gamepad.axes) {
               const axes = source.gamepad.axes;
               const stickX = axes.length >= 3 ? axes[2] : (axes.length >= 1 ? axes[0] : 0);
-              const stickY = axes.length >= 4 ? axes[3] : (axes.length >= 2 ? axes[1] : 0);
-              if (Math.abs(stickX) > 0.55 && !this.thumbstickDebounce && this.state === GameState.PLAYING) {
-                this.player.shiftLane(stickX > 0 ? 1 : -1);
-                this.thumbstickDebounce = true;
-                setTimeout(() => (this.thumbstickDebounce = false), 220);
+              if (Math.abs(stickX) > 0.55) {
+                if (!this.thumbstickDebounce && this.state === GameState.PLAYING) {
+                  this.player.shiftLane(stickX > 0 ? 1 : -1);
+                  this.thumbstickDebounce = true;
+                  setTimeout(() => (this.thumbstickDebounce = false), 220);
+                }
               }
+
+              const stickY = axes.length >= 4 ? axes[3] : (axes.length >= 2 ? axes[1] : 0);
               if (stickY < -0.65 && this.state === GameState.PLAYING) {
                 this.player.jump();
               }

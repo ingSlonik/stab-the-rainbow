@@ -21,6 +21,7 @@ export class TrackManager {
 
   constructor(scene: any) {
     this.group = new THREE.Group();
+    this.group.position.set(0, 0.60, 0);
     scene.add(this.group);
 
     // Attract mode initial healths: lively and varied so numbers are dynamic from the first frame!

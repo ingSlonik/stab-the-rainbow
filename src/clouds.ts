@@ -48,18 +48,18 @@ export class CloudManager {
     const mat = new THREE.MeshLambertMaterial({
       color: colorHex,
       emissive: colorHex,
-      emissiveIntensity: 0.32,
+      emissiveIntensity: 0.35,
       flatShading: true,
       transparent: true,
       opacity: 0.95,
     });
 
     const spheres = [
-      { r: 0.65, x: 0, y: 0, z: 0 },
-      { r: 0.48, x: -0.52, y: -0.05, z: 0.1 },
-      { r: 0.52, x: 0.52, y: -0.05, z: -0.1 },
-      { r: 0.42, x: 0.15, y: 0.36, z: 0.05 },
-      { r: 0.36, x: -0.25, y: 0.28, z: -0.08 },
+      { r: 0.25, x: 0, y: 0, z: 0 },
+      { r: 0.19, x: -0.18, y: -0.02, z: 0.04 },
+      { r: 0.20, x: 0.18, y: -0.02, z: -0.04 },
+      { r: 0.16, x: 0.06, y: 0.14, z: 0.02 },
+      { r: 0.14, x: -0.10, y: 0.11, z: -0.03 },
     ];
 
     const baseSphereGeom = new THREE.SphereGeometry(1, 8, 7);
@@ -169,9 +169,9 @@ export class CloudManager {
   }
 
   public spawnCloud(preferredColorIdx?: number): void {
-    // Spawn across lane positions (-3.3 to +3.3)
+    // Spawn across lane positions (-1.20 to +1.20 for 0.40m lanes)
     const lane = floor(random() * LANE_COUNT);
-    const x = (lane - 3) * LANE_WIDTH + randRange(-0.35, 0.35);
+    const x = (lane - 3) * LANE_WIDTH + randRange(-0.08, 0.08);
 
     // Pick color: 65% chance of preferred urgent color if provided, else random
     let colorIdx = floor(random() * LANE_COUNT);
@@ -182,9 +182,9 @@ export class CloudManager {
     const colHex = RAINBOW_COLORS[colorIdx];
     const mesh = this.createCloudMesh(colHex);
     const z = randRange(-85, -75);
-    // ~40% high clouds (must jump to reach: 2.5 - 3.25m), 60% ground height (1.3 - 1.75m)
+    // ~40% high clouds (must jump to reach: 2.85 - 3.45m), 60% ground height (1.85 - 2.35m)
     const isHigh = random() < 0.4;
-    const baseY = isHigh ? randRange(2.5, 3.25) : randRange(1.3, 1.75);
+    const baseY = isHigh ? randRange(2.85, 3.45) : randRange(1.85, 2.35);
 
     mesh.position.set(x, baseY, z);
     this.group.add(mesh);
@@ -201,11 +201,11 @@ export class CloudManager {
       freqY: randRange(1.5, 3.0),
       phaseX: random() * Math.PI * 2,
       phaseY: random() * Math.PI * 2,
-      radius: 0.85,
+      radius: 0.36,
       stabbed: false,
       popping: false,
       popTimer: 0,
-      popDuration: 0.32,
+      popDuration: 0.35,
       echoed: false,
     });
   }
@@ -277,9 +277,9 @@ export class CloudManager {
         continue;
       }
 
-      // Harmonic 3D oscillation
-      const offsetX = sin(time * c.freqX + c.phaseX) * 0.45;
-      const offsetY = cos(time * c.freqY + c.phaseY) * 0.35;
+      // Harmonic 3D oscillation (subtle lateral sway within 0.29m lane)
+      const offsetX = sin(time * c.freqX + c.phaseX) * 0.05;
+      const offsetY = cos(time * c.freqY + c.phaseY) * 0.22;
       c.x += offsetX * dt;
       c.y = c.baseY + offsetY;
 
