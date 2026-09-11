@@ -1,15 +1,14 @@
+import { sin, max, min, floor, HALF_PI } from './math';
+// import { BEST_DEATH_QUIP } from './quips';
+import { toggleAudio, toggleSfx, getAudioMuted, getSfxMuted } from './audio';
+
 import {
   LANE_COUNT,
   LANE_WIDTH,
   RAINBOW_COLORS,
-  RAINBOW_HEX_STRINGS,
-  COLOR_NAMES_EN,
   GameState,
   GameMode,
 } from './types';
-import { sin, max, min, floor } from './math';
-import { getRandomDeathQuip } from './quips';
-import { toggleAudio, toggleSfx, getAudioMuted, getSfxMuted } from './audio';
 
 export interface UIButton {
   id: string;
@@ -20,7 +19,7 @@ export interface UIButton {
   action: () => void;
 }
 
-const THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
+const THREE = (window as any).THREE; // || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
 
 const uiFont = (size: number, weight: number | string = 900) => `${weight} ${size}px system-ui, sans-serif`;
 
@@ -49,7 +48,7 @@ export class UIManager {
   private board3DGroup: any;
   private charMaterials: Record<string, any> = {};
   private labelMaterials: Record<string, any> = {};
-  private statusMaterials: any[] = [];
+  // private statusMaterials: any[] = [];
   private scoreDigitMeshes: any[] = [];
   private bestDigitMeshes: any[] = [];
   private comboLabelMesh: any;
@@ -60,11 +59,11 @@ export class UIManager {
     colGroup: any;
     borderMesh: any;
     cardMesh: any;
-    colorLabelMesh: any;
+    colorLabelMesh?: any;
     percentDigitMeshes: any[];
-    emptyMesh: any;
-    statusTextMesh: any;
-    statusPillMesh: any;
+    emptyMesh?: any;
+    statusTextMesh?: any;
+    statusPillMesh?: any;
     gaugeMesh: any;
   }> = [];
 
@@ -102,11 +101,7 @@ export class UIManager {
   public pointerY = -100;
 
   private highScores = [0, 0, 0];
-  private lastQuote = '';
-
-  // Dynamic funny quips for Hard mode
-  private currentQuip = '';
-  private quipTimer = 0;
+  // private lastQuote = BEST_DEATH_QUIP;
 
   constructor(scene: any, camera: any) {
     this.camera = camera;
@@ -125,9 +120,8 @@ export class UIManager {
   }
 
   private loadHighScores(): void {
-    const keys = ['str_h_desktop', 'str_h_easy', 'str_h_hard'];
-    this.highScores = keys.map(k => {
-      try { return parseInt(localStorage.getItem(k) || '0', 10) || 0; } catch (_) { return 0; }
+    this.highScores = [0, 1, 2].map(m => {
+      try { return +localStorage.getItem('str_' + m)! || 0; } catch (_) { return 0; }
     });
   }
 
@@ -136,9 +130,7 @@ export class UIManager {
     if (score > prev) {
       this.highScores[mode] = score;
       this.dialogDirty = true;
-      try {
-        localStorage.setItem(['str_h_desktop', 'str_h_easy', 'str_h_hard'][mode], score.toString());
-      } catch (_) { }
+      try { localStorage.setItem('str_' + mode, '' + score); } catch (_) { }
       return true;
     }
     return false;
@@ -148,14 +140,13 @@ export class UIManager {
     return this.highScores[mode] || 0;
   }
 
-  public getLastQuote(): string {
-    return this.lastQuote || 'Gravity was faster this time.';
-  }
+  // 13KB optimization
+  // public getLastQuote(): string {
+  //   return this.lastQuote;
+  // }
 
-  public setQuip(text: string): void {
-    this.currentQuip = text;
-    this.quipTimer = 4.0;
-  }
+  // 13KB optimization: In-run dynamic quips disabled to save space
+  public setQuip(_text: string): void { }
 
   public setGameOverPosition(playerX: number, playerY: number, isVR: boolean = false): void {
     if (!this.dialogMesh) return;
@@ -207,8 +198,7 @@ export class UIManager {
 
   private initStaticMaterials(): void {
     // 1. Single-character materials (pre-rasterized once at boot)
-    const chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '%', ',', ' ', 'x', '!', '-'];
-    for (const ch of chars) {
+    for (const ch of '0123456789%, x!-.') {
       this.charMaterials[ch] = this.createTextMaterial(
         ch,
         uiFont(110),
@@ -220,22 +210,24 @@ export class UIManager {
     }
 
     // 2. Fixed UI Labels (enlarged for crisp readability and prominent header)
-    const fixedLabels: [string, number, string, number, number, string?][] = [
-      ['SCORE:', 48, '#ffffff', 280, 72, '#00d4ff'],
-      ['BEST:', 44, '#ffd24d', 240, 72],
-      ['COMBO', 48, '#ffdd00', 240, 72, '#ffdd00'],
-      ['VR EASY', 46, '#00d4ff', 340, 72],
-      ['VR HARD', 46, '#ffdd00', 340, 72],
-      ['DESKTOP', 46, '#a0b8d8', 340, 72],
-      ['EMPTY', 46, '#ff2a4b', 240, 72, '#ff2a4b'],
-      ['100%', 64, '#ffffff', 220, 76, '#000000'],
-      ['-5%', 64, '#ffffff', 180, 76, '#000000'],
+    const fixedLabels: [string, number, string, number, string?][] = [
+      ['SCORE:', 48, '#fff', 280, '#00d4ff'],
+      ['BEST:', 44, '#ffd24d', 240],
+      ['COMBO', 48, '#ffd', 240, '#ffd'],
+      ['VR EASY', 46, '#00d4ff', 340],
+      ['VR HARD', 46, '#ffd', 340],
+      ['DESKTOP', 46, '#a0b8d8', 340],
+      ['100%', 64, '#fff', 220, '#000'],
+      ['-5%', 64, '#fff', 180, '#000'],
     ];
 
-    for (const [text, sz, col, w, h, glow] of fixedLabels) {
-      this.labelMaterials[text] = this.createTextMaterial(text, uiFont(sz), col, w, h, glow);
+    for (const [text, sz, col, w, glow] of fixedLabels) {
+      this.labelMaterials[text] = this.createTextMaterial(text, uiFont(sz), col, w, sz > 50 ? 76 : 72, glow);
     }
 
+    // 13KB bundle optimization: Status badges and text color names commented out
+    // (HUD is much cleaner with card background + colored border + dynamic gauge + percentage digits)
+    /*
     // 3. Status Badges (indexed 0: OK, 1: DRAIN, 2: ALERT, 3: GONE)
     const statusBadges: [string, number, string, number, number][] = [
       ['● OK', 30, '#10e052', 180, 48],
@@ -248,7 +240,7 @@ export class UIManager {
       this.statusMaterials[i] = this.createTextMaterial(text, uiFont(sz), col, w, h);
     }
 
-    // 3. Lane Color Names
+    // 4. Lane Color Names
     for (let i = 0; i < LANE_COUNT; i++) {
       const name = COLOR_NAMES_EN[i].toUpperCase();
       this.labelMaterials[name] = this.createTextMaterial(
@@ -259,17 +251,18 @@ export class UIManager {
         56
       );
     }
+    */
   }
 
   private init3DBoard(): void {
     this.board3DGroup = new THREE.Group();
     // Positioned closer to player with optimized sightline tilt
     this.board3DGroup.position.set(0, 0.74, -2.7);
-    this.board3DGroup.rotation.set(-Math.PI / 2 + 0.46, 0, 0);
+    this.board3DGroup.rotation.set(-HALF_PI + 0.46, 0, 0);
     this.group.add(this.board3DGroup);
 
     // 1. Dark Main Backplate (tightened to 2.80m width, exactly matching the 2.80m rainbow track with minimal side padding)
-    const bgMesh = createQuad(2.80, 0.82, createMat(0x080616, 0.90), 0, 0.09, 0, 100, this.board3DGroup);
+    const bgMesh = createQuad(2.84, 0.82, createMat(0x080616, 0.8), 0, 0.09, 0, 100, this.board3DGroup);
 
     // Subtle cyan frame outline
     const frameEdges = new THREE.EdgesGeometry(bgMesh.geometry);
@@ -292,7 +285,7 @@ export class UIManager {
     const makeDigits = (count: number, startX: number) => {
       const arr = [];
       for (let d = 0; d < count; d++) {
-        arr.push(createQuad(0.065, 0.11, this.charMaterials[' '], startX + d * 0.068, 0.36, 0.02, 104, this.board3DGroup));
+        arr.push(createQuad(0.065, 0.11, this.charMaterials[' '], startX + d * 0.055, 0.36, 0.02, 104, this.board3DGroup));
       }
       return arr;
     };
@@ -300,13 +293,14 @@ export class UIManager {
     // Score Digits (8 digit quads, enlarged for crisp visibility)
     this.scoreDigitMeshes = makeDigits(8, -0.97);
 
+    // 13KB bundle optimization
     // Heartbeat Pulse Mesh (instant visual feedback of 90/120Hz live frame loop)
-    const hbGeom = new THREE.CircleGeometry(0.022, 16);
-    const hbMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, side: THREE.DoubleSide, depthWrite: false });
-    this.heartbeatMesh = new THREE.Mesh(hbGeom, hbMat);
-    this.heartbeatMesh.position.set(-0.41, 0.36, 0.02);
-    this.heartbeatMesh.renderOrder = 104;
-    this.board3DGroup.add(this.heartbeatMesh);
+    //const hbGeom = new THREE.CircleGeometry(0.022, 16);
+    //const hbMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, side: THREE.DoubleSide, depthWrite: false });
+    //this.heartbeatMesh = new THREE.Mesh(hbGeom, hbMat);
+    //this.heartbeatMesh.position.set(-0.41, 0.36, 0.02);
+    //this.heartbeatMesh.renderOrder = 104;
+    //this.board3DGroup.add(this.heartbeatMesh);
 
     // Center: COMBO or BEST Label & Digits (significantly enlarged multiplier)
     this.comboLabelMesh = createQuad(0.28, 0.11, this.labelMaterials['COMBO'], -0.19, 0.36, 0.02, 104, this.board3DGroup);
@@ -331,7 +325,7 @@ export class UIManager {
       this.board3DGroup.add(colGroup);
 
       // Card Background Plane
-      const cardMesh = new THREE.Mesh(cardGeom, createMat(0x0c091c, 0.88));
+      const cardMesh = new THREE.Mesh(cardGeom, createMat(0x0c091c, 0.8));
       cardMesh.renderOrder = 102;
       colGroup.add(cardMesh);
 
@@ -345,11 +339,13 @@ export class UIManager {
       colGroup.add(borderMesh);
 
       // 3D Gauge Fill inside card (pivoted at bottom, scales with lane health)
-      const gaugeMesh = new THREE.Mesh(gaugeGeom, createMat(RAINBOW_COLORS[i], 0.50));
+      const gaugeMesh = new THREE.Mesh(gaugeGeom, createMat(RAINBOW_COLORS[i], 0.5));
       gaugeMesh.position.set(0, -0.24, 0.01);
       gaugeMesh.renderOrder = 103;
       colGroup.add(gaugeMesh);
 
+      // 13KB bundle optimization: Redundant meshes (color name, empty label, status text/pill) commented out
+      /*
       // Color Name Quad
       const colorLabelMesh = createQuad(
         0.34,
@@ -361,15 +357,17 @@ export class UIManager {
         104,
         colGroup
       );
+      */
 
       // 4 Percentage Digit Quads (e.g. '1', '0', '0', '%' or ' ', '8', '5', '%')
       const percentDigitMeshes: any[] = [];
       const pw = 0.066;
       for (let d = 0; d < 4; d++) {
-        const pMesh = createQuad(pw, 0.096, this.charMaterials[' '], -1.5 * pw + d * pw, 0.05, 0.025, 104, colGroup);
+        const pMesh = createQuad(pw, 0.096, this.charMaterials[' '], -1.75 * pw + d * pw, -0.16, 0.025, 104, colGroup);
         percentDigitMeshes.push(pMesh);
       }
 
+      /* 13KB bundle optimization
       // EMPTY label (displayed when lane health is <= 0.04)
       const emptyMesh = createQuad(0.30, 0.092, this.labelMaterials['EMPTY'], 0, 0.05, 0.025, 104, colGroup);
       emptyMesh.visible = false;
@@ -379,16 +377,17 @@ export class UIManager {
 
       // Status Pill Mesh (glowing underline)
       const statusPillMesh = createQuad(0.24, 0.020, createMat(0x10e052), 0, -0.17, 0.025, 104, colGroup);
+      */
 
       this.laneColumns.push({
         colGroup,
         borderMesh,
         cardMesh,
-        colorLabelMesh,
+        // colorLabelMesh,
         percentDigitMeshes,
-        emptyMesh,
-        statusTextMesh,
-        statusPillMesh,
+        // emptyMesh,
+        // statusTextMesh,
+        // statusPillMesh,
         gaugeMesh,
       });
     }
@@ -444,7 +443,7 @@ export class UIManager {
       p.mesh.scale.set(popScale, popScale, popScale);
       if (progress > 0.40) {
         const fade = (1 - progress) / 0.60;
-        p.mesh.material.opacity = Math.max(0, fade);
+        p.mesh.material.opacity = max(0, fade);
       }
       if (this.camera) {
         p.mesh.quaternion.copy(this.camera.quaternion);
@@ -474,12 +473,12 @@ export class UIManager {
     if (!this.board3DGroup) return;
 
     // 1. Live Score Digits
-    const sStr = Math.floor(score).toLocaleString('en-US').padStart(8, ' ');
+    const sStr = floor(score).toLocaleString().padStart(8, ' ');
     this.setDigits(this.scoreDigitMeshes, sStr);
 
     // 2. Heartbeat Indicator
     if (this.heartbeatMesh) {
-      const pulse = 1 + 0.35 * Math.sin(time * 8);
+      const pulse = 1 + 0.35 * sin(time * 8);
       this.heartbeatMesh.scale.set(pulse, pulse, 1);
       this.heartbeatMesh.material.color.setHex(combo > 1 ? 0xffdd00 : 0x00d4ff);
     }
@@ -488,7 +487,7 @@ export class UIManager {
     const isCombo = combo > 1;
     if (this.comboLabelMesh) this.comboLabelMesh.visible = isCombo;
     if (this.bestLabelMesh) this.bestLabelMesh.visible = !isCombo;
-    const comboStr = isCombo ? `x${combo}` : Math.floor(this.getHighScore(vrMode)).toLocaleString('en-US');
+    const comboStr = isCombo ? `x${combo}` : floor(this.getHighScore(vrMode)).toLocaleString();
     this.setDigits(this.bestDigitMeshes, comboStr.padStart(6, ' '));
 
     // 4. Mode Label
@@ -500,7 +499,7 @@ export class UIManager {
     }
 
     // 5. 7 Rainbow Lane Columns
-    const blink = Math.sin(time * 18) > 0;
+    const blink = sin(time * 18) > 0;
     for (let laneIdx = 0; laneIdx < LANE_COUNT; laneIdx++) {
       const col = this.laneColumns[laneIdx];
       if (!col) continue;
@@ -515,26 +514,27 @@ export class UIManager {
 
       // Gauge fill: visible as long as health > 0%
       col.gaugeMesh.visible = h > 0.0;
-      col.gaugeMesh.scale.y = Math.max(0.02, Math.min(1.0, h));
+      col.gaugeMesh.scale.y = max(0.02, min(1.0, h));
 
-      // Percent digits vs EMPTY: EMPTY only at 0%
+      // Percent digits (clean percentage display: 100%, 85%, 0%)
+      const pctStr = `${floor(h * 100 + 0.5)}%`.padStart(4, ' ');
+      for (let pIdx = 0; pIdx < 4; pIdx++) col.percentDigitMeshes[pIdx].visible = true;
+      this.setDigits(col.percentDigitMeshes, pctStr);
+
+      // 13KB bundle optimization: status badges and pills commented out
+      /*
       if (h > 0.0) {
         if (col.emptyMesh) col.emptyMesh.visible = false;
-        const pctStr = `${Math.round(h * 100)}%`.padStart(4, ' ');
-        for (let pIdx = 0; pIdx < 4; pIdx++) col.percentDigitMeshes[pIdx].visible = true;
-        this.setDigits(col.percentDigitMeshes, pctStr);
       } else {
         if (col.emptyMesh) col.emptyMesh.visible = true;
-        for (let pIdx = 0; pIdx < 4; pIdx++) col.percentDigitMeshes[pIdx].visible = false;
       }
-
-      // Status Badge and Status Pill (indexed 0: OK, 1: DRAIN, 2: ALERT, 3: GONE)
       const statusIdx = h > 0.70 ? 0 : (h > 0.32 ? 1 : (h > 0.0 ? 2 : 3));
       const pillColor = h > 0.70 ? 0x10e052 : (h > 0.32 ? 0xffdd00 : (h > 0.0 ? 0xff2a4b : 0x888888));
       if (this.statusMaterials[statusIdx]) {
         col.statusTextMesh.material = this.statusMaterials[statusIdx];
       }
       col.statusPillMesh.material.color.setHex(pillColor);
+      */
     }
   }
 
@@ -542,11 +542,6 @@ export class UIManager {
     // 1. Centered 3D Dialog panel (Menu & Game Over) in 3D world space (comfortable VR reading distance)
     const cvs = document.createElement('canvas');
     cvs.width = cvs.height = 1024;
-    cvs.style.cssText =
-      'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1000;';
-    if (typeof document !== 'undefined' && document.body) {
-      document.body.appendChild(cvs);
-    }
     this.dialogCanvas = cvs;
     this.dialogCtx = cvs.getContext('2d')!;
 
@@ -717,7 +712,7 @@ export class UIManager {
   }
 
   public setGameOverDeathQuote(): void {
-    this.lastQuote = getRandomDeathQuip();
+    // this.lastQuote = BEST_DEATH_QUIP;
     this.dialogDirty = true;
   }
 
@@ -735,12 +730,6 @@ export class UIManager {
     isVR: boolean = false,
     vrMode: GameMode = GameMode.DESKTOP
   ): void {
-    if (this.quipTimer > 0) {
-      this.quipTimer -= dt;
-      if (this.quipTimer <= 0) {
-        this.currentQuip = '';
-      }
-    }
 
     // 1. Update 100% Native 3D HUD Board (zero dynamic canvas uploads, 90/120Hz native WebGL)
     this.update3DBoard(score, combo, laneHealth, time, dt, vrMode);
@@ -820,7 +809,7 @@ export class UIManager {
     ctx.textAlign = 'center';
 
     if (isHover) {
-      // Vivid glowing gradient fill
+      /* 13KB bundle optimization: Clean, vivid hex alpha fill replacing 15 lines of gradient comparisons
       const grad = ctx.createLinearGradient(x, y, x + w, y + h);
       const colLower = color.toLowerCase();
       const [c1, c2] = colLower.includes('ffdd00') || colLower.includes('yellow') || colLower.includes('ff7b00')
@@ -834,15 +823,18 @@ export class UIManager {
       grad.addColorStop(1, c2);
 
       ctx.fillStyle = grad;
+      */
+
+      ctx.fillStyle = `${color}44`;
       this.roundRect(ctx, bx, by, bw, bh, br);
       ctx.fill();
 
       // Glowing multi-layer border
       ctx.save();
       ctx.shadowColor = color;
-      ctx.shadowBlur = 24;
+      ctx.shadowBlur = 20;
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 5.5;
+      ctx.lineWidth = 5;
       this.roundRect(ctx, bx, by, bw, bh, br);
       ctx.stroke();
       ctx.restore();
@@ -850,13 +842,13 @@ export class UIManager {
       // Highlighted title
       ctx.save();
       ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 14;
+      ctx.shadowBlur = 12;
       ctx.fillStyle = '#ffffff';
       ctx.font = uiFont(32);
       ctx.fillText(`✨  ${title}  ✨`, x + w / 2, titleY);
       ctx.restore();
     } else {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+      ctx.fillStyle = '#ffffff12';
       this.roundRect(ctx, bx, by, bw, bh, br);
       ctx.fill();
 
@@ -871,7 +863,7 @@ export class UIManager {
 
     if (subtitle) {
       ctx.fillStyle = isHover ? '#ffffff' : '#c8d6e5';
-      ctx.font = uiFont(isHover ? 19 : 18, isHover ? 700 : 600);
+      ctx.font = uiFont(18, 600);
       ctx.fillText(subtitle, x + w / 2, y + h * 0.72);
     }
   }
@@ -881,78 +873,44 @@ export class UIManager {
     x1: number,
     x2: number,
     y: number,
-    w: number,
-    musicSub: string,
-    sfxSub: string
+    w: number
   ): void {
-    const isMusicMuted = getAudioMuted();
-    const isSfxMuted = getSfxMuted();
-
-    this.drawButton(
-      ctx,
-      'btn-music-3d',
-      x1,
-      y,
-      w,
-      85,
-      isMusicMuted ? '🎵 MUSIC: OFF' : '🎵 MUSIC: ON',
-      musicSub,
-      isMusicMuted ? '#8899aa' : '#00d4ff',
-      () => {
-        toggleAudio();
-        // bm = #btn-music (sync HTML button text)
-        const b = document.getElementById('bm');
-        if (b) b.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
-        this.dialogDirty = true;
-      }
-    );
-
-    this.drawButton(
-      ctx,
-      'btn-sfx-3d',
-      x2,
-      y,
-      w,
-      85,
-      isSfxMuted ? '🔊 SFX: OFF' : '🔊 SFX: ON',
-      sfxSub,
-      isSfxMuted ? '#8899aa' : '#10e052',
-      () => {
-        toggleSfx();
-        // bs = #btn-sfx (sync HTML button text)
-        const b = document.getElementById('bs');
-        if (b) b.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
-        this.dialogDirty = true;
-      }
-    );
+    const makeBtn = (id: string, x: number, icon: string, name: string, isMuted: boolean, sub: string, col: string, toggle: () => void) => {
+      this.drawButton(ctx, id, x, y, w, 85, `${icon} ${name}: ${isMuted ? 'OFF' : 'ON'}`, sub, isMuted ? '#8899aa' : col, () => { toggle(); this.dialogDirty = true; });
+    };
+    makeBtn('btn-music-3d', x1, '🎵', 'MUSIC', getAudioMuted(), 'Toggle music', '#00d4ff', toggleAudio);
+    makeBtn('btn-sfx-3d', x2, '🔊', 'SFX', getSfxMuted(), 'Toggle SFX', '#10e052', toggleSfx);
   }
 
   private drawControlsText(
     ctx: CanvasRenderingContext2D,
     baseY: number,
-    gap: number,
-    aimText: string,
+    // gap: number,
     showDesktop: boolean = false
   ): void {
-    ctx.textAlign = 'center';
-    ctx.font = uiFont(19, 800);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText('🌈 STEER: Take real side-steps across the 2m rainbow!', 512, baseY);
+    const gap = 40;
 
-    ctx.font = uiFont(17, 700);
+    ctx.textAlign = 'center';
+    ctx.font = uiFont(25, 800);
+    ctx.fillStyle = '#ffffff';
+    // Original: '🌈 STEER: Take real side-steps across the 2m rainbow!'
+    ctx.fillText('🌈 STEER: Real side-steps across the rainbow!', 512, baseY);
+
+    ctx.font = uiFont(23, 700);
     ctx.fillStyle = '#00d4ff';
-    ctx.fillText('🥽 VR CONTROLLER: Trigger = Stab  •  Grip = Jump  •  A / B = Return to Home', 512, baseY + gap);
+    // Original: '🥽 VR CONTROLLER: Trigger = Stab  •  Grip = Jump  •  A / B = Return to Home'
+    ctx.fillText('🥽 VR: Trigger = Stab • Grip = Jump • A/B = Home', 512, baseY + gap);
 
     let offset = 2;
     if (showDesktop) {
-      ctx.font = uiFont(15, 600);
+      ctx.font = uiFont(20, 600);
       ctx.fillStyle = '#10e052';
-      ctx.fillText('💻 DESKTOP: Mouse Move to Steer  •  Left-Click: Stab  •  Right-Click / Wheel: Jump', 512, baseY + gap * offset++);
+      ctx.fillText('💻 DESKTOP: Mouse: steer • Left: stab • Right: jump', 512, baseY + gap * offset++);
     }
 
-    ctx.font = uiFont(15, 600);
-    ctx.fillStyle = '#9cb3d0';
-    ctx.fillText(aimText, 512, baseY + gap * offset);
+    // ctx.font = uiFont(15, 600);
+    // ctx.fillStyle = '#9cb3d0';
+    // ctx.fillText('🎯 Aim pointer & Trigger to select', 512, baseY + gap * offset);
   }
 
   private drawMenu(
@@ -962,16 +920,16 @@ export class UIManager {
     currentMode: GameMode
   ): void {
     // Elegant dialog card
-    ctx.fillStyle = 'rgba(12, 8, 28, 0.94)';
+    ctx.fillStyle = '#0c081cf0';
     this.roundRect(ctx, 80, 70, 864, 884, 32);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(0, 212, 255, 0.7)';
+    ctx.strokeStyle = '#00d4ffb3';
     ctx.lineWidth = 3.5;
     ctx.stroke();
 
     // Title
     ctx.textAlign = 'center';
-    ctx.font = uiFont(52);
+    ctx.font = uiFont(50);
     ctx.fillStyle = '#00d4ff';
     ctx.shadowColor = '#00d4ff';
     ctx.shadowBlur = 20;
@@ -979,12 +937,12 @@ export class UIManager {
     ctx.shadowBlur = 0;
 
     // Subtitle
-    ctx.font = uiFont(21, 700);
+    ctx.font = uiFont(28, 700);
     ctx.fillStyle = '#ffdd00';
-    ctx.fillText('CHOOSE DIFFICULTY ABOVE THE RAINBOW', 512, 206);
+    ctx.fillText('CHOOSE DIFFICULTY', 512, 210);
 
     // High Scores - Easy & Hard separated
-    ctx.font = uiFont(21, 700);
+    ctx.font = uiFont(22, 700);
     ctx.fillStyle = '#ffffff';
     ctx.fillText(
       `HIGH SCORES:   EASY: ${this.getHighScore(GameMode.VR_EASY)}   •   HARD: ${this.getHighScore(GameMode.VR_HARD)}`,
@@ -993,7 +951,7 @@ export class UIManager {
     );
 
     // Separator line
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.strokeStyle = '#ffffff26';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(140, 286);
@@ -1028,18 +986,20 @@ export class UIManager {
     );
 
     // Controls Instructions (Clear, stylish and aligned)
-    this.drawControlsText(ctx, 625, 35, '🎯 Aim pointer beam & pull Trigger to select difficulty');
+    this.drawControlsText(ctx, 690);
 
     // Separator line before Audio Bar
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    /*
+    ctx.strokeStyle = '#ffffff26';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(140, 735);
-    ctx.lineTo(884, 735);
+    ctx.moveTo(140, 850);
+    ctx.lineTo(884, 850);
     ctx.stroke();
+    */
 
     // 3D Audio Buttons (Side-by-side in bottom bar)
-    this.drawAudioBar(ctx, 110, 534, 755, 380, 'Click to toggle music soundtrack', 'Click to toggle sound effects');
+    this.drawAudioBar(ctx, 110, 534, 840, 380);
   }
 
   private drawGameOver(
@@ -1052,14 +1012,14 @@ export class UIManager {
     vrMode: GameMode
   ): void {
     const isHard = vrMode === GameMode.VR_HARD;
-    const isEasy = vrMode === GameMode.VR_EASY;
-    const modeName = isHard ? 'VR HARD' : (isEasy ? 'VR EASY' : 'DESKTOP');
+    // const isEasy = vrMode === GameMode.VR_EASY;
+    // const modeName = isHard ? 'VR HARD' : (isEasy ? 'VR EASY' : 'DESKTOP');
     const otherModeName = isHard ? 'VR EASY' : 'VR HARD';
     const highScore = this.getHighScore(vrMode) || 0;
     const isNewHigh = score >= highScore && score > 0;
 
     // Dark elegant panel
-    ctx.fillStyle = 'rgba(16, 8, 24, 0.95)';
+    ctx.fillStyle = '#100818f2';
     this.roundRect(ctx, 100, 70, 824, 884, 32);
     ctx.fill();
 
@@ -1077,14 +1037,16 @@ export class UIManager {
     ctx.shadowBlur = 0;
 
     // Death quote
-    ctx.font = uiFont(22, 'italic 600');
-    ctx.fillStyle = '#ffd2d9';
-    ctx.fillText(this.lastQuote || 'Gravity was faster this time.', 512, 218);
+    // 13KB optimization
+    // ctx.font = uiFont(22, 'italic 600');
+    // ctx.fillStyle = '#ffd2d9';
+    // ctx.fillText(this.lastQuote || 'Gravity was faster this time.', 512, 218);
 
     // Final Score
     ctx.font = uiFont(46);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`SCORE (${modeName}): ${score.toLocaleString()}`, 512, 290);
+    // Original: `SCORE (${modeName}): ${score.toLocaleString()}`
+    ctx.fillText(`SCORE: ${score.toLocaleString()}`, 512, 290);
 
     if (isNewHigh) {
       ctx.font = uiFont(26, 800);
@@ -1093,74 +1055,36 @@ export class UIManager {
     } else {
       ctx.font = uiFont(22, 700);
       ctx.fillStyle = '#ffdd00';
-      ctx.fillText(`BEST SCORE (${modeName}): ${highScore.toLocaleString()}`, 512, 335);
+      // Original: `BEST SCORE (${modeName}): ${highScore.toLocaleString()}`
+      ctx.fillText(`BEST: ${highScore.toLocaleString()}`, 512, 335);
     }
 
     // Action Buttons
-    this.drawButton(
-      ctx,
-      'btn-retry',
-      140,
-      370,
-      744,
-      88,
-      'PLAY AGAIN',
-      '',
-      '#10e052',
-      () => onRestart()
-    );
+    const btn = (id: string, y: number, text: string, col: string, fn: () => void) =>
+      this.drawButton(ctx, id, 140, y, 744, 88, text, '', col, fn);
 
-    this.drawButton(
-      ctx,
-      'btn-home',
-      140,
-      472,
-      744,
-      88,
-      'MAIN MENU',
-      '',
-      '#00d4ff',
-      () => onHome()
-    );
-
-    if (isVR) {
-      this.drawButton(
-        ctx,
-        'btn-toggle',
-        140,
-        574,
-        744,
-        88,
-        'SWITCH TO ' + otherModeName,
-        '',
-        '#ffdd00',
-        () => onToggleMode()
-      );
-    }
+    btn('btn-retry', 370, 'PLAY AGAIN', '#10e052', onRestart);
+    btn('btn-home', 472, 'MAIN MENU', '#00d4ff', onHome);
+    if (isVR) btn('btn-toggle', 574, 'SWITCH: ' + otherModeName, '#ffdd00', onToggleMode);
 
     // Controls Instructions (Consistent with VR Menu + Desktop)
-    const instrBaseY = isVR ? 684 : 598;
-    const lineGap = isVR ? 27 : 29;
-    this.drawControlsText(
-      ctx,
-      instrBaseY,
-      lineGap,
-      isVR ? '🎯 Aim pointer beam & pull Trigger to select' : '🎯 Aim with mouse & left-click button to select',
-      true
-    );
+    const instrBaseY = isVR ? 730 : 665;
+    this.drawControlsText(ctx, instrBaseY, !isVR);
+
 
     // Separator line before Audio Bar
-    const audioY = isVR ? 782 : 706;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    /*
+    const audioY = isVR ? 850 : 774;
+    ctx.strokeStyle = '#ffffff26';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(160, audioY);
     ctx.lineTo(864, audioY);
     ctx.stroke();
+    */
 
     // 3D Audio Buttons (Side-by-side in bottom bar)
-    const btnAudioY = isVR ? 802 : 726;
-    this.drawAudioBar(ctx, 140, 529, btnAudioY, 355, 'Toggle music', 'Toggle sound effects');
+    this.drawAudioBar(ctx, 140, 529, 830, 355);
   }
 
 
@@ -1172,21 +1096,7 @@ export class UIManager {
     h: number,
     r: number
   ): void {
-    if (ctx.roundRect) {
-      ctx.beginPath();
-      ctx.roundRect(x, y, w, h, r);
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
-    }
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
   }
 }
