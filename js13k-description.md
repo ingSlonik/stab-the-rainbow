@@ -1,16 +1,16 @@
 # ✨ Stab the Rainbow 🦄⚡🌈
 
-> *"This game was crafted primarily for WebXR VR headsets, giving you the authentic, embodied feeling of being a galloping unicorn! You can play on desktop, but you will miss out on the magical sensation of physically being the unicorn."*
+> *"Crafted primarily for WebXR VR headsets, giving you the authentic feeling of being a galloping unicorn! You can play on desktop, but you will miss out on the magical sensation of physically being the unicorn."*
 
 ---
 
 ## 📖 The Cosmic Duty
 
-Rainbows don't just stay in deep space by luck — they decay under cosmic entropy! As a celestial galloping unicorn, you must keep the 7-lane spectral highway intact beneath your hooves.
+Rainbows decay under cosmic entropy! As a galloping unicorn, keep the 7-lane highway intact beneath your hooves.
 
-Lanes bleed energy over time, flicker under 32%, and dissolve into the void at 0%. If you step into an empty lane... unicorn hooves have zero aerodynamic lift and you plunge into the abyss. **Stab oncoming color-coded clouds with your crystal horn** to recharge lanes back to 100%, rack up combos (up to 8×), and save the spectrum!
+Lanes lose energy, flicker under 32%, and dissolve at 0%. Step into a gap and you plunge into the abyss! **Stab oncoming color clouds with your crystal horn** to recharge lanes to 100%, build combos (up to 8×), and save the spectrum.
 
-To onlookers in real life, you are a human in a VR headset aggressively headbutting space clouds and leaping over imaginary gaps on your living room rug. Glorious.
+To onlookers, you are a human in VR aggressively headbutting space clouds and leaping over gaps on your rug. Glorious.
 
 ---
 
@@ -42,10 +42,10 @@ To onlookers in real life, you are a human in a VR headset aggressively headbutt
 
 ## 🔬 Tech Highlights (12.94 KB)
 
-- **WebXR (A-Frame + Three.js):** 100% immersive room-scale VR with seamless desktop fallback.
-- **100% Native 3D UI:** Bypasses the Meta Quest canvas freeze bug via pre-baked glyph atlases & 3D quad material swaps at 90/120 FPS.
-- **Procedural Audio:** 0 audio files! 134+ BPM synthwave with synthesized stereo hoofbeats ("clop/clip" silenced mid-air) & 3D cloud echoes.
-- **Size:** Packed into **13,251 bytes** (61 bytes under the 13 KB limit).
+- **WebXR (A-Frame + Three.js):** Room-scale VR + desktop fallback.
+- **100% Native 3D UI:** 90/120 FPS sprite-font quads (no Quest canvas freeze).
+- **Procedural Audio:** 0 files! 134+ BPM synthwave with stereo hooves & 3D echoes.
+- **Size:** **13,251 bytes** (61 bytes under 13 KB limit).
 
 ---
 
