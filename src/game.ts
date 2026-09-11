@@ -1,12 +1,6 @@
 const THREE = (window as any).THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
 
-import {
-  GameState,
-  GameMode,
-  LANE_COUNT,
-  RAINBOW_COLORS,
-} from './types';
-import { sin, cos, max, min, floor, lerp } from './math';
+import { max, min, floor, lerp, abs } from './math';
 import {
   initAudio,
   playStabSound,
@@ -14,21 +8,21 @@ import {
   setAudioState,
   toggleAudio,
   toggleSfx,
-  getAudioMuted,
-  getSfxMuted,
 } from './audio';
-import {
-  // Commented out for 13KB bundle size optimization:
-  // speakQuip,
-  getRandomStartQuip,
-  getRandomStabQuip,
-  getRandomComboQuip,
-} from './quips';
 import { TrackManager } from './track';
 import { CloudManager } from './clouds';
 import { SceneryManager } from './scenery';
 import { Player } from './player';
 import { UIManager } from './ui';
+
+// 13KB bundle optimization: In-run quips disabled to fit 13KB limit
+
+import { GameState, GameMode, } from './types';
+
+const rayO = new THREE.Vector3();
+const rayD = new THREE.Vector3();
+
+const $ = (id: string) => document.getElementById(id);
 
 export class Game {
   public sceneEl: any;
@@ -67,7 +61,6 @@ export class Game {
   // Desktop Pointer state
   private pointerNdcX = 0;
   private pointerNdcY = 0;
-  private keysDown: { [k: string]: boolean } = {};
 
   constructor(sceneEl: any) {
     this.sceneEl = sceneEl;
@@ -118,6 +111,9 @@ export class Game {
     this.initAFrameWebXR();
 
     this.isReady = true;
+
+    // JS13K: Initialize Wavedash SDK for the Wavedash category
+    (self as any).Wavedash?.init();
   }
 
   public isImmersiveVR(): boolean {
@@ -144,7 +140,7 @@ export class Game {
       const on = (events: string[], fn: () => void) => events.forEach((e) => el.addEventListener(e, fn));
       on(['triggerdown', 'selectstart'], () => this.onTriggerDown(isLeft));
       on(['gripdown', 'squeezestart'], () => this.onGripDown(isLeft));
-      on(['abuttondown', 'xbuttondown', 'bbuttondown', 'ybuttondown'], () => this.onAButtonDown());
+      on(['abuttondown', 'bbuttondown', /*'xbuttondown','ybuttondown' */], () => this.onAButtonDown());
       // Commented out per spec: Thumbstick movement disabled, only physical stepping and button stab/jump allowed
       // el.addEventListener('thumbstickmoved', (e: any) => this.onThumbstick(e.detail));
       // el.addEventListener('axismove', (e: any) => this.onAxisMove(e.detail));
@@ -239,15 +235,16 @@ export class Game {
   private onEnterVR(): void {
     // Strictly verify an active immersive WebXR session exists! Non-immersive fallback must NEVER run VR mode!
     if (!this.isImmersiveVR()) {
-      console.warn('Blocked non-immersive VR mode attempt');
+      // console.warn('Blocked non-immersive VR mode attempt');
       this.sceneEl?.exitVR();
       // w = vr-warning, m = modal
-      const warningEl = document.getElementById('w');
+      const warningEl = $('w');
       if (warningEl) {
-        warningEl.innerHTML = '⚠️ <strong>Immersive VR headset required</strong><br>No active WebXR headset detected. Connect a VR headset or click PLAY ON DESKTOP.';
+        // Original: '⚠️ <strong>Immersive VR headset required</strong><br>No active WebXR headset detected. Connect a VR headset or click PLAY ON DESKTOP.'
+        warningEl.innerHTML = '⚠️ VR headset required';
         warningEl.style.display = 'block';
       }
-      const modal = document.getElementById('m');
+      const modal = $('m');
       if (modal) modal.style.display = 'flex';
       this.onExitVR();
       return;
@@ -292,14 +289,14 @@ export class Game {
   */
   private initDOM(): void {
     const on = (id: string, fn: () => void) => {
-      const el = document.getElementById(id);
+      const el = $(id);
       if (el) el.addEventListener('click', fn);
     };
 
     // Check WebXR support; disable VR button on desktop if no headset detected
     const checkVRSupport = async () => {
-      const vrBtn = document.getElementById('bv') as HTMLButtonElement | null;
-      const vrSub = document.getElementById('vs');
+      const vrBtn = $('bv') as HTMLButtonElement | null;
+      const vrSub = $('vs');
       let isSupported = false;
       if (typeof navigator !== 'undefined' && 'xr' in navigator && (navigator as any).xr) {
         try {
@@ -312,17 +309,15 @@ export class Game {
       if (!isSupported && vrBtn) {
         vrBtn.disabled = true;
         vrBtn.classList.add('d');
-        if (vrSub) vrSub.textContent = 'VR Headset Required (Not Available on Desktop)';
+        // Original: 'VR Headset Required (Not Available on Desktop)'
+        if (vrSub) vrSub.textContent = 'VR Headset Required';
       }
     };
     checkVRSupport();
 
-    on('bv', () => {
-      this.requestVRSession();
-    });
-    on('bd', () => {
-      this.startGame(GameMode.DESKTOP);
-    });
+    on('bv', () => this.requestVRSession());
+    on('bd', () => this.startGame(GameMode.DESKTOP));
+    // 13kb optimalizace: #bm, #bs, #bf don't exist in HTML
     /*
     on('bm', () => {
       toggleAudio();
@@ -336,18 +331,11 @@ export class Game {
     */
   }
 
-  private syncAudioDOM(): void {
-    const bm = document.getElementById('bm');
-    if (bm) bm.textContent = `🎵 MUSIC: ${getAudioMuted() ? 'OFF' : 'ON'}`;
-    const bs = document.getElementById('bs');
-    if (bs) bs.textContent = `🔊 SFX: ${getSfxMuted() ? 'OFF' : 'ON'}`;
-  }
-
   // Combined hide for 2D warning banner (w) and start modal (m)
   private hideModal(): void {
-    const w = document.getElementById('w');
+    const w = $('w');
     if (w) w.style.display = 'none';
-    const m = document.getElementById('m');
+    const m = $('m');
     if (m) m.style.display = 'none';
   }
 
@@ -360,7 +348,7 @@ export class Game {
   }
 
   public requestVRSession(): void {
-    const warningEl = document.getElementById('w');
+    const warningEl = $('w');
     if (warningEl) warningEl.style.display = 'none';
 
     initAudio();
@@ -376,7 +364,8 @@ export class Game {
 
     if (!hasXR || (!this.hasWebXR && !isHeadsetConnected)) {
       if (warningEl) {
-        warningEl.innerHTML = '⚠️ <strong>Immersive VR headset required</strong><br>WebXR immersive-vr is not supported or no headset detected. Please use a VR headset (e.g. Meta Quest) or click PLAY ON DESKTOP.';
+        // Original: '⚠️ <strong>Immersive VR headset required</strong><br>WebXR immersive-vr is not supported or no headset detected. Please use a VR headset (e.g. Meta Quest) or click PLAY ON DESKTOP.'
+        warningEl.innerHTML = '⚠️ VR headset required';
         warningEl.style.display = 'block';
       }
       return;
@@ -385,7 +374,8 @@ export class Game {
     const failVR = (msg: string, err: any) => {
       console.warn(msg, err);
       if (warningEl) {
-        warningEl.innerHTML = '⚠️ <strong>Failed to start VR session</strong><br>' + (err?.message || 'Ensure your VR headset is active.');
+        // Original: '⚠️ <strong>Failed to start VR session</strong><br>' + (err?.message || 'Ensure your VR headset is active.')
+        warningEl.innerHTML = '⚠️ VR Error: ' + (err?.message || '');
         warningEl.style.display = 'block';
       }
       this.sceneEl?.exitVR();
@@ -436,10 +426,10 @@ export class Game {
       return false;
     };
     window.addEventListener('contextmenu', blockContext);
-    document.addEventListener('contextmenu', blockContext);
 
     window.addEventListener('mousedown', (e) => {
       initAudio();
+      if ((e.target as HTMLElement)?.closest?.('#m')) return;
       if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
         this.ui?.triggerClick();
       } else if (this.state === GameState.PLAYING && this.player) {
@@ -452,11 +442,10 @@ export class Game {
     });
 
     window.addEventListener('keydown', (e) => {
-      this.keysDown[e.code] = true;
       initAudio();
       const c = e.code;
 
-      // 13kb optimalizace: Staré ovládání klávesnicí na desktopu (desktop je striktně pouze na myš)
+      // 13kb optimalizace: Keyboard movement
       /*
       const isPlay = this.state === GameState.PLAYING;
       if (c === 'ArrowLeft' || c === 'KeyA') {
@@ -497,19 +486,13 @@ export class Game {
       } else if (c === 'KeyM') {
         e.preventDefault();
         toggleAudio();
-        this.syncAudioDOM();
       } else if (c === 'KeyN') {
         e.preventDefault();
         toggleSfx();
-        this.syncAudioDOM();
       } else if (c === 'KeyH' || c === 'Escape') {
         // Return to menu at any time
         this.goToMenu();
       }
-    });
-
-    window.addEventListener('keyup', (e) => {
-      this.keysDown[e.code] = false;
     });
 
     // Touch support for mobile
@@ -533,7 +516,7 @@ export class Game {
   public goToMenu(): void {
     const isVR = this.isImmersiveVR();
     // m = #modal
-    const modal = document.getElementById('m');
+    const modal = $('m');
     if (modal) {
       modal.style.display = isVR ? 'none' : 'flex';
     }
@@ -574,14 +557,6 @@ export class Game {
     setTimeout(() => {
       this.menuButtonDebounce = false;
     }, 800);
-
-    const isHard = this.currentVRMode === GameMode.VR_HARD;
-    if (isHard) {
-      const startQuip = getRandomStartQuip();
-      this.ui?.setQuip(startQuip);
-      // Commented out for 13KB bundle size optimization:
-      // speakQuip(startQuip, true);
-    }
   }
 
   public restartGame(): void {
@@ -609,10 +584,10 @@ export class Game {
       const dz = hornTipPos.z - c.z;
 
       // 1. Vertical height test: Must actually be inside the cloud's vertical span (no hitting clouds from far below!)
-      if (Math.abs(dy) > maxHalfY) continue;
+      if (abs(dy) > maxHalfY) continue;
 
       // 2. Lateral alignment test: Must be within the cloud's lane
-      if (Math.abs(dx) > maxHalfX) continue;
+      if (abs(dx) > maxHalfX) continue;
 
       // 3. Track depth reach test:
       // Positive dz = cloud ahead of horn tip; negative dz = cloud touching or passing horn tip
@@ -621,7 +596,7 @@ export class Game {
 
       if (dz >= minZ && dz <= maxZ) {
         // In Hard mode, ramming into a cloud automatically pierces and pops it without manual stabbing
-        if (isHard || isStabbing || (isAirborne && Math.abs(dz) <= 0.55)) {
+        if (isHard || isStabbing || (isAirborne && abs(dz) <= 0.55)) {
           c.stabbed = true;
           this.clouds.popCloud(c);
           this.track.replenishLane(c.colorIdx);
@@ -633,18 +608,6 @@ export class Game {
 
           // Visual popup (100%) in 3D world in lane color
           this.ui.spawnWorldPopup('100%', c.colorIdx);
-
-          // Hard mode humorous quips on cloud stabbing
-          if (isHard) {
-            const q = this.combo >= 3 && Math.random() < 0.6
-              ? getRandomComboQuip()
-              : (Math.random() < 0.4 ? getRandomStabQuip() : null);
-            if (q) {
-              this.ui.setQuip(q);
-              // Commented out for 13KB bundle size optimization:
-              // speakQuip(q);
-            }
-          }
           break;
         }
       }
@@ -749,10 +712,10 @@ export class Game {
               }
             };
 
-            // Trigger check (Button 0) -> Stab (pích)
+            // Trigger check (Button 0) -> Stab
             checkBtn(0, '_trig', () => this.onTriggerDown(isLeft));
 
-            // Squeeze / Grip button (Button 1) -> Jump (skok)
+            // Squeeze / Grip button (Button 1) -> Jump
             checkBtn(1, '_grip', () => this.onGripDown(isLeft));
 
             // A & B Buttons (and X & Y) -> Return to Home (exit game) during play, or select in menu
@@ -867,23 +830,19 @@ export class Game {
     // 3D UI raycasting from VR controller/horn or head gaze in VR, or mouse pointer on desktop
     if (this.state === GameState.MENU || this.state === GameState.GAMEOVER) {
       if (isVR) {
-        const origin = new THREE.Vector3();
-        const dir = new THREE.Vector3();
         let hitResult: any = null;
 
         // 1. Try horn / controller ray first
-        if (this.getVRPointerRay(origin, dir)) {
-          hitResult = this.ui.updateHoverRay(origin, dir);
+        if (this.getVRPointerRay(rayO, rayD)) {
+          hitResult = this.ui.updateHoverRay(rayO, rayD);
         }
 
         // 2. Head gaze fallback: if controller ray missed or wasn't pointing at board, use head gaze
         if ((!hitResult || !hitResult.hit) && this.camera) {
-          const headOrigin = new THREE.Vector3();
-          const headDir = new THREE.Vector3();
           this.camera.updateMatrixWorld(true);
-          this.camera.getWorldPosition(headOrigin);
-          this.camera.getWorldDirection(headDir);
-          const gazeResult = this.ui.updateHoverRay(headOrigin, headDir);
+          this.camera.getWorldPosition(rayO);
+          this.camera.getWorldDirection(rayD);
+          const gazeResult = this.ui.updateHoverRay(rayO, rayD);
           if (gazeResult.hit) {
             hitResult = gazeResult;
           }
@@ -918,33 +877,16 @@ export class Game {
   }
 }
 
-// Register A-Frame component
+// Register A-Frame component & auto-boot
+let g: Game;
 if (typeof AFRAME !== 'undefined') {
   AFRAME.registerComponent('rainbow-game', {
     init: function () {
-      (window as any)._g = new Game(this.el);
+      g = new Game(this.el);
+      (window as any)._g = g;
     },
     tick: function (time: number, timeDelta: number) {
-      if ((window as any)._g) {
-        (window as any)._g.loop(time, timeDelta);
-      }
+      if (g) g.loop(time, timeDelta);
     }
   });
-}
-
-// Auto-boot helper
-export const bootGame = () => {
-  const sceneEl = document.querySelector('a-scene');
-  if (sceneEl && !(window as any)._g) {
-    if (!sceneEl.hasAttribute('rainbow-game')) {
-      sceneEl.setAttribute('rainbow-game', '');
-    }
-  }
-};
-(window as any).bootGame = bootGame;
-
-if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', bootGame);
-} else {
-  bootGame();
 }
