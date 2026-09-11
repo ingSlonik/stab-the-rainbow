@@ -1,6 +1,6 @@
-import { sin, randRange } from './math';
+import { sin, randRange, PI2 } from './math';
 
-const THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
+const THREE = (window as any).THREE; // || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
 
 interface HillData {
   mesh: any;
@@ -23,7 +23,7 @@ export class SceneryManager {
 
   private initSun(): void {
     // 1. Radiant central solar sphere
-    const sunGeom = new THREE.SphereGeometry(9, 14, 22);
+    const sunGeom = new THREE.SphereGeometry(9, 12, 22);
     const sunMat = new THREE.MeshBasicMaterial({
       color: 0xfffae0,
       fog: false,
@@ -38,10 +38,10 @@ export class SceneryManager {
     cvs.width = cvs.height = 32;
     const ctx = cvs.getContext('2d')!;
     const grad = ctx.createRadialGradient(16, 16, 2, 16, 16, 16);
-    grad.addColorStop(0, 'rgba(255,245,190,.95)');
-    grad.addColorStop(0.3, 'rgba(255,175,50,.6)');
-    grad.addColorStop(0.7, 'rgba(255,80,20,.18)');
-    grad.addColorStop(1, 'rgba(255,40,0,0)');
+    grad.addColorStop(0, '#fff5bef2');
+    grad.addColorStop(0.3, '#ffaf3299');
+    grad.addColorStop(0.7, '#ff50142e');
+    grad.addColorStop(1, '#ff280000');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 32, 32);
 
@@ -95,7 +95,7 @@ export class SceneryManager {
         const mesh = new THREE.Mesh(hillGeom, mats[mat]);
         mesh.position.set(x, deepBaseY, z);
         mesh.scale.set(totalR, totalH, totalR * 1.25);
-        mesh.rotation.y = randRange(0, Math.PI * 2);
+        mesh.rotation.y = randRange(0, PI2);
 
         this.group.add(mesh);
         this.hills.push({ mesh, speedFactor: speed });
@@ -125,7 +125,7 @@ export class SceneryManager {
       // Wrap when passing behind the camera
       if (h.mesh.position.z > 25) {
         h.mesh.position.z -= 165;
-        h.mesh.rotation.y = randRange(0, Math.PI * 2);
+        h.mesh.rotation.y = randRange(0, PI2);
       }
     }
   }

@@ -1,12 +1,13 @@
+import { sin, max, min, floor, PI2, HALF_PI } from './math';
+
 import {
   LANE_COUNT,
   LANE_WIDTH,
   TRACK_WIDTH,
   RAINBOW_COLORS,
 } from './types';
-import { sin, cos, max, min, floor, random } from './math';
 
-const THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
+const THREE = (window as any).THREE; // || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
 
 export class TrackManager {
   public group: any;
@@ -40,18 +41,18 @@ export class TrackManager {
 
     // Soft horizontal starlight gradient that seamlessly blends at the seams
     const grad = ctx.createLinearGradient(0, 0, 64, 0);
-    grad.addColorStop(0, 'rgba(255, 255, 255, 0.82)');
-    grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.98)');
-    grad.addColorStop(1, 'rgba(255, 255, 255, 0.82)');
+    grad.addColorStop(0, '#ffffffd1');
+    grad.addColorStop(0.5, '#fffffff9');
+    grad.addColorStop(1, '#ffffffd1');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 64, 128);
 
     // Subtle magical flow lines and glittering cosmic flecks
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.fillStyle = '#ffffff59';
     for (let y = 0; y < 128; y += 24) {
       ctx.fillRect(4, y, 56, 3);
       ctx.beginPath();
-      ctx.arc(32, y + 12, 2.5, 0, Math.PI * 2);
+      ctx.arc(32, y + 12, 2.5, 0, PI2);
       ctx.fill();
     }
 
@@ -66,7 +67,7 @@ export class TrackManager {
     const segmentsY = 60;
     // Seamless contiguous rainbow band with slight overlap to prevent any gaps
     const geom = new THREE.PlaneGeometry(LANE_WIDTH * 1.01, trackLength, 1, segmentsY);
-    geom.rotateX(-Math.PI / 2);
+    geom.rotateX(-HALF_PI);
 
     // Gentle forward downward slope and curve
     const pos = geom.attributes.position;
@@ -80,9 +81,6 @@ export class TrackManager {
       const y = -sin((-actualZ) * 0.02) * 1.5;
       pos.setY(i, y);
     }
-    geom.computeVertexNormals();
-    geom.computeBoundingBox();
-    geom.computeBoundingSphere();
 
     for (let i = 0; i < LANE_COUNT; i++) {
       const col = RAINBOW_COLORS[i];
