@@ -1,3 +1,8 @@
+// 13KB bundle optimization: quips.ts is preserved for documentation/reference.
+// Random in-run speech/dialogue quips were disabled to save ~1KB bundle size.
+// The single best death quote is retained directly for Game Over.
+
+/*
 import { randChoice } from './math';
 
 export const UNICORN_START_QUIPS = [
@@ -28,6 +33,7 @@ export const UNICORN_DEATH_QUIPS = [
   'Gravity was faster this time.',
   'Watch your step!',
 ];
+
 
 // Commented out for 13KB bundle size optimization:
 // let lastSpokenTime = 0;
@@ -67,3 +73,4 @@ export function getRandomComboQuip(): string {
 export function getRandomDeathQuip(): string {
   return randChoice(UNICORN_DEATH_QUIPS);
 }
+*/

@@ -26,6 +26,8 @@ export const RAINBOW_COLORS = [
   0xb82bfb, // Violet
 ];
 
+// 13KB bundle optimization: Unused color string constants commented out (saved for reference)
+/*
 export const RAINBOW_HEX_STRINGS = [
   '#ff2a4b',
   '#ff7b00',
@@ -36,7 +38,6 @@ export const RAINBOW_HEX_STRINGS = [
   '#b82bfb',
 ];
 
-
 export const COLOR_NAMES_EN = [
   'Red',
   'Orange',
@@ -46,6 +47,7 @@ export const COLOR_NAMES_EN = [
   'Blue',
   'Violet',
 ];
+*/
 
 export interface CloudData {
   mesh: any;
