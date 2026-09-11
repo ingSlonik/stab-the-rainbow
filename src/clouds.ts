@@ -1,3 +1,6 @@
+import { sin, cos, max, floor, random, randRange, PI2 } from './math';
+import { playCloudEcho } from './audio';
+
 import {
   LANE_COUNT,
   LANE_WIDTH,
@@ -5,10 +8,9 @@ import {
   CloudData,
   Particle,
 } from './types';
-import { sin, cos, max, min, floor, random, randRange } from './math';
-import { playCloudEcho } from './audio';
 
-const THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
+const THREE = (window as any).THREE; // || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
+const MAX_BURST = 1200;
 
 export class CloudManager {
   public group: any;
@@ -55,29 +57,27 @@ export class CloudManager {
     });
 
     const spheres = [
-      { r: 0.25, x: 0, y: 0, z: 0 },
-      { r: 0.19, x: -0.18, y: -0.02, z: 0.04 },
-      { r: 0.20, x: 0.18, y: -0.02, z: -0.04 },
-      { r: 0.16, x: 0.06, y: 0.14, z: 0.02 },
-      { r: 0.14, x: -0.10, y: 0.11, z: -0.03 },
+      0.25, 0, 0, 0,
+      0.19, -0.18, -0.02, 0.04,
+      0.20, 0.18, -0.02, -0.04,
+      0.16, 0.06, 0.14, 0.02,
+      0.14, -0.10, 0.11, -0.03,
     ];
 
     const baseSphereGeom = new THREE.SphereGeometry(1, 8, 7);
 
-    spheres.forEach((s) => {
+    for (let i = 0; i < spheres.length; i += 4) {
+      const r = spheres[i];
       const m = new THREE.Mesh(baseSphereGeom, mat);
-      m.scale.set(s.r, s.r * 0.85, s.r);
-      m.position.set(s.x, s.y, s.z);
+      m.scale.set(r, r * 0.85, r);
+      m.position.set(spheres[i + 1], spheres[i + 2], spheres[i + 3]);
       cloudRoot.add(m);
-    });
+    }
 
     return cloudRoot;
   }
 
-  private static readonly MAX_BURST = 1200;
-
   private initParticles(): void {
-    const MAX_BURST = CloudManager.MAX_BURST;
     this.burstPosArr = new Float32Array(MAX_BURST * 3);
     this.burstColArr = new Float32Array(MAX_BURST * 3);
 
@@ -96,10 +96,10 @@ export class CloudManager {
     cvs.height = 32;
     const ctx = cvs.getContext('2d')!;
     const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
-    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    grad.addColorStop(0.25, 'rgba(255, 255, 255, 0.9)');
-    grad.addColorStop(0.65, 'rgba(255, 255, 255, 0.35)');
-    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.25, '#ffffffe6');
+    grad.addColorStop(0.65, '#ffffff59');
+    grad.addColorStop(1, '#ffffff00');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 32, 32);
     const sparkTex = new THREE.CanvasTexture(cvs);
@@ -121,17 +121,12 @@ export class CloudManager {
   }
 
   private initSkyMotes(): void {
-    const moteCount = 36;
-    const dashGeom = new THREE.BoxGeometry(0.08, 0.08, 0.48);
-    const dotGeom = new THREE.BoxGeometry(0.13, 0.13, 0.13);
-    const colors = [0xd8f2ff, 0xffe899, 0xffc4f2, 0xafe8ff, 0xf0e6ff];
+    const geom = new THREE.BoxGeometry(0.08, 0.08, 0.48);
+    const colors = [0xd8f2ff, 0xffe899, 0xafe8ff];
 
-    for (let i = 0; i < moteCount; i++) {
-      const isDash = i % 2 === 0;
-      const geom = isDash ? dashGeom : dotGeom;
-      const col = colors[i % colors.length];
+    for (let i = 0; i < 30; i++) {
       const mat = new THREE.MeshBasicMaterial({
-        color: col,
+        color: colors[i % 3],
         transparent: true,
         opacity: 0.2,
         blending: THREE.AdditiveBlending,
@@ -147,7 +142,7 @@ export class CloudManager {
         mesh,
         mat,
         freq: randRange(1.8, 3.8),
-        phase: random() * Math.PI * 2,
+        phase: random() * PI2,
         baseY,
       });
     }
@@ -157,8 +152,8 @@ export class CloudManager {
     const count = 200;
     for (let i = 0; i < count; i++) {
       const speed = randRange(3.5, 12.5);
-      const theta = random() * Math.PI * 2;
-      const phi = randRange(-Math.PI / 2.5, Math.PI / 2.5);
+      const theta = random() * PI2;
+      const phi = randRange(-1.25, 1.25);
 
       // 35% sparkling white/gold stars, 65% vivid rainbow color
       const isSpark = random() < 0.35;
@@ -216,8 +211,8 @@ export class CloudManager {
       baseY,
       freqX: randRange(1.2, 2.4),
       freqY: randRange(1.5, 3.0),
-      phaseX: random() * Math.PI * 2,
-      phaseY: random() * Math.PI * 2,
+      phaseX: random() * PI2,
+      phaseY: random() * PI2,
       radius: 0.36,
       stabbed: false,
       popping: false,
@@ -257,6 +252,7 @@ export class CloudManager {
     for (let i = this.clouds.length - 1; i >= 0; i--) {
       const c = this.clouds[i];
 
+      /* 13KB optimization
       if (c.popping) {
         c.popTimer -= dt;
         if (c.popTimer <= 0) {
@@ -287,6 +283,7 @@ export class CloudManager {
         c.mesh.position.set(c.x, c.y, c.z);
         continue;
       }
+      */
 
       // Move toward player
       c.z += speed * dt;
@@ -330,7 +327,7 @@ export class CloudManager {
     // 3. Update Burst Particles
     const posAttr = this.burstGeom.attributes.position;
     const colAttr = this.burstGeom.attributes.color;
-    const maxB = CloudManager.MAX_BURST;
+    const maxB = MAX_BURST;
     let pIdx = 0;
 
     for (let i = this.burstParticles.length - 1; i >= 0; i--) {
@@ -380,15 +377,13 @@ export class CloudManager {
       if (m.mesh.position.z > 15) {
         m.mesh.position.z = randRange(-95, -80);
         m.mesh.position.x = randRange(-16, 16);
-        m.baseY = randRange(5.5, 11.5);
-        m.mesh.position.y = m.baseY;
-        m.phase = random() * Math.PI * 2;
+        m.mesh.position.y = m.baseY = randRange(5.5, 11.5);
+        m.phase = random() * PI2;
       }
 
       // Gentle starlight pulse & twinkle: shine then fade
-      const s = sin(time * m.freq + m.phase);
-      const glow = max(0, s);
-      m.mat.opacity = 0.05 + 0.82 * (glow * glow);
+      const s = max(0, sin(time * m.freq + m.phase));
+      m.mat.opacity = 0.05 + 0.8 * s * s;
     }
   }
 }
