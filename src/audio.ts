@@ -1,7 +1,7 @@
 // =============================================================
 // Stab the Rainbow - High-Energy Procedural Audio Engine
 // Driving gallop beat, rolling synth bass, catchy lead theme,
-// and shimmering cloud reverberations ("dozvuky").
+// and shimmering cloud reverberations ("echo").
 // =============================================================
 
 import { GameState } from './types';
@@ -58,6 +58,10 @@ const createPan = (panVal: number, t: number, dest?: AudioNode): StereoPannerNod
   p.pan.setValueAtTime(panVal, t);
   if (dest) p.connect(dest);
   return p;
+};
+const startStop = (n: AudioScheduledSourceNode, t: number, d: number) => {
+  n.start(t);
+  n.stop(t + d);
 };
 
 // 7 Rainbow Chords & Scales (C Lydian/Major: Red, Orange, Yellow, Green, Cyan, Blue, Violet)
@@ -233,16 +237,12 @@ function playHoof(time: number, isLeft: boolean, intensity: number): void {
     const noiseFilter = createFilter('bandpass', isLeft ? 2400 : 3100, time, 2.2, noiseGain);
     noise.connect(noiseFilter);
 
-    noise.start(time);
-    noise.stop(time + 0.024);
+    startStop(noise, time, 0.024);
   }
 
-  knockOsc.start(time);
-  knockOsc.stop(time + 0.05);
-  clickOsc.start(time);
-  clickOsc.stop(time + 0.025);
-  thudOsc.start(time);
-  thudOsc.stop(time + 0.05);
+  startStop(knockOsc, time, 0.05);
+  startStop(clickOsc, time, 0.025);
+  startStop(thudOsc, time, 0.05);
 }
 
 // 2. Punchy Sub Kick (Underpinning heavy lead hoof)
@@ -254,8 +254,7 @@ function playKick(time: number, intensity: number): void {
   const osc = createOsc('sine', 140, time, g);
   rampExp(osc.frequency, 42, time + 0.09);
 
-  osc.start(time);
-  osc.stop(time + 0.12);
+  startStop(osc, time, 0.12);
 }
 
 // 3. Crisp Snare / Clap on Backbeats (2 & 4)
@@ -270,8 +269,7 @@ function playSnare(time: number, intensity: number): void {
   const filter = createFilter('highpass', 1200, time, undefined, g);
   noise.connect(filter);
 
-  noise.start(time);
-  noise.stop(time + 0.09);
+  startStop(noise, time, 0.09);
 }
 
 // 4. Rolling Synth Bassline (tightly locked with the gallop)
@@ -287,8 +285,7 @@ function playBassNote(time: number, semi: number, dur: number, intensity: number
 
   const osc = createOsc('sawtooth', semitoneFreq(semi), time, filter);
 
-  osc.start(time);
-  osc.stop(time + dur + 0.02);
+  startStop(osc, time, dur + 0.02);
 }
 
 // 5. Sparkling Prismatic Arpeggio (16th notes dancing across rainbow chords)
@@ -299,8 +296,7 @@ function playArpNote(time: number, semi: number, intensity: number): void {
   rampExp(g.gain, 0.0001, time + 0.085);
   const osc = createOsc('triangle', semitoneFreq(semi), time, g);
 
-  osc.start(time);
-  osc.stop(time + 0.09);
+  startStop(osc, time, 0.09);
 }
 
 // 6. Catchy, Heroic Lead Theme
@@ -323,10 +319,8 @@ function playLeadNote(time: number, semi: number, dur: number, intensity: number
     g.connect(echoSend);
   }
 
-  osc1.start(time);
-  osc2.start(time);
-  osc1.stop(time + dur + 0.02);
-  osc2.stop(time + dur + 0.02);
+  startStop(osc1, time, dur + 0.02);
+  startStop(osc2, time, dur + 0.02);
 }
 
 // -------------------------------------------------------------
@@ -345,60 +339,29 @@ function playLeadNote(time: number, semi: number, dur: number, intensity: number
 const BAR_ROOTS = [-12, -17, -15, -19, -12, -17, -19, -17];
 
 // Arpeggio patterns for the 8 bars (semi relative to C4):
+const cArp = [0, 4, 7, 12, 16, 12, 7, 4];
+const gArp = [-1, 2, 7, 11, 14, 11, 7, 2];
+const fArp = [-5, -1, 4, 7, 11, 7, 4, -1];
 const ARP_CHORDS = [
-  [0, 4, 7, 12, 16, 12, 7, 4],   // C Maj
-  [-1, 2, 7, 11, 14, 11, 7, 2],  // G Maj
-  [-3, 0, 4, 9, 12, 9, 4, 0],    // A min
-  [-5, -1, 4, 7, 11, 7, 4, -1],  // F Maj
-  [0, 4, 7, 12, 16, 12, 7, 4],   // C Maj
-  [-1, 2, 7, 11, 14, 11, 7, 2],  // G Maj
-  [-5, -1, 4, 7, 11, 7, 4, -1],  // F Maj
-  [-1, 2, 5, 7, 11, 14, 11, 7],  // G Sus
+  cArp,
+  gArp,
+  [-3, 0, 4, 9, 12, 9, 4, 0],
+  fArp,
+  cArp,
+  gArp,
+  fArp,
+  [-1, 2, 5, 7, 11, 14, 11, 7],
 ];
 
 // Lead Melody: [stepIndex, semitone, durationInSteps]
-const LEAD_THEME: [number, number, number][] = [
-  // Phrase 1 (Bars 0-1): Triumphant rise
-  [0, 7, 4],    // G4
-  [4, 4, 4],    // E4
-  [8, 7, 2],    // G4
-  [10, 9, 2],   // A4
-  [12, 12, 4],  // C5
-  [16, 11, 6],  // B4
-  [22, 7, 2],   // G4
-  [24, 14, 6],  // D5
-
-  // Phrase 2 (Bars 2-3): Energetic roll
-  [32, 12, 4],  // C5
-  [36, 9, 4],   // A4
-  [40, 4, 2],   // E4
-  [42, 7, 2],   // G4
-  [44, 9, 4],   // A4
-  [48, 17, 4],  // F5
-  [52, 16, 4],  // E5
-  [56, 14, 4],  // D5
-  [60, 12, 4],  // C5
-
-  // Phrase 3 (Bars 4-5): Soaring rainbow climax
-  [64, 7, 4],   // G4
-  [68, 12, 4],  // C5
-  [72, 14, 2],  // D5
-  [74, 16, 2],  // E5
-  [76, 19, 4],  // G5
-  [80, 17, 4],  // F5
-  [84, 16, 2],  // E5
-  [86, 14, 2],  // D5
-  [88, 12, 6],  // C5
-
-  // Phrase 4 (Bars 6-7): Uplifting turnaround hook
-  [96, 9, 4],    // A4
-  [100, 12, 4],  // C5
-  [104, 14, 4],  // D5
-  [108, 16, 4],  // E5
-  [112, 14, 6],  // D5
-  [118, 11, 2],  // B4
-  [120, 12, 6],  // C5
+const LEAD_THEME = [
+  0, 7, 4, 4, 4, 4, 8, 7, 2, 10, 9, 2, 12, 12, 4, 16, 11, 6, 22, 7, 2, 24, 14, 6,
+  32, 12, 4, 36, 9, 4, 40, 4, 2, 42, 7, 2, 44, 9, 4, 48, 17, 4, 52, 16, 4, 56, 14, 4, 60, 12, 4,
+  64, 7, 4, 68, 12, 4, 72, 14, 2, 74, 16, 2, 76, 19, 4, 80, 17, 4, 84, 16, 2, 86, 14, 2, 88, 12, 6,
+  96, 9, 4, 100, 12, 4, 104, 14, 4, 108, 16, 4, 112, 14, 6, 118, 11, 2, 120, 12, 6,
 ];
+
+const HOOF_STEPS = [0, 2, 3, 4, 6, 7, 8, 10, 11, 12, 14, 15];
 
 let sequencerInterval: any = null;
 let curStep = 0;
@@ -441,7 +404,6 @@ function scheduleStep(step: number, time: number): void {
   // A. Hoofbeats & Gallop Beat
   // Classic 16th gallop pattern: [1, 0, 1, 1,  1, 0, 1, 1, ...]
   // -----------------------------------------------------------
-  const HOOF_STEPS = [0, 2, 3, 4, 6, 7, 8, 10, 11, 12, 14, 15];
   const hoofHitIdx = HOOF_STEPS.indexOf(stepInBar);
 
   if ((isPlaying || isMenu) && hoofHitIdx !== -1) {
@@ -468,14 +430,11 @@ function scheduleStep(step: number, time: number): void {
   // -----------------------------------------------------------
   // B. Rolling Synth Bassline (locked into the gallop groove)
   // -----------------------------------------------------------
-  if (isPlaying || isMenu) {
-    const isBassStep = [0, 2, 3, 4, 6, 7, 8, 10, 11, 12, 14, 15].includes(stepInBar);
-    if (isBassStep) {
-      const isOctaveUp = stepInBar === 3 || stepInBar === 7 || stepInBar === 11 || stepInBar === 15;
-      const bassSemi = root + (isOctaveUp ? 12 : 0);
-      const intensity = isPlaying ? (stepInBar === 0 || stepInBar === 8 ? 1.0 : 0.75) : 0.4;
-      playBassNote(time, bassSemi, 0.09, intensity);
-    }
+  if ((isPlaying || isMenu) && hoofHitIdx !== -1) {
+    const isOctaveUp = stepInBar % 4 === 3;
+    const bassSemi = root + (isOctaveUp ? 12 : 0);
+    const intensity = isPlaying ? (stepInBar === 0 || stepInBar === 8 ? 1.0 : 0.75) : 0.4;
+    playBassNote(time, bassSemi, 0.09, intensity);
   }
 
   // -----------------------------------------------------------
@@ -489,17 +448,17 @@ function scheduleStep(step: number, time: number): void {
   // D. Catchy Lead Melody
   // -----------------------------------------------------------
   if (isPlaying) {
-    const leadEntry = LEAD_THEME.find(([s]) => s === step);
-    if (leadEntry) {
-      const [, semi, durSteps] = leadEntry;
-      const durSec = durSteps * (60 / (134 * 4)) * 0.92;
-      playLeadNote(time, semi, durSec, 1.0);
+    for (let i = 0; i < LEAD_THEME.length; i += 3) {
+      if (LEAD_THEME[i] === step) {
+        playLeadNote(time, LEAD_THEME[i + 1], LEAD_THEME[i + 2] * (60 / (134 * 4)) * 0.92, 1.0);
+        break;
+      }
     }
   }
 }
 
 // -------------------------------------------------------------
-// Cloud Sounds: Pure Spatial Reverberations ("Dozvuky")
+// Cloud Sounds: Pure Spatial Reverberations ("echo")
 // -------------------------------------------------------------
 
 /**
@@ -522,8 +481,7 @@ export function playCloudEcho(colorIdx: number, panX: number, intensity = 0.22):
 
   const osc = createOsc('sine', semitoneFreq(semi), t, g);
 
-  osc.start(t);
-  osc.stop(t + 0.5);
+  startStop(osc, t, 0.5);
 }
 
 
@@ -547,8 +505,7 @@ export function playStabSound(colorIdx: number): void {
   const click = createOsc('sawtooth', 1400, t, clickGain);
   rampExp(click.frequency, 200, t + 0.05);
 
-  click.start(t);
-  click.stop(t + 0.07);
+  startStop(click, t, 0.07);
 
   // 2. Multi-octave rainbow shimmer feeding directly into the echo bus!
   chord.forEach((s, idx) => {
@@ -558,8 +515,7 @@ export function playStabSound(colorIdx: number): void {
     if (echoBus) g.connect(echoBus); // Blossoms into the spatial echo tail!
     const osc = createOsc(idx % 2 === 0 ? 'triangle' : 'sine', semitoneFreq(s + 24), noteTime, g);
 
-    osc.start(noteTime);
-    osc.stop(noteTime + 0.6);
+    startStop(osc, noteTime, 0.6);
   });
 }
 
@@ -575,8 +531,7 @@ export function playJumpSound(): void {
   const osc = createOsc('triangle', 240, t, g);
   rampExp(osc.frequency, 680, t + 0.16);
 
-  osc.start(t);
-  osc.stop(t + 0.22);
+  startStop(osc, t, 0.22);
 }
 
 /**
@@ -595,6 +550,5 @@ export function playFallSound(): void {
   const osc = createOsc('sawtooth', 320, t, filter);
   rampExp(osc.frequency, 45, t + 0.85);
 
-  osc.start(t);
-  osc.stop(t + 0.95);
+  startStop(osc, t, 0.95);
 }
