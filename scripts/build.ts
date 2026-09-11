@@ -13,16 +13,18 @@ const JS13K_LIMIT_BYTES = 13312;
 
 function getInternalPropertiesToMangle(): RegExp {
   const reserved = new Set([
-    'camera', 'scene', 'renderer', 'root', 'x', 'y', 'z', 'vx', 'vy', 'vz',
-    'speed', 'score', 'combo', 'state', 'width', 'height', 'action', 'id', 'w', 'h',
-    'color', 'type', 'time', 'dt', 'name', 'life', 'active', 'length', 'target',
+    'camera', 'scene', 'renderer', 'x', 'y', 'z', 'vx', 'vy', 'vz',
+    'state', 'width', 'height', 'action', 'id', 'w', 'h',
+    'color', 'type', 'time', 'dt', 'name', 'length', 'target',
     'constructor', 'setup', 'loop', 'update', 'reset', 'init', 'tick', 'push', 'pop',
     'map', 'filter', 'slice', 'find', 'indexOf', 'includes', 'forEach', 'sort',
     'position', 'rotation', 'quaternion', 'scale', 'matrixWorld', 'visible',
     'renderOrder', 'geometry', 'material', 'opacity', 'transparent', 'depthWrite',
     'depthTest', 'side', 'object3D', 'el', 'xrSession', 'inputSources', 'gamepad',
     'buttons', 'axes', 'pressed', 'value', 'handedness',
-    'async', 'static', 'roundRect'
+    'async', 'static', 'roundRect',
+    'parent', 'children', 'canvas', 'context', 'attributes', 'index', 'count',
+    'needsUpdate', 'matrix', 'now', 'random', 'floor', 'min', 'max', 'sin', 'cos'
   ]);
 
   const safeInternal = new Set<string>();
@@ -38,6 +40,39 @@ function getInternalPropertiesToMangle(): RegExp {
         safeInternal.add(name);
       }
     }
+  }
+
+  // 13KB bundle optimization: Internal object & interface properties safe to mangle
+  const extraInternalProps = [
+    'colorIdx', 'baseY', 'freqX', 'freqY', 'phaseX', 'phaseY', 'radius',
+    'stabbed', 'popping', 'popTimer', 'popDuration', 'missTriggered', 'echoed',
+    'maxLife', 'speedFactor', 'cardMesh', 'gaugeMesh', 'colorLabelMesh',
+    'percentDigitMeshes', 'emptyMesh', 'statusTextMesh', 'statusPillMesh',
+    'borderMesh', 'colGroup', 'burstParticles', 'burstPoints', 'burstGeom',
+    'burstPosArr', 'burstColArr', 'skyMotes', 'floatingPopups', 'charMaterials',
+    'labelMaterials', 'statusMaterials', 'scoreDigitMeshes', 'bestDigitMeshes',
+    'comboLabelMesh', 'bestLabelMesh', 'modeLabelMesh', 'heartbeatMesh',
+    'laneColumns', 'highScores', 'lastQuote', 'currentQuip', 'quipTimer',
+    'dialogCanvas', 'dialogCtx', 'dialogDirty', 'lastDialogState',
+    'lastDialogAudioMuted', 'lastDialogSfxMuted', 'lastDialogScore',
+    'lastDialogIsVR', 'lastDialogVRMode', 'tempLocalVec', 'mouseVec',
+    'hoveredButtonId', 'pointerX', 'pointerY', 'keysDown', 'prevHeadZ',
+    'prevHeadY', 'prevHeadPitch', 'isCalibrated', 'calibratedHeadX',
+    'calibratedHeadY', 'pointerBeam', 'gallopTimer', 'tempV1', 'tempV2',
+    'hornTipWorldPos', 'groundMarkerMat', 'laneMeshes', 'laneMaterials',
+    'laneRespawnTimer',
+    'mesh', 'group', 'speed', 'score', 'combo', 'root', 'life', 'active', 'targetX',
+    'track', 'clouds', 'scenery', 'player', 'ui', 'hills',
+    'reticle3DMesh', 'dialogTexture', 'dialogMesh', 'sunMesh', 'coronaMesh',
+    'scoreFloat', 'runTime', 'fallTimer', 'cloudsStabbed', 'clock', 'hasWebXR',
+    'thumbstickDebounce', 'menuButtonDebounce', 'triggerPressedMap', 'isReady',
+    'pointerNdcX', 'pointerNdcY', 'isImmersiveVR', 'currentVRMode',
+    'currentLane', 'isGrounded', 'isFalling', 'isFallen', 'isStabbing', 'stabTimer',
+    'hornMat', 'vrMode', 'vrController', 'groundMarker', 'horn', 'hornTip',
+    'laneHealth', 'laneFlash', 'trackTexture'
+  ];
+  for (const p of extraInternalProps) {
+    if (!reserved.has(p)) safeInternal.add(p);
   }
 
   return new RegExp('^(' + Array.from(safeInternal).join('|') + ')$');
@@ -73,11 +108,11 @@ async function build() {
   const stage1Html = indexHtmlRaw
     .replace(
       /<link\b[^>]*\brel=["']stylesheet["'][^>]*\/?>|<link\b[^>]*\bhref=["'][^"']*style\.css["'][^>]*\/?>/i,
-      `<style>${rawCss}</style>`
+      () => `<style>${rawCss}</style>`
     )
     .replace(
       /<script\b[^>]*\bsrc=["'][^"']*game\.ts["'][^>]*>\s*<\/script>/i,
-      `<script>${unminifiedJs}</script>`
+      () => `<script>${unminifiedJs}</script>`
     );
   fs.writeFileSync(path.join(distDir, 'index_1_bundle.html'), stage1Html, 'utf8');
   console.log(`   Stage 1: dist/index_1_bundle.html (unminified bundle, pre-minification, ${(stage1Html.length / 1024).toFixed(2)} KB)`);
@@ -131,6 +166,7 @@ async function build() {
       toplevel: true,
       properties: {
         regex: getInternalPropertiesToMangle(),
+        builtins: true,
       },
     },
     format: {
@@ -157,11 +193,11 @@ async function build() {
   const fullHtmlRaw = indexHtmlRaw
     .replace(
       /<link\b[^>]*\brel=["']stylesheet["'][^>]*\/?>|<link\b[^>]*\bhref=["'][^"']*style\.css["'][^>]*\/?>/i,
-      `<style>${minifiedCss}</style>`
+      () => `<style>${minifiedCss}</style>`
     )
     .replace(
       /<script\b[^>]*\bsrc=["'][^"']*game\.ts["'][^>]*>\s*<\/script>/i,
-      `<script>${minifiedJs}</script>`
+      () => `<script>${minifiedJs}</script>`
     );
 
   fs.writeFileSync(path.join(distDir, 'index_2_terser.html'), fullHtmlRaw, 'utf8');
@@ -193,7 +229,7 @@ async function build() {
     ],
     {
       allowFreeVars: true,
-      dynamicModels: 1,
+      dynamicModels: 5,
     }
   );
 
