@@ -15,33 +15,22 @@ body {
   cursor: crosshair;
 }
 
-canvas {
-  width: 100vw;
-  height: 100vh;
-  display: block;
-}
-
-/* Unified Flexbox */
 .f {
   display: flex;
-}
-
-.jcc {
-  justify-content: center;
 }
 
 .dc {
   flex-direction: column;
 }
 
-/* Modal overlay and card container */
 #m {
   position: fixed;
   inset: 0;
   z-index: 9;
   align-items: center;
-  background: #07041266;
+  background: #07041288;
   backdrop-filter: blur(8px);
+  justify-content: center;
 }
 
 .c {
@@ -49,7 +38,7 @@ canvas {
   border: 2px solid #fff3;
   border-radius: 20px;
   padding: 20px 24px;
-  width: 500px;
+  width: 480px;
   text-align: center;
   color: #fff;
 }
@@ -63,76 +52,62 @@ h1 {
   margin-bottom: 8px;
 }
 
-.s {
-  font-size: 13px;
-}
-
-/* Unified 16px bottom margin */
 .mb,
 #w {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
-/* Unified notice and warning boxes */
-.u,
 #w {
-  padding: 12px 16px;
+  padding: 10px 14px;
   border: 1.5px solid;
-  border-radius: 14px;
+  border-radius: 12px;
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .u {
-  background: linear-gradient(135deg, #fd02, #b82bfb26);
-  border-color: #fd06;
   color: #f7efff;
+  font-size: 13px;
+  /*
+  background: #23123d;
+  border-color: #fd05;
   text-align: left;
+  */
 }
 
 .u strong {
   color: #ffdd00;
   display: block;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 #w {
   display: none;
-  background: #ff2a4b29;
+  background: #350817;
   border-color: #ff2a4b;
   color: #ffc2cc;
-  text-align: center;
 }
 
-#w strong {
-  color: #fff;
-  font-size: 14px;
-}
-
-/* Unified base button rules */
 button {
   cursor: pointer;
   font-family: inherit;
   color: #fff;
-  border: 1px solid transparent;
 }
 
 .ch {
   gap: 10px;
 }
 
-/* Choice buttons (.b = choice-btn) */
 .b {
   gap: 3px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  border-width: 2px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 2px solid;
   text-align: left;
 }
 
 .b strong {
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 14px;
 }
 
 .b small {
@@ -144,7 +119,6 @@ button {
   filter: brightness(1.25);
 }
 
-/* Button color themes */
 .vb {
   border-color: #00d4ff;
   background: #00d4ff24;
@@ -155,13 +129,8 @@ button {
   background: #10e05224;
 }
 
-/* Disabled VR button state (.d = disabled) */
-.vb:disabled,
-.vb.d {
+.vb:disabled {
   opacity: 0.45;
-  cursor: not-allowed;
-  border-color: #678;
-  background: #323c4b40;
   filter: grayscale(0.8);
   pointer-events: none;
 }
