@@ -1,8 +1,9 @@
-import { LANE_COUNT, LANE_WIDTH, TRACK_WIDTH, GameMode, RAINBOW_COLORS } from './types';
-import { sin, cos, max, min, clamp, lerp } from './math';
+import { sin, max, min, clamp, lerp, HALF_PI } from './math';
 import { playJumpSound } from './audio';
 
-const THREE = (window as any).THREE || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
+import { LANE_COUNT, LANE_WIDTH, TRACK_WIDTH, GameMode, RAINBOW_COLORS } from './types';
+
+const THREE = (window as any).THREE; // || (typeof AFRAME !== 'undefined' ? AFRAME.THREE : null);
 
 export class Player {
   public root: any;
@@ -77,35 +78,32 @@ export class Player {
     this.groundMarker = new THREE.Group();
     this.groundMarker.rotation.x = -0.03;
 
-    const makeMat = (color: number, opacity: number) =>
-      new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity,
-        side: THREE.DoubleSide,
-        depthTest: true,
-        depthWrite: false,
-      });
+    const getMat = (color: number) => new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.95,
+      side: THREE.DoubleSide,
+      depthTest: true,
+      depthWrite: false,
+    })
 
-    const addMesh = (geom: any, mat: any, order = 60) => {
-      geom.rotateX(-Math.PI / 2);
+    this.groundMarkerMat = getMat(0x10e052);
+    const whiteMat = getMat(0xffffff);
+
+    const addMesh = (geom: any, mat: any) => {
+      geom.rotateX(-HALF_PI);
       const mesh = new THREE.Mesh(geom, mat);
-      mesh.renderOrder = order;
+      mesh.renderOrder = 60;
       this.groundMarker.add(mesh);
-      return mesh;
     };
 
     // 1. Outer glowing starlight ring (renderOrder 60)
-    this.groundMarkerMat = makeMat(0x10e052, 0.95);
-    addMesh(new THREE.RingGeometry(0.20, 0.25, 32), this.groundMarkerMat);
+    addMesh(new THREE.RingGeometry(0.18, 0.24, 42), this.groundMarkerMat);
+    addMesh(new THREE.RingGeometry(0.08, 0.12, 42), whiteMat);
+    // 2. Central disc fill
+    addMesh(new THREE.CircleGeometry(0.06, 16), this.groundMarkerMat);
 
-    // 2. Inner concentric ring
-    addMesh(new THREE.RingGeometry(0.08, 0.12, 32), makeMat(0xffffff, 0.85));
-
-    // 3. Central disc fill
-    addMesh(new THREE.CircleGeometry(0.06, 24), this.groundMarkerMat);
-
-    // 4. Forward-pointing magical chevron / arrow indicating lane direction
+    /* 13KB bundle optimization: Inner concentric ring and line chevron commented out
     const arrowGeom = new THREE.BufferGeometry();
     const vertices = new Float32Array([
       -0.09, 0.002, -0.04,
@@ -124,6 +122,7 @@ export class Player {
     const arrowLine = new THREE.Line(arrowGeom, arrowMat);
     arrowLine.renderOrder = 61;
     this.groundMarker.add(arrowLine);
+    */
 
     // 5. Lateral boundary brackets (+/- LANE_WIDTH / 2) showing precise lane occupancy
     /*const bracketGeom = new THREE.BufferGeometry();
@@ -150,7 +149,7 @@ export class Player {
     // Elegant crystal unicorn horn (0.78m length, comfortable proportion)
     const coneLength = 0.78;
     const coneGeom = new THREE.ConeGeometry(0.032, coneLength, 20, 1);
-    coneGeom.rotateX(-Math.PI / 2);
+    coneGeom.rotateX(-HALF_PI);
     coneGeom.translate(0, 0, -coneLength / 2);
 
     this.hornMat = new THREE.MeshStandardMaterial({
@@ -182,8 +181,8 @@ export class Player {
     this.horn.add(this.hornTip);
 
     // Magical starlight pointer beam extending from horn tip for VR interaction (unit length 1.0)
-    const beamGeom = new THREE.CylinderGeometry(0.008, 0.016, 1.0, 8);
-    beamGeom.rotateX(-Math.PI / 2);
+    const beamGeom = new THREE.ConeGeometry(0.016, 1.0, 8);
+    beamGeom.rotateX(-HALF_PI);
     beamGeom.translate(0, 0, -0.5);
     const beamMat = new THREE.MeshBasicMaterial({
       color: 0x00ffff,
@@ -259,7 +258,7 @@ export class Player {
     if (hitPoint && this.hornTip) {
       this.hornTip.getWorldPosition(this.tempV1);
       const dist = this.tempV1.distanceTo(hitPoint);
-      this.pointerBeam.scale.set(1, 1, Math.max(0.1, dist));
+      this.pointerBeam.scale.set(1, 1, max(0.1, dist));
     } else {
       this.pointerBeam.scale.set(1, 1, 3.5);
     }
@@ -336,6 +335,8 @@ export class Player {
     return this.x;
   }
 
+  // 13KB optimization: Legacy methods shiftLane and moveLateral replaced by physical stepping & mouse steering
+  /*
   public shiftLane(direction: number): void {
     if (this.isFalling || this.isFallen) return;
     const closest = clamp(Math.round(this.targetX / LANE_WIDTH + 3), 0, LANE_COUNT - 1);
@@ -348,6 +349,7 @@ export class Player {
     const maxX = (TRACK_WIDTH / 2) - (LANE_WIDTH * 0.4);
     this.targetX = clamp(this.targetX + deltaX, -maxX, maxX);
   }
+  */
 
   public setTargetX(normX: number): void {
     if (this.isFalling || this.isFallen) return;
@@ -522,12 +524,12 @@ export class Player {
         const col = isLaneSolid ? RAINBOW_COLORS[this.currentLane] : 0xff2a4b;
         if (this.groundMarkerMat) {
           this.groundMarkerMat.color.setHex(col);
-          const jumpOpacity = this.isGrounded ? 0.88 : Math.max(0.40, 0.88 - this.y * 0.08);
+          const jumpOpacity = this.isGrounded ? 0.88 : max(0.40, 0.88 - this.y * 0.08);
           this.groundMarkerMat.opacity = jumpOpacity;
         }
 
         // Landing target scale mod on jump
-        const jumpScale = this.isGrounded ? 1.0 : (1.0 + Math.min(0.35, this.y * 0.08));
+        const jumpScale = this.isGrounded ? 1.0 : (1.0 + min(0.35, this.y * 0.08));
         this.groundMarker.scale.set(jumpScale, 1.0, jumpScale);
       }
     }
