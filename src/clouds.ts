@@ -307,7 +307,7 @@ export class CloudManager {
       // Spatial pass-by echo ("dozvuk") if cloud rushes past the player
       if (c.z > -4 && c.z < 2 && !c.echoed && !c.stabbed) {
         c.echoed = true;
-        playCloudEcho(c.colorIdx, c.x / 4, 0.22);
+        playCloudEcho(c.colorIdx, c.x / 4);
       }
 
       // Passed behind player without being stabbed: immediate damage trigger!

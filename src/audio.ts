@@ -465,23 +465,24 @@ function scheduleStep(step: number, time: number): void {
  * Cloud pass-by echo: gentle spatial resonant chime into the echo bus
  * Only triggers when passing very close, leaving a soft shimmering tail.
  */
-export function playCloudEcho(colorIdx: number, panX: number, intensity = 0.22): void {
-  if (!audioCtx || !echoBus || isMuted) return;
+export function playCloudEcho(colorIdx: number, panX: number): void {
+  if (!audioCtx || !sfxGain || sfxMuted) return;
 
   const t = audioCtx.currentTime;
   const chord = RAINBOW_CHORD_SEMIS[colorIdx] || RAINBOW_CHORD_SEMIS[0];
-  const semi = chord[2] + 12; // Shimmering harmonic chime
+  const semi = chord[2] + 12;
 
-  // Feeds directly into the stereo delay reverb tail!
-  const pan = createPan(max(-0.95, min(0.95, panX)), t, echoBus);
+  // Clear stereo separation in SFX bus + spatial echo tail
+  const pan = createPan(max(-0.95, min(0.95, panX)), t, sfxGain);
 
   const g = createGain(0.0001, t, pan);
-  rampLin(g.gain, 0.2 * intensity, t + 0.04);
-  rampExp(g.gain, 0.0001, t + 0.45);
+  rampLin(g.gain, 0.28, t + 0.03);
+  rampExp(g.gain, 0.0001, t + 0.35);
 
-  const osc = createOsc('sine', semitoneFreq(semi), t, g);
+  if (echoBus) g.connect(echoBus);
 
-  startStop(osc, t, 0.5);
+  const osc = createOsc('triangle', semitoneFreq(semi), t, g);
+  startStop(osc, t, 0.38);
 }
 
 
