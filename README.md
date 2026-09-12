@@ -38,8 +38,8 @@ The true soul of the game lies inside an **immersive WebXR VR headset** (Meta Qu
 This is the way the cosmos intended. In Hard Mode, the crystal horn is mounted **directly on your forehead**:
 
 - **Steer Across Lanes:** Take **real physical side-steps** or lean your body laterally across your room! Room-scale movement is tracked in real-time and amplified ($3\times$) so you can comfortably dance across the entire 2.8-meter rainbow.
-- **Stab Clouds:** **Furious Headbutts & Sharp Nods!** Thrust your head forward or nod sharply down to impale oncoming clouds. You can also simply ram your cranial horn directly into clouds at full gallop!
-- **Jump Over Gaps:** **Real Physical Leaps!** Vertically leap into the air in your living room ($\text{headVelY} > 0.70$) to jump over missing void lanes. (Controller **Grip** works as a couch-friendly backup).
+- **Stab Clouds:** **Furious Headbutts & Sharp Nods!** Thrust your head forward ($\text{headVelZ} < -0.70$) or nod sharply down to impale oncoming clouds. You can also simply ram your cranial horn directly into clouds at full gallop!
+- **Jump Over Gaps:** **Real Physical Leaps!** Vertically leap into the air in your living room ($\text{headVelY} > 1.20$) to jump over missing void lanes. (Controller **Grip** works as a couch-friendly backup).
 - **Restart Run:** A quick, confident nod of your head on the Game Over screen instantly starts a fresh gallop.
 - **Main Menu:** Press **A** or **B** (or **X** / **Y**) on either VR controller at any time to return home.
 
@@ -50,7 +50,7 @@ Prefer a slightly more civil fencing match with the cosmos?
 
 - **Aim the Horn:** The crystal horn is held directly in your **right hand controller**. Point the starlight beam and aim precisely like a celestial rapier.
 - **Stab Clouds:** Pull the **Right Controller Trigger** (or select button).
-- **Jump Over Gaps:** Squeeze any **VR Controller Grip**.
+- **Jump Over Gaps:** **Real Physical Leaps!** ($\text{headVelY} > 1.20$) or squeeze any **VR Controller Grip**.
 - **Steer Across Lanes:** Physical side-steps and body leaning still guide your path along the rainbow.
 - **Main Menu:** Press **A** or **B** on your controller.
 

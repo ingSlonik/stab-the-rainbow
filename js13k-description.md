@@ -27,7 +27,7 @@ To onlookers, you are a human in VR aggressively headbutting space clouds and le
 ### 🤺 VR EASY: *"Unicorn Rider"*
 *Horn in your right hand like a celestial rapier.*
 - 🎯 **Aim & Stab:** Point controller • Pull **Trigger** to stab.
-- 🦘 **Jump:** Squeeze controller **Grip**.
+- 🦘 **Jump:** Squeeze controller **Grip** or just physically jump.
 - ↔️ **Steer:** Physical side-steps across lanes.
 - 🏠 **Menu:** Press **A** or **B**.
 

@@ -435,39 +435,43 @@ export class Player {
 
     // 1. Body motion controls in VR (Physical side-steps steer across the rainbow in both Easy and Hard)
     if (isVR && (this.vrMode === GameMode.VR_HARD || this.vrMode === GameMode.VR_EASY) && this.camera) {
+      const m = this.camera.matrixWorld.elements;
+      const curHeadX = m[12];
+      const curHeadY = m[13] - this.y;
+      const curHeadZ = m[14];
+
       if (!this.isCalibrated) {
-        this.calibratedHeadX = this.camera.position.x;
-        this.calibratedHeadY = this.camera.position.y ?? 0;
-        this.prevHeadZ = this.camera.position.z;
-        this.prevHeadY = this.calibratedHeadY;
-        this.prevHeadPitch = this.camera.rotation.x;
+        this.calibratedHeadX = curHeadX;
+        this.calibratedHeadY = curHeadY;
+        this.prevHeadZ = curHeadZ;
+        this.prevHeadY = curHeadY;
+        this.prevHeadPitch = -m[9];
         this.isCalibrated = true;
       }
 
       // Lateral head position / physical side-steps steer across lanes (amplified for comfortable room scale)
-      const headLeanX = this.camera.position.x - this.calibratedHeadX;
+      const headLeanX = curHeadX - this.calibratedHeadX;
       const targetNormX = clamp(headLeanX * 3.0, -1.0, 1.0);
       this.setTargetX(targetNormX);
 
-      // Hard mode: Head forward thrust ("headbutt") or nod triggers STAB, physical vertical leap triggers JUMP
+      // Physical vertical leap triggers JUMP across both Easy and Hard VR modes
+      const headVelY = (curHeadY - this.prevHeadY) / max(0.001, dt);
+      this.prevHeadY = curHeadY;
+      if (headVelY > 1.20 && !this.isFalling && this.isGrounded) {
+        this.jump();
+      }
+
+      // Hard mode: Head forward thrust ("headbutt") or nod triggers STAB
       if (this.vrMode === GameMode.VR_HARD) {
-        const curHeadZ = this.camera.position.z;
         const headVelZ = (curHeadZ - this.prevHeadZ) / max(0.001, dt);
         this.prevHeadZ = curHeadZ;
 
-        const curHeadPitch = this.camera.rotation.x;
+        const curHeadPitch = -m[9];
         const pitchVel = (curHeadPitch - this.prevHeadPitch) / max(0.001, dt);
         this.prevHeadPitch = curHeadPitch;
 
-        if ((headVelZ < -0.26 || pitchVel < -1.3) && !this.isFalling && !this.isStabbing) {
+        if ((headVelZ < -0.70 || pitchVel < -2.2) && !this.isFalling && !this.isStabbing) {
           this.stab();
-        }
-
-        const curHeadY = this.camera.position.y;
-        const headVelY = (curHeadY - this.prevHeadY) / max(0.001, dt);
-        this.prevHeadY = curHeadY;
-        if (headVelY > 0.70 && !this.isFalling && this.isGrounded) {
-          this.jump();
         }
       }
     }

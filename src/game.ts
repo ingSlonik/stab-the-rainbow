@@ -760,10 +760,10 @@ export class Game {
 
       // 3. Hard mode: Head nod in GameOver restarts
       if (isHard && this.state === GameState.GAMEOVER) {
-        const curHeadZ = this.camera.position.z;
+        const curHeadZ = this.camera?.matrixWorld.elements[14] ?? 0;
         const headVelZ = (curHeadZ - this.prevHeadZ) / max(0.001, dt);
         this.prevHeadZ = curHeadZ;
-        if (headVelZ < -0.38) {
+        if (headVelZ < -0.75) {
           this.restartGame();
         }
       }
@@ -818,6 +818,7 @@ export class Game {
       if (this.fallTimer >= 1.05) {
         this.player.stopFalling();
         this.state = GameState.GAMEOVER;
+        this.prevHeadZ = this.camera?.matrixWorld.elements[14] ?? 0;
         this.ui.setGameOverPosition(this.player.getPlayerWorldX(), this.player.root.position.y, isVR);
         this.player.setMenuMode(isVR, isVR ? this.rightControllerEl?.object3D : null);
       }
